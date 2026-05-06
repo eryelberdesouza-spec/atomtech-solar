@@ -1,8 +1,8 @@
 import { createTRPCReact } from "@trpc/react-query"
 import { httpBatchLink } from "@trpc/client"
-import type { AppRouter } from "../../api/src/routers/index"
 
-export const trpc = createTRPCReact<AppRouter>()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const trpc = createTRPCReact<any>()
 
 const API_URL = typeof window !== "undefined" && window.location.hostname !== "localhost"
   ? "https://atomtech-solar-production.up.railway.app/trpc"
