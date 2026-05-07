@@ -40,8 +40,12 @@ function renderTexto(txt: string | undefined | null): string {
 }
 
 const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Calibri:wght@300;400;600;700&display=swap');
+  @font-face { font-family: 'Calibri'; src: local('Calibri Light'), local('Calibri'), local('Carlito'); font-weight: 300; }
+  @font-face { font-family: 'Calibri'; src: local('Calibri'), local('Carlito'); font-weight: 400; }
+  @font-face { font-family: 'Calibri'; src: local('Calibri Bold'), local('Calibri'), local('Carlito'); font-weight: 700; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #222; background: white; font-size: 14px; line-height: 1.7; }
+  body { font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; font-weight: 300; color: #222; background: white; font-size: 14px; line-height: 1.7; }
   .page { width: 210mm; min-height: 297mm; position: relative; overflow: hidden; display: flex; flex-direction: column; page-break-after: always; }
   .capa { background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%); width: 210mm; min-height: 297mm; display: flex; flex-direction: column; position: relative; overflow: hidden; }
   .capa-top { padding: 28px 36px 0; display: flex; justify-content: space-between; align-items: center; }
