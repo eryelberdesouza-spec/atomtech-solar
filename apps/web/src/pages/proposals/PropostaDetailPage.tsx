@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import {
@@ -13,9 +13,9 @@ import { abrirPdfNoNavegador } from '../../lib/gerarPdfBrowser'
 
 const TABS = [
   { id: 'dimensionamento', label: 'Dimensionamento' },
-  { id: 'financeiro',      label: 'Análise Financeira' },
-  { id: 'precificacao',    label: 'Precificação' },
-  { id: 'pagamento',       label: 'Condições Comerciais' },
+  { id: 'financeiro',      label: 'AnÃ¡lise Financeira' },
+  { id: 'precificacao',    label: 'PrecificaÃ§Ã£o' },
+  { id: 'pagamento',       label: 'CondiÃ§Ãµes Comerciais' },
   { id: 'blocos',          label: 'Blocos da Proposta' },
 ]
 
@@ -44,17 +44,17 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
-  if (!dim) return <EmptyState icon="☀️" title="Dimensionamento não calculado" />
+  if (!dim) return <EmptyState icon="â˜€ï¸" title="Dimensionamento nÃ£o calculado" />
 
   const kpis = [
-    { label: 'Potência Final',    value: formatKwp(dim.potenciaFinalKwp),           color: C.solar },
-    { label: 'Potência Recom.',   value: formatKwp(dim.potenciaRecomendadaKwp),     color: C.textMuted },
-    { label: 'Geração Anual',     value: formatKwh(dim.geracaoAnualKwh),            color: C.green },
-    { label: 'Geração/Mês',       value: formatKwh(Number(dim.geracaoAnualKwh)/12), color: C.green },
-    { label: 'Área Estimada',     value: `${Number(dim.areaEstimadaM2).toFixed(1)} m²`, color: C.accent },
-    { label: '% Compensação',     value: formatPct(dim.percentualCompensacao),      color: C.success },
-    { label: 'Módulos',           value: dim.quantidadeModulos ?? '—',              color: C.text },
-    { label: 'Economia/Mês Est.', value: formatCurrency(dim.economiaMensalEstimada), color: C.solar },
+    { label: 'PotÃªncia Final',    value: formatKwp(dim.potenciaFinalKwp),           color: C.solar },
+    { label: 'PotÃªncia Recom.',   value: formatKwp(dim.potenciaRecomendadaKwp),     color: C.textMuted },
+    { label: 'GeraÃ§Ã£o Anual',     value: formatKwh(dim.geracaoAnualKwh),            color: C.green },
+    { label: 'GeraÃ§Ã£o/MÃªs',       value: formatKwh(Number(dim.geracaoAnualKwh)/12), color: C.green },
+    { label: 'Ãrea Estimada',     value: `${Number(dim.areaEstimadaM2).toFixed(1)} mÂ²`, color: C.accent },
+    { label: '% CompensaÃ§Ã£o',     value: formatPct(dim.percentualCompensacao),      color: C.success },
+    { label: 'MÃ³dulos',           value: dim.quantidadeModulos ?? 'â€”',              color: C.text },
+    { label: 'Economia/MÃªs Est.', value: formatCurrency(dim.economiaMensalEstimada), color: C.solar },
   ]
 
   return (
@@ -70,46 +70,46 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
 
       <Card style={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>Parâmetros Técnicos</p>
-          <Btn size="sm" variant="ghost" onClick={() => setEditando(!editando)}>{editando ? '✖ Cancelar' : '✏️ Editar'}</Btn>
+          <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>ParÃ¢metros TÃ©cnicos</p>
+          <Btn size="sm" variant="ghost" onClick={() => setEditando(!editando)}>{editando ? 'âœ– Cancelar' : 'âœï¸ Editar'}</Btn>
         </div>
         {!editando ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
               ['Topologia', dim.topologia], ['Tipo de Sistema', dim.tipoSistema?.replace('_', ' ')],
-              ['Tipo de Telhado', dim.tipoTelhado], ['Desvio Azimutal', `${dim.desvioAzimutal ?? 0}°`],
-              ['Inclinação', `${dim.inclinacaoGraus ?? 0}°`],
-              ['Tarifa Usada', dim.tarifaUsada ? `R$ ${Number(dim.tarifaUsada).toFixed(4)}/kWh` : '—'],
+              ['Tipo de Telhado', dim.tipoTelhado], ['Desvio Azimutal', `${dim.desvioAzimutal ?? 0}Â°`],
+              ['InclinaÃ§Ã£o', `${dim.inclinacaoGraus ?? 0}Â°`],
+              ['Tarifa Usada', dim.tarifaUsada ? `R$ ${Number(dim.tarifaUsada).toFixed(4)}/kWh` : 'â€”'],
             ].map(([k, v]) => (
               <div key={k} style={{ borderBottom: `1px solid ${C.darkBorder}`, paddingBottom: 8 }}>
                 <span style={{ color: C.textDim, fontSize: 11 }}>{k}: </span>
-                <span style={{ color: C.text, fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{v ?? '—'}</span>
+                <span style={{ color: C.text, fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{v ?? 'â€”'}</span>
               </div>
             ))}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Input label="Potência Final (kWp)" type="number" value={form.potenciaFinalKwp} onChange={e => set('potenciaFinalKwp', Number(e.target.value))} />
-              <Input label="Qtd. Módulos" type="number" value={form.quantidadeModulos} onChange={e => set('quantidadeModulos', Number(e.target.value))} />
+              <Input label="PotÃªncia Final (kWp)" type="number" value={form.potenciaFinalKwp} onChange={e => set('potenciaFinalKwp', Number(e.target.value))} />
+              <Input label="Qtd. MÃ³dulos" type="number" value={form.quantidadeModulos} onChange={e => set('quantidadeModulos', Number(e.target.value))} />
             </div>
-            <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: '4px 0 0' }}>Módulos</p>
+            <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: '4px 0 0' }}>MÃ³dulos</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 12 }}>
               <Input label="Fabricante" value={form.fabricanteModulo} onChange={e => set('fabricanteModulo', e.target.value)} placeholder="Ex: JA Solar" />
               <Input label="Modelo" value={form.modeloModulo} onChange={e => set('modeloModulo', e.target.value)} placeholder="Ex: JAM72S30-620" />
-              <Input label="Potência (Wp)" type="number" value={form.potenciaModuloWp} onChange={e => set('potenciaModuloWp', Number(e.target.value))} />
+              <Input label="PotÃªncia (Wp)" type="number" value={form.potenciaModuloWp} onChange={e => set('potenciaModuloWp', Number(e.target.value))} />
             </div>
             <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: '4px 0 0' }}>Inversores / Microinversores</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 100px', gap: 12 }}>
               <Input label="Fabricante" value={form.fabricanteInversor} onChange={e => set('fabricanteInversor', e.target.value)} placeholder="Ex: Sungrow" />
               <Input label="Modelo" value={form.modeloInversor} onChange={e => set('modeloInversor', e.target.value)} placeholder="Ex: SG5.0RT" />
-              <Input label="Potência (Wp)" type="number" value={form.potenciaInversorWp} onChange={e => set('potenciaInversorWp', Number(e.target.value))} />
+              <Input label="PotÃªncia (Wp)" type="number" value={form.potenciaInversorWp} onChange={e => set('potenciaInversorWp', Number(e.target.value))} />
               <Input label="Quantidade" type="number" value={form.quantidadeInversores} onChange={e => set('quantidadeInversores', Number(e.target.value))} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
               <Btn onClick={() => updateDim.mutate({ propostaId, ...form })} disabled={updateDim.isPending}>
-                {updateDim.isPending ? '⏳ Salvando...' : '✔ Salvar Alterações'}
+                {updateDim.isPending ? 'â³ Salvando...' : 'âœ” Salvar AlteraÃ§Ãµes'}
               </Btn>
             </div>
           </div>
@@ -122,7 +122,7 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: C.dark }}>
-                {['Tipo', 'Fabricante / Modelo', 'Qtd.', 'Potência', 'Garantia'].map(h => (
+                {['Tipo', 'Fabricante / Modelo', 'Qtd.', 'PotÃªncia', 'Garantia'].map(h => (
                   <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
@@ -130,11 +130,11 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
             <tbody>
               {equips.map((eq: any) => (
                 <tr key={eq.id} style={{ borderTop: `1px solid ${C.darkBorder}` }}>
-                  <td style={{ padding: '10px 12px', color: C.text, fontWeight: 600 }}>{eq.tipo === 'modulo' ? 'Módulos Fotovoltaicos' : eq.tipo === 'microinversor' ? 'Microinversor(es)' : 'Inversor(es)'}</td>
-                  <td style={{ padding: '10px 12px', color: C.textMuted }}>{[eq.fabricante, eq.modelo].filter(Boolean).join(' — ') || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: C.text, fontWeight: 600 }}>{eq.tipo === 'modulo' ? 'MÃ³dulos Fotovoltaicos' : eq.tipo === 'microinversor' ? 'Microinversor(es)' : 'Inversor(es)'}</td>
+                  <td style={{ padding: '10px 12px', color: C.textMuted }}>{[eq.fabricante, eq.modelo].filter(Boolean).join(' â€” ') || 'â€”'}</td>
                   <td style={{ padding: '10px 12px', color: C.solar, fontWeight: 700 }}>{eq.quantidade}</td>
-                  <td style={{ padding: '10px 12px', color: C.text }}>{eq.potenciaWp ? `${eq.tipo === 'modulo' ? eq.potenciaWp + ' Wp' : (eq.potenciaWp/1000).toFixed(1) + ' kW'}` : '—'}</td>
-                  <td style={{ padding: '10px 12px', color: C.green }}>{eq.garantiaAnos ? `${eq.garantiaAnos} anos` : '—'}</td>
+                  <td style={{ padding: '10px 12px', color: C.text }}>{eq.potenciaWp ? `${eq.tipo === 'modulo' ? eq.potenciaWp + ' Wp' : (eq.potenciaWp/1000).toFixed(1) + ' kW'}` : 'â€”'}</td>
+                  <td style={{ padding: '10px 12px', color: C.green }}>{eq.garantiaAnos ? `${eq.garantiaAnos} anos` : 'â€”'}</td>
                 </tr>
               ))}
             </tbody>
@@ -146,19 +146,19 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
 }
 
 function TabFinanceiro({ af }: any) {
-  if (!af) return <EmptyState icon="📈" title="Análise financeira não disponível" />
+  if (!af) return <EmptyState icon="ðŸ“ˆ" title="AnÃ¡lise financeira nÃ£o disponÃ­vel" />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: `${C.solar}10`, border: `1px solid ${C.solar}30`, borderRadius: 10, padding: '14px 18px' }}>
-        <p style={{ color: C.textDim, fontSize: 12, margin: '0 0 4px' }}>A análise financeira é recalculada automaticamente quando você edita a precificação ou o dimensionamento.</p>
+        <p style={{ color: C.textDim, fontSize: 12, margin: '0 0 4px' }}>A anÃ¡lise financeira Ã© recalculada automaticamente quando vocÃª edita a precificaÃ§Ã£o ou o dimensionamento.</p>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {[
           { label: 'Payback Simples', value: formatPayback(af.paybackSimplesMeses), color: C.solar },
           { label: 'VPL (25 anos)', value: formatCurrency(af.vpl ?? af.vpl25Anos), color: C.green },
           { label: 'TIR', value: `${Number(af.tir).toFixed(2)}%`, color: C.accent },
-          { label: 'Geração Anual', value: formatKwh(af.geracaoAnualKwh ?? af.investimentoTotal), color: C.green },
+          { label: 'GeraÃ§Ã£o Anual', value: formatKwh(af.geracaoAnualKwh ?? af.investimentoTotal), color: C.green },
           { label: 'Economia Ano 1', value: formatCurrency(af.economiaAnualAno1 ?? af.economiaAno1), color: C.solar },
           { label: 'Saldo 25 Anos', value: formatCurrency(af.saldo25Anos ?? af.saldoAcumulado25Anos), color: C.green },
         ].map(k => (
@@ -191,7 +191,7 @@ function TabPrecificacao({ prec, propostaId }: any) {
   })
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
-  if (!prec) return <EmptyState icon="💰" title="Precificação não disponível" />
+  if (!prec) return <EmptyState icon="ðŸ’°" title="PrecificaÃ§Ã£o nÃ£o disponÃ­vel" />
 
   const custoTotal = form.custoKit + form.custoInstalacaoModulos + form.custoInstalacaoInversor + form.custoProjeto
   const precoVenda = custoTotal * (1 + form.margemOverride / 100)
@@ -201,8 +201,8 @@ function TabPrecificacao({ prec, propostaId }: any) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card style={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Composição de Preço</p>
-          <Btn size="sm" variant="ghost" onClick={() => setEditando(!editando)}>{editando ? '✖ Cancelar' : '✏️ Editar'}</Btn>
+          <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>ComposiÃ§Ã£o de PreÃ§o</p>
+          <Btn size="sm" variant="ghost" onClick={() => setEditando(!editando)}>{editando ? 'âœ– Cancelar' : 'âœï¸ Editar'}</Btn>
         </div>
 
         {!editando ? (
@@ -210,10 +210,10 @@ function TabPrecificacao({ prec, propostaId }: any) {
             {[
               { label: 'Custo Total', value: prec.custoTotal, color: C.text },
               { label: 'Margem Aplicada', value: `${Number(prec.margemAplicada).toFixed(1)}%`, color: C.textMuted, isPercent: true },
-              { label: 'Preço de Venda', value: prec.precoVenda, color: C.text },
+              { label: 'PreÃ§o de Venda', value: prec.precoVenda, color: C.text },
               { label: 'Desconto Aplicado', value: prec.descontoAplicado, color: C.danger },
             ].map(r => (
-              (Number(r.value) !== 0 || r.label === 'Custo Total' || r.label === 'Preço de Venda') && (
+              (Number(r.value) !== 0 || r.label === 'Custo Total' || r.label === 'PreÃ§o de Venda') && (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${C.darkBorder}40` }}>
                   <span style={{ color: C.textMuted, fontSize: 13 }}>{r.label}</span>
                   <span style={{ color: r.color, fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>
@@ -223,7 +223,7 @@ function TabPrecificacao({ prec, propostaId }: any) {
               )
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', borderTop: `1px solid ${C.darkBorder}`, marginTop: 6 }}>
-              <span style={{ color: C.text, fontSize: 15, fontWeight: 700 }}>Preço Final</span>
+              <span style={{ color: C.text, fontSize: 15, fontWeight: 700 }}>PreÃ§o Final</span>
               <span style={{ color: C.solar, fontSize: 18, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(prec.precoFinal)}</span>
             </div>
           </div>
@@ -231,25 +231,25 @@ function TabPrecificacao({ prec, propostaId }: any) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Input label="Custo do Kit (R$)" type="number" value={form.custoKit || ''} onChange={e => set('custoKit', Number(e.target.value))} />
-              <Input label="Custo Instalação Módulos (R$)" type="number" value={form.custoInstalacaoModulos || ''} onChange={e => set('custoInstalacaoModulos', Number(e.target.value))} placeholder="0" />
-              <Input label="Custo Instalação Inversor (R$)" type="number" value={form.custoInstalacaoInversor || ''} onChange={e => set('custoInstalacaoInversor', Number(e.target.value))} placeholder="0" />
+              <Input label="Custo InstalaÃ§Ã£o MÃ³dulos (R$)" type="number" value={form.custoInstalacaoModulos || ''} onChange={e => set('custoInstalacaoModulos', Number(e.target.value))} placeholder="0" />
+              <Input label="Custo InstalaÃ§Ã£o Inversor (R$)" type="number" value={form.custoInstalacaoInversor || ''} onChange={e => set('custoInstalacaoInversor', Number(e.target.value))} placeholder="0" />
               <Input label="Custo de Projeto (R$)" type="number" value={form.custoProjeto || ''} onChange={e => set('custoProjeto', Number(e.target.value))} placeholder="0" />
               <Input label="Margem (%)" type="number" value={form.margemOverride || ''} onChange={e => set('margemOverride', Number(e.target.value))} suffix="%" />
-              <Input label="Comissão (%)" type="number" value={form.comissao || ''} onChange={e => set('comissao', Number(e.target.value))} placeholder="0" suffix="%" />
-              <Input label="Desconto à Vista (%)" type="number" value={form.descontoAplicado || ''} onChange={e => set('descontoAplicado', Number(e.target.value))} placeholder="0" suffix="%" />
+              <Input label="ComissÃ£o (%)" type="number" value={form.comissao || ''} onChange={e => set('comissao', Number(e.target.value))} placeholder="0" suffix="%" />
+              <Input label="Desconto Ã  Vista (%)" type="number" value={form.descontoAplicado || ''} onChange={e => set('descontoAplicado', Number(e.target.value))} placeholder="0" suffix="%" />
             </div>
             <div style={{ background: `${C.solar}10`, border: `1px solid ${C.solar}30`, borderRadius: 10, padding: '12px 16px' }}>
-              <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 8px' }}>Preview do Novo Preço</p>
+              <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 8px' }}>Preview do Novo PreÃ§o</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>Custo Total</p><p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(custoTotal)}</p></div>
-                <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>Preço de Venda</p><p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(precoVenda)}</p></div>
-                <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>Preço Final</p><p style={{ color: C.solar, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(precoFinal)}</p></div>
+                <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>PreÃ§o de Venda</p><p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(precoVenda)}</p></div>
+                <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>PreÃ§o Final</p><p style={{ color: C.solar, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(precoFinal)}</p></div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
               <Btn onClick={() => updatePrec.mutate({ propostaId, ...form })} disabled={updatePrec.isPending}>
-                {updatePrec.isPending ? '⏳ Salvando...' : '✔ Salvar Alterações'}
+                {updatePrec.isPending ? 'â³ Salvando...' : 'âœ” Salvar AlteraÃ§Ãµes'}
               </Btn>
             </div>
           </div>
@@ -271,10 +271,10 @@ function TabPagamento({ condicoes, propostaId }: any) {
   const [formAvista, setFormAvista] = useState({ desconto: 0, prazoDias: 0, tipoPrazo: 'corridos' })
 
   const tipos: Record<string, string> = {
-    avista: '💰 À Vista',
-    parcelado_marcos: '📋 Parcelado por Marcos',
-    financiamento: '🏪 Financiamento Bancário',
-    cartao: '💳 Cartão de Crédito',
+    avista: 'ðŸ’° Ã€ Vista',
+    parcelado_marcos: 'ðŸ“‹ Parcelado por Marcos',
+    financiamento: 'ðŸª Financiamento BancÃ¡rio',
+    cartao: 'ðŸ’³ CartÃ£o de CrÃ©dito',
   }
 
   const iniciarEdicao = (c: any) => {
@@ -290,7 +290,7 @@ function TabPagamento({ condicoes, propostaId }: any) {
     setEditandoId(c.id)
   }
 
-  if (!condicoes?.length) return <EmptyState icon="💳" title="Condições comerciais não configuradas" />
+  if (!condicoes?.length) return <EmptyState icon="ðŸ’³" title="CondiÃ§Ãµes comerciais nÃ£o configuradas" />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -306,14 +306,14 @@ function TabPagamento({ condicoes, propostaId }: any) {
                 <div style={{ width: 4, height: 20, borderRadius: 2, background: i === 0 ? C.solar : i === 1 ? C.green : C.accent }} />
                 <span style={{ color: C.text, fontSize: 14, fontWeight: 700 }}>{tipos[c.tipo] ?? c.tipo}</span>
                 {c.tipo === 'parcelado_marcos' && (
-                  <span style={{ fontSize: 10, color: C.solar, background: `${C.solar}18`, padding: '2px 8px', borderRadius: 20 }}>Padrão Atom Tech</span>
+                  <span style={{ fontSize: 10, color: C.solar, background: `${C.solar}18`, padding: '2px 8px', borderRadius: 20 }}>PadrÃ£o Atom Tech</span>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: C.solar, fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(c.valorTotal)}</span>
                 {podeEditar && (
                   <Btn size="sm" variant="ghost" onClick={() => isEditando ? setEditandoId(null) : iniciarEdicao(c)}>
-                    {isEditando ? '✖ Cancelar' : '✏️ Editar'}
+                    {isEditando ? 'âœ– Cancelar' : 'âœï¸ Editar'}
                   </Btn>
                 )}
               </div>
@@ -323,7 +323,7 @@ function TabPagamento({ condicoes, propostaId }: any) {
               <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${C.darkBorder}40` }}>
                 <div>
                   <span style={{ color: C.text, fontSize: 12, fontWeight: 500 }}>{p.descricaoEvento}</span>
-                  {p.prazoDias > 0 && <span style={{ color: C.textDim, fontSize: 11, marginLeft: 8 }}>(até {p.prazoDias} dias {p.tipoPrazo})</span>}
+                  {p.prazoDias > 0 && <span style={{ color: C.textDim, fontSize: 11, marginLeft: 8 }}>(atÃ© {p.prazoDias} dias {p.tipoPrazo})</span>}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ color: C.text, fontSize: 13, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(p.valor)}</span>
@@ -340,7 +340,7 @@ function TabPagamento({ condicoes, propostaId }: any) {
                     <input type="number" min={0} max={30} step={0.5} value={formAvista.desconto}
                       onChange={e => setFormAvista(f => ({ ...f, desconto: Number(e.target.value) }))}
                       style={{ width: '100%', padding: '8px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 14, fontWeight: 700, outline: 'none' }} />
-                    {formAvista.desconto > 0 && <p style={{ color: C.green, fontSize: 12, margin: '4px 0 0', fontWeight: 600 }}>→ {formatCurrency(Number(c.valorTotal) * (1 - formAvista.desconto / 100))}</p>}
+                    {formAvista.desconto > 0 && <p style={{ color: C.green, fontSize: 12, margin: '4px 0 0', fontWeight: 600 }}>â†’ {formatCurrency(Number(c.valorTotal) * (1 - formAvista.desconto / 100))}</p>}
                   </div>
                   <div>
                     <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Prazo (dias)</label>
@@ -352,7 +352,7 @@ function TabPagamento({ condicoes, propostaId }: any) {
                     <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Tipo</label>
                     <select value={formAvista.tipoPrazo} onChange={e => setFormAvista(f => ({ ...f, tipoPrazo: e.target.value }))}
                       style={{ width: '100%', padding: '8px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.textMuted, fontSize: 12, outline: 'none' }}>
-                      <option value="uteis">Dias Úteis</option>
+                      <option value="uteis">Dias Ãšteis</option>
                       <option value="corridos">Dias Corridos</option>
                     </select>
                   </div>
@@ -362,13 +362,13 @@ function TabPagamento({ condicoes, propostaId }: any) {
                   <Btn onClick={() => {
                     const valorFinal = formAvista.desconto > 0 ? Number(c.valorTotal) * (1 - formAvista.desconto / 100) : Number(c.valorTotal)
                     updateCond.mutate({ propostaId, condicaoId: c.id,
-                      descricao: formAvista.desconto > 0 ? `Pagamento à Vista — ${formAvista.desconto}% de desconto` : 'Pagamento à Vista',
+                      descricao: formAvista.desconto > 0 ? `Pagamento Ã  Vista â€” ${formAvista.desconto}% de desconto` : 'Pagamento Ã  Vista',
                       valorTotal: valorFinal,
-                      parcelas: [{ numeroParcela: 1, descricaoEvento: formAvista.desconto > 0 ? `À vista com ${formAvista.desconto}% de desconto` : 'Pagamento à vista',
+                      parcelas: [{ numeroParcela: 1, descricaoEvento: formAvista.desconto > 0 ? `Ã€ vista com ${formAvista.desconto}% de desconto` : 'Pagamento Ã  vista',
                         percentualDoTotal: 100, valor: valorFinal, prazoDias: formAvista.prazoDias, tipoPrazo: formAvista.tipoPrazo as any }],
                     })
                   }} disabled={updateCond.isPending}>
-                    {updateCond.isPending ? '⏳ Salvando...' : '✔ Salvar'}
+                    {updateCond.isPending ? 'â³ Salvando...' : 'âœ” Salvar'}
                   </Btn>
                 </div>
               </div>
@@ -388,20 +388,20 @@ function TabPagamento({ condicoes, propostaId }: any) {
                       style={{ width: '100%', padding: '7px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
                     <select value={p.tipoPrazo} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], tipoPrazo: e.target.value }; setFormParcelas(n) }}
                       style={{ padding: '7px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.textMuted, fontSize: 11, outline: 'none' }}>
-                      <option value="uteis">úteis</option>
+                      <option value="uteis">Ãºteis</option>
                       <option value="corridos">corridos</option>
                     </select>
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: `1px solid ${C.darkBorder}` }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: Math.abs(totalPct - 100) < 0.01 ? C.green : C.danger }}>
-                    Total: {totalPct.toFixed(0)}% {Math.abs(totalPct - 100) < 0.01 ? '✔' : '⚠ deve ser 100%'}
+                    Total: {totalPct.toFixed(0)}% {Math.abs(totalPct - 100) < 0.01 ? 'âœ”' : 'âš  deve ser 100%'}
                   </span>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Btn variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
                     <Btn disabled={Math.abs(totalPct - 100) > 0.01 || updateCond.isPending}
                       onClick={() => updateCond.mutate({ propostaId, condicaoId: c.id, parcelas: formParcelas })}>
-                      {updateCond.isPending ? '⏳ Salvando...' : '✔ Salvar'}
+                      {updateCond.isPending ? 'â³ Salvando...' : 'âœ” Salvar'}
                     </Btn>
                   </div>
                 </div>
@@ -423,16 +423,16 @@ function TabBlocos({ blocos, propostaId }: any) {
   const [estado, setEstado] = useState<any[]>(blocos ?? [])
 
   const LABELS: Record<string, string> = {
-    capa: 'Capa', apresentacao_empresa: 'Apresentação da Empresa',
+    capa: 'Capa', apresentacao_empresa: 'ApresentaÃ§Ã£o da Empresa',
     o_que_inclui: 'O que inclui', como_funciona: 'Como funciona',
-    regulamentacao: 'Regulamentação', diferenciais: 'Diferenciais',
+    regulamentacao: 'RegulamentaÃ§Ã£o', diferenciais: 'Diferenciais',
     garantias: 'Garantias', fornecedores: 'Fornecedores',
     dimensionamento: 'Dimensionamento', equipamentos: 'Equipamentos',
-    cronograma: 'Cronograma', analise_financeira: 'Análise Financeira',
+    cronograma: 'Cronograma', analise_financeira: 'AnÃ¡lise Financeira',
     indicadores_financeiros: 'Indicadores Financeiros', fluxo_caixa: 'Fluxo de Caixa',
-    reducao_conta: 'Redução da Conta', condicoes_comerciais: 'Condições Comerciais',
+    reducao_conta: 'ReduÃ§Ã£o da Conta', condicoes_comerciais: 'CondiÃ§Ãµes Comerciais',
     formas_pagamento: 'Formas de Pagamento', aceite: 'Aceite da Proposta',
-    contato: 'Contato e Endereço',
+    contato: 'Contato e EndereÃ§o',
   }
 
   const toggle = (id: number) => {
@@ -443,7 +443,7 @@ function TabBlocos({ blocos, propostaId }: any) {
 
   return (
     <div>
-      <p style={{ color: C.textMuted, fontSize: 12, marginBottom: 16 }}>Ative ou desative os blocos que aparecerão no PDF.</p>
+      <p style={{ color: C.textMuted, fontSize: 12, marginBottom: 16 }}>Ative ou desative os blocos que aparecerÃ£o no PDF.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {estado.map((b, i) => (
           <Card key={b.id ?? i} style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', gap: 12, opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s' }}>
@@ -471,7 +471,7 @@ export function PropostaDetailPage() {
   const utils = trpc.useUtils()
 
   const handleGerarPdf = () => {
-    if (!data) { alert('Dados da proposta ainda não carregados.'); return }
+    if (!data) { alert('Dados da proposta ainda nÃ£o carregados.'); return }
     setGerandoPdf(true)
     setTimeout(() => {
       try {
@@ -482,7 +482,7 @@ export function PropostaDetailPage() {
         }
         abrirPdfNoNavegador({ ...data, empresa: { ...data.empresa, ...empresa }, textos })
       } catch (e) {
-        alert('Erro ao gerar PDF. Verifique se popups estão permitidos neste site.')
+        alert('Erro ao gerar PDF. Verifique se popups estÃ£o permitidos neste site.')
         console.error(e)
       } finally {
         setGerandoPdf(false)
@@ -495,7 +495,7 @@ export function PropostaDetailPage() {
       <Spinner size={36} />
     </div>
   )
-  if (!data) return <EmptyState icon="☹" title="Proposta não encontrada" />
+  if (!data) return <EmptyState icon="â˜¹" title="Proposta nÃ£o encontrada" />
 
   const { proposta, dimensionamento, equipamentos, precificacao, analiseFinanceira, condicoesComerciais, blocos } = data
 
@@ -508,7 +508,7 @@ export function PropostaDetailPage() {
   const nextStatus: Record<string, { label: string; status: string; color: string }> = {
     rascunho:  { label: 'Marcar como Enviada', status: 'enviada',  color: C.accent },
     enviada:   { label: 'Marcar como Aceita',  status: 'aceita',   color: C.green },
-    aceita:    { label: 'Proposta Aceita ✔',   status: 'aceita',   color: C.green },
+    aceita:    { label: 'Proposta Aceita âœ”',   status: 'aceita',   color: C.green },
     recusada:  { label: 'Reabrir',             status: 'rascunho', color: C.textMuted },
     expirada:  { label: 'Reabrir',             status: 'rascunho', color: C.textMuted },
   }
@@ -518,7 +518,7 @@ export function PropostaDetailPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '12px 24px', borderBottom: `1px solid ${C.darkBorder}`, background: C.darkMid, display: 'flex', alignItems: 'center', gap: 16 }}>
-        <button onClick={() => navigate('/propostas')} style={{ padding: '6px 12px', borderRadius: 7, border: `1px solid ${C.darkBorder}`, background: 'transparent', color: C.textMuted, cursor: 'pointer', fontSize: 12 }}>← Voltar</button>
+        <button onClick={() => navigate('/propostas')} style={{ padding: '6px 12px', borderRadius: 7, border: `1px solid ${C.darkBorder}`, background: 'transparent', color: C.textMuted, cursor: 'pointer', fontSize: 12 }}>â† Voltar</button>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }}>{proposta.numero}</span>
@@ -528,7 +528,7 @@ export function PropostaDetailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
             <span style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>Proposta {proposta.numero}</span>
             <span style={{ color: C.textDim, fontSize: 12 }}>
-              Emissão: {formatDate(proposta.dataEmissao)}{proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}
+              EmissÃ£o: {formatDate(proposta.dataEmissao)}{proposta.dataValidade && ` Â· Validade: ${formatDate(proposta.dataValidade)}`}
             </span>
           </div>
         </div>
@@ -538,7 +538,7 @@ export function PropostaDetailPage() {
           )}
           <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')} style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
           <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
-            {gerandoPdf ? '⏳ Gerando...' : '↯ Exportar PDF'}
+            {gerandoPdf ? 'â³ Gerando...' : 'â†¯ Exportar PDF'}
           </Btn>
         </div>
       </div>
@@ -557,3 +557,4 @@ export function PropostaDetailPage() {
     </div>
   )
 }
+
