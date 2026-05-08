@@ -1,7 +1,7 @@
-// ═══════════════════════════════════════════════════════════════════
-// App Router — agrega todos os sub-routers
-// Ponto de entrada único para toda a API tRPC
-// ═══════════════════════════════════════════════════════════════════
+﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// App Router â€” agrega todos os sub-routers
+// Ponto de entrada Ãºnico para toda a API tRPC
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 import { router } from './trpc'
 import { authRouter }      from './auth.router'
@@ -13,6 +13,7 @@ import { premissasRouter } from './premissas.router'
 import { pdfRouter }       from './pdf.router'
 import { calculoRouter }   from './calculo.router'
 import { usuarioRouter }   from './usuario.router'
+import { textoRouter }     from './texto.router'
 
 export const appRouter = router({
   auth:     authRouter,
@@ -24,6 +25,8 @@ export const appRouter = router({
   calculo:  calculoRouter,
   pdf:      pdfRouter,
   usuario:  usuarioRouter,
+  textoInstitucional: textoRouter,
 })
 
 export type AppRouter = typeof appRouter
+
