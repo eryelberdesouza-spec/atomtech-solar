@@ -1,5 +1,5 @@
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ConfiguraÃ§Ãµes â€” Empresa, Premissas, PrecificaÃ§Ã£o, Textos, UsuÃ¡rios
+// Configurações â€” Empresa, Premissas, Precificação, Textos, Usuários
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 import { useState } from 'react'
@@ -46,19 +46,19 @@ function AbaEmpresa() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 780 }}>
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 16px' }}>
-          IdentificaÃ§Ã£o
+          Identificação
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Input label="Nome da Empresa" value={val('nome')} onChange={e => set('nome', e.target.value)} />
           <Input label="CNPJ" value={val('cnpj')} onChange={e => set('cnpj', e.target.value)} />
-          <Input label="InscriÃ§Ã£o Estadual" value={val('inscricaoEstadual')} onChange={e => set('inscricaoEstadual', e.target.value)} />
+          <Input label="Inscrição Estadual" value={val('inscricaoEstadual')} onChange={e => set('inscricaoEstadual', e.target.value)} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16 }}>
             <Toggle checked={val('isentoIE') || false} onChange={v => set('isentoIE', v)} />
             <span style={{ color: C.textMuted, fontSize: 13 }}>Isento de IE</span>
           </div>
           <Input label="Estado (UF)" value={val('estado')} onChange={e => set('estado', e.target.value)} />
           <Input label="Cidade" value={val('cidade')} onChange={e => set('cidade', e.target.value)} />
-          <Input label="EndereÃ§o" value={val('endereco')} onChange={e => set('endereco', e.target.value)} style={{ gridColumn: 'span 2' } as any} />
+          <Input label="Endereço" value={val('endereco')} onChange={e => set('endereco', e.target.value)} style={{ gridColumn: 'span 2' } as any} />
           <Input label="CEP" value={val('cep')} onChange={e => set('cep', e.target.value)} />
           <Input label="Telefone" value={val('telefone')} onChange={e => set('telefone', e.target.value)} />
           <Input label="E-mail" type="email" value={val('email')} onChange={e => set('email', e.target.value)} />
@@ -73,31 +73,31 @@ function AbaEmpresa() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Input label="URL do Logotipo" value={val('logoUrl')} onChange={e => set('logoUrl', e.target.value)} placeholder="https://..." />
           <div />
-          <Input label="Cor PrimÃ¡ria" type="color" value={val('corPrimaria') || '#F5A623'} onChange={e => set('corPrimaria', e.target.value)} />
-          <Input label="Cor SecundÃ¡ria" type="color" value={val('corSecundaria') || '#2D9C4E'} onChange={e => set('corSecundaria', e.target.value)} />
+          <Input label="Cor Primária" type="color" value={val('corPrimaria') || '#F5A623'} onChange={e => set('corPrimaria', e.target.value)} />
+          <Input label="Cor Secundária" type="color" value={val('corSecundaria') || '#2D9C4E'} onChange={e => set('corSecundaria', e.target.value)} />
         </div>
       </Card>
 
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 16px' }}>
-          Dados BancÃ¡rios (usados nas condiÃ§Ãµes de pagamento)
+          Dados Bancários (usados nas condições de pagamento)
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
           <Input label="Nome do Banco" value={val('bancoNome')} onChange={e => set('bancoNome', e.target.value)} />
-          <Input label="CÃ³digo do Banco" value={val('bancoCodigo')} onChange={e => set('bancoCodigo', e.target.value)} />
+          <Input label="Código do Banco" value={val('bancoCodigo')} onChange={e => set('bancoCodigo', e.target.value)} />
           <Input label="AgÃªncia" value={val('bancoAgencia')} onChange={e => set('bancoAgencia', e.target.value)} />
           <Input label="Conta" value={val('bancoConta')} onChange={e => set('bancoConta', e.target.value)} />
           <Select label="Tipo" value={val('bancoTipo') || ''} onChange={e => set('bancoTipo', e.target.value)}
-            options={[{ value: '', label: 'Selecione...' }, { value: 'corrente', label: 'Corrente' }, { value: 'poupanÃ§a', label: 'PoupanÃ§a' }]} />
+            options={[{ value: '', label: 'Selecione...' }, { value: 'corrente', label: 'Corrente' }, { value: 'poupança', label: 'Poupança' }]} />
           <Select label="Tipo da Chave PIX" value={val('bancoPixTipo') || ''} onChange={e => set('bancoPixTipo', e.target.value)}
-            options={[{ value: '', label: 'Selecione...' }, { value: 'cnpj', label: 'CNPJ' }, { value: 'cpf', label: 'CPF' }, { value: 'email', label: 'E-mail' }, { value: 'telefone', label: 'Telefone' }, { value: 'aleatorio', label: 'AleatÃ³ria' }]} />
+            options={[{ value: '', label: 'Selecione...' }, { value: 'cnpj', label: 'CNPJ' }, { value: 'cpf', label: 'CPF' }, { value: 'email', label: 'E-mail' }, { value: 'telefone', label: 'Telefone' }, { value: 'aleatorio', label: 'Aleatória' }]} />
           <Input label="Chave PIX" value={val('bancoPixChave')} onChange={e => set('bancoPixChave', e.target.value)} style={{ gridColumn: 'span 2' } as any} />
         </div>
       </Card>
 
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 16px' }}>
-          RodapÃ© das Propostas
+          Rodapé das Propostas
         </p>
         <textarea
           value={val('rodapeTexto')}
@@ -108,7 +108,7 @@ function AbaEmpresa() {
             background: C.dark, border: `1px solid ${C.darkBorder}`,
             color: C.text, fontSize: 13, resize: 'vertical', outline: 'none',
           }}
-          placeholder="Atom Tech â€” Energia Solar e Tecnologia | BrasÃ­lia/DF | contato@atomtech.tec.br"
+          placeholder="Atom Tech â€” Energia Solar e Tecnologia | Brasília/DF | contato@atomtech.tec.br"
         />
       </Card>
 
@@ -117,7 +117,7 @@ function AbaEmpresa() {
           <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>âœ” Salvo com sucesso</span>
         )}
         <Btn onClick={handleSave} disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? 'Salvando...' : 'Salvar ConfiguraÃ§Ãµes'}
+          {updateMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
         </Btn>
       </div>
     </div>
@@ -204,7 +204,7 @@ function AbaPremissas() {
           Premissas Financeiras
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-          <Input label="InflaÃ§Ã£o EnergÃ©tica (% a.a.)" {...num('inflacaoEnergetica')} suffix="%" />
+          <Input label="Inflação Energética (% a.a.)" {...num('inflacaoEnergetica')} suffix="%" />
           <Input label="Taxa de Desconto VPL (% a.a.)" {...num('taxaDescontoVpl')} suffix="%" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18 }}>
             <Toggle
@@ -224,8 +224,8 @@ function AbaPremissas() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           <Input label="Sobredimensionamento (%)" {...num('sobredimensionamentoPadrao')} suffix="%" />
           <Input label="Margem PotÃªncia Ideal (%)" {...num('margemPotenciaIdeal')} suffix="%" />
-          <Input label="Desvio Azimutal PadrÃ£o (Â°)" {...num('desvioAzimutalPadrao')} suffix="Â°" />
-          <Input label="InclinaÃ§Ã£o PadrÃ£o (Â°)" {...num('inclinacaoPadrao')} suffix="Â°" />
+          <Input label="Desvio Azimutal Padrão (Â°)" {...num('desvioAzimutalPadrao')} suffix="Â°" />
+          <Input label="Inclinação Padrão (Â°)" {...num('inclinacaoPadrao')} suffix="Â°" />
           <Input label="Perda Efic. Anual Trad. (%)" {...num('perdaEficienciaAnualTradicional')} suffix="%" />
           <Input label="Perda Efic. Anual Micro. (%)" {...num('perdaEficienciaAnualMicroinversor')} suffix="%" />
           <Input label="Perda Efic. Anual Otim. (%)" {...num('perdaEficienciaAnualOtimizador')} suffix="%" />
@@ -243,13 +243,13 @@ function AbaPremissas() {
           Ãrea Ãštil por Tipo de Telhado
         </p>
         <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 14px' }}>
-          mÂ² de Ã¡rea necessÃ¡ria por mÂ² de mÃ³dulo instalado
+          mÂ² de área necessária por mÂ² de módulo instalado
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {[
-            ['Carport', 'areaCarport'], ['CerÃ¢mico', 'areaCeramico'],
+            ['Carport', 'areaCarport'], ['Cerâmico', 'areaCeramico'],
             ['Fibrocimento', 'areaFibrocimento'], ['Laje', 'areaLaje'],
-            ['Shingle', 'areaShingle'], ['MetÃ¡lico', 'areaMetalico'],
+            ['Shingle', 'areaShingle'], ['Metálico', 'areaMetalico'],
             ['Zipado', 'areaZipado'], ['Solo', 'areaSolo'],
           ].map(([label, key]) => (
             <Input key={key} label={label} {...num(key)} suffix="mÂ²/mÂ²" />
@@ -257,14 +257,14 @@ function AbaPremissas() {
         </div>
       </Card>
 
-      {/* PrecificaÃ§Ã£o */}
+      {/* Precificação */}
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 16px' }}>
-          PrecificaÃ§Ã£o PadrÃ£o
+          Precificação Padrão
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
           <Select
-            label="MÃ©todo de PrecificaÃ§Ã£o"
+            label="Método de Precificação"
             value={val('metodoPrecificacao') || 'margem_custo'}
             onChange={e => set('metodoPrecificacao', e.target.value)}
             options={[
@@ -272,7 +272,7 @@ function AbaPremissas() {
               { value: 'margem_venda', label: 'Margem sobre a Venda' },
             ]}
           />
-          <Input label="Margem PadrÃ£o (%)" {...num('margemPadrao')} suffix="%" />
+          <Input label="Margem Padrão (%)" {...num('margemPadrao')} suffix="%" />
           <Input label="Imposto sobre Energia (%)" {...num('impostoEnergia')} suffix="%" />
         </div>
       </Card>
@@ -280,30 +280,30 @@ function AbaPremissas() {
       {/* â”€â”€ COMPOSIÃ‡ÃƒO DE CUSTOS PADRÃƒO (NOVO) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>
-          ComposiÃ§Ã£o de Custos PadrÃ£o
+          Composição de Custos Padrão
         </p>
         <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 16px', lineHeight: 1.6 }}>
-          Valores usados automaticamente ao criar uma proposta. Podem ser ajustados individualmente em cada proposta na aba PrecificaÃ§Ã£o.
+          Valores usados automaticamente ao criar uma proposta. Podem ser ajustados individualmente em cada proposta na aba Precificação.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          {/* MÃ£o de obra mÃ³dulos */}
+          {/* Mão de obra módulos */}
           <div>
-            <label style={labelBase}>MÃ£o de Obra â€” MÃ³dulos (R$/mÃ³dulo)</label>
+            <label style={labelBase}>Mão de Obra â€” Módulos (R$/módulo)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input style={inputBaseStyle} type="number" min={0} step={5}
                 value={val('custoMaoObraModulo') !== '' ? val('custoMaoObraModulo') : custoModulo}
                 onChange={e => set('custoMaoObraModulo', Number(e.target.value))} />
-              <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: 'nowrap' }}>R$/mÃ³dulo</span>
+              <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: 'nowrap' }}>R$/módulo</span>
             </div>
             <p style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
-              Exemplo: 10 mÃ³dulos Ã— R$ {custoModulo} = R$ {(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              Exemplo: 10 módulos Ã— R$ {custoModulo} = R$ {(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
 
-          {/* MÃ£o de obra inversor */}
+          {/* Mão de obra inversor */}
           <div>
-            <label style={labelBase}>MÃ£o de Obra â€” Inversor (R$/inversor)</label>
+            <label style={labelBase}>Mão de Obra â€” Inversor (R$/inversor)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input style={inputBaseStyle} type="number" min={0} step={10}
                 value={val('custoMaoObraInversor') !== '' ? val('custoMaoObraInversor') : custoInversor}
@@ -350,13 +350,13 @@ function AbaPremissas() {
           border: `1px solid ${C.darkBorder}`, marginTop: 16,
         }}>
           <p style={{ fontSize: 10, color: C.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            SimulaÃ§Ã£o â€” Sistema 10 mÃ³dulos / 1 inversor
+            Simulação â€” Sistema 10 módulos / 1 inversor
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
             {[
               { label: 'Kit (informado na proposta)', valor: 'â€”' },
-              { label: `InstalaÃ§Ã£o mÃ³dulos`, valor: `R$ ${(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
-              { label: `InstalaÃ§Ã£o inversor`, valor: `R$ ${custoInversor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
+              { label: `Instalação módulos`, valor: `R$ ${(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
+              { label: `Instalação inversor`, valor: `R$ ${custoInversor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
               { label: 'Projeto de engenharia', valor: `R$ ${custoProjeto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
             ].map(item => (
               <div key={item.label}>
@@ -376,7 +376,7 @@ function AbaPremissas() {
               Itens Adicionais
             </p>
             <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
-              Baterias, carregadores veiculares, padrÃ£o de entrada, outros serviÃ§os
+              Baterias, carregadores veiculares, padrão de entrada, outros serviços
             </p>
           </div>
           <button
@@ -387,7 +387,7 @@ function AbaPremissas() {
           </button>
         </div>
 
-        {/* FormulÃ¡rio de novo item */}
+        {/* Formulário de novo item */}
         {mostrarFormItem && (
           <div style={{
             background: `${C.accent}08`, borderRadius: 10, padding: 16,
@@ -396,7 +396,7 @@ function AbaPremissas() {
             <p style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginBottom: 12 }}>Novo Item Adicional</p>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12 }}>
               <div>
-                <label style={labelBase}>DescriÃ§Ã£o</label>
+                <label style={labelBase}>Descrição</label>
                 <input style={inputBaseStyle} type="text" placeholder="Ex: Bateria de Armazenamento"
                   value={novoItem.descricao} onChange={e => setNovoItem(p => ({ ...p, descricao: e.target.value }))} />
               </div>
@@ -422,7 +422,7 @@ function AbaPremissas() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.textMuted, cursor: 'pointer' }}>
                 <input type="checkbox" checked={novoItem.ativo}
                   onChange={e => setNovoItem(p => ({ ...p, ativo: e.target.checked }))} />
-                Ativo por padrÃ£o nas novas propostas
+                Ativo por padrão nas novas propostas
               </label>
               <button style={btnSmall(C.accent)} onClick={adicionarItem} disabled={!novoItem.descricao.trim()}>
                 âœ“ Adicionar
@@ -448,7 +448,7 @@ function AbaPremissas() {
                 borderRadius: 8, padding: '10px 14px', opacity: item.ativo ? 1 : 0.6,
               }}>
                 {editandoItemId !== item.id ? (
-                  // VisualizaÃ§Ã£o
+                  // Visualização
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {/* Toggle ativo */}
                     <button onClick={() => toggleAtivoItem(item.id)} title={item.ativo ? 'Desativar' : 'Ativar'}
@@ -483,11 +483,11 @@ function AbaPremissas() {
                     </div>
                   </div>
                 ) : (
-                  // EdiÃ§Ã£o inline
+                  // Edição inline
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
                       <div>
-                        <label style={labelBase}>DescriÃ§Ã£o</label>
+                        <label style={labelBase}>Descrição</label>
                         <input style={inputBaseStyle} type="text" value={formItem.descricao}
                           onChange={e => setFormItem(p => ({ ...p, descricao: e.target.value }))} />
                       </div>
@@ -521,7 +521,7 @@ function AbaPremissas() {
         )}
       </Card>
 
-      {/* BotÃ£o salvar */}
+      {/* Botão salvar */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         {updateMutation.isSuccess && (
           <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>âœ” Salvo com sucesso</span>
@@ -545,12 +545,12 @@ function AbaTextos() {
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
 
   const CHAVES = [
-    { key: 'apresentacao_empresa', label: 'ApresentaÃ§Ã£o da Empresa' },
+    { key: 'apresentacao_empresa', label: 'Apresentação da Empresa' },
     { key: 'o_que_inclui', label: 'O que inclui' },
     { key: 'diferenciais', label: 'Diferenciais' },
     { key: 'garantias', label: 'Garantias' },
     { key: 'fornecedores', label: 'Fornecedores' },
-    { key: 'regulamentacao', label: 'RegulamentaÃ§Ã£o' },
+    { key: 'regulamentacao', label: 'Regulamentação' },
     { key: 'como_funciona', label: 'Como funciona' },
   ]
 
@@ -583,7 +583,7 @@ function AbaTextos() {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>
-          Suporta markdown bÃ¡sico: **negrito**, _itÃ¡lico_, listas com -
+          Suporta markdown básico: **negrito**, _itálico_, listas com -
         </p>
         <textarea
           value={getTexto(chaveAtiva)}
@@ -612,22 +612,22 @@ function AbaTextos() {
 // â”€â”€â”€ ABA USUÃRIOS (stub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// AbaUsuarios â€” GestÃ£o completa de usuÃ¡rios com nÃ­veis de acesso
+// AbaUsuarios â€” Gestão completa de usuários com níveis de acesso
 // Substitui o stub existente na ConfiguracoesPage.tsx
 //
 // INSTRUÃ‡Ã•ES DE INTEGRAÃ‡ÃƒO:
 // 1. Adicione este import no topo da ConfiguracoesPage.tsx:
-//    (os hooks do trpc jÃ¡ estÃ£o disponÃ­veis)
+//    (os hooks do trpc já estão disponíveis)
 //
-// 2. Substitua a funÃ§Ã£o AbaUsuarios() existente por esta abaixo.
-//    A funÃ§Ã£o comeÃ§a em: function AbaUsuarios() {
+// 2. Substitua a função AbaUsuarios() existente por esta abaixo.
+//    A função começa em: function AbaUsuarios() {
 //    e termina no segundo } antes de: // â”€â”€â”€ LAYOUT DA CONFIGURAÃ‡ÃƒO
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const ROLE_LABELS: Record<string, string> = {
   admin:        'Administrador',
   comercial:    'Comercial',
-  tecnico:      'TÃ©cnico',
+  tecnico:      'Técnico',
   visualizador: 'Visualizador',
 }
 
@@ -639,7 +639,7 @@ const ROLE_CORES: Record<string, string> = {
 }
 
 const ROLE_DESCRICOES: Record<string, string> = {
-  admin:        'Acesso total â€” configuraÃ§Ãµes, usuÃ¡rios, todas as propostas',
+  admin:        'Acesso total â€” configurações, usuários, todas as propostas',
   comercial:    'Cria e edita propostas e clientes',
   tecnico:      'Visualiza e edita dimensionamentos, exporta PDFs',
   visualizador: 'Somente leitura â€” visualiza propostas e clientes',
@@ -733,7 +733,7 @@ function AbaUsuarios() {
             background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 13,
           }}>â† Voltar</button>
           <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0 }}>
-            {modo === 'novo' ? 'Novo UsuÃ¡rio' : 'Editar UsuÃ¡rio'}
+            {modo === 'novo' ? 'Novo Usuário' : 'Editar Usuário'}
           </h2>
         </div>
 
@@ -741,7 +741,7 @@ function AbaUsuarios() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={labelStyle}>Nome completo *</label>
-              <input style={inputStyle} type="text" placeholder="Ex: JoÃ£o da Silva"
+              <input style={inputStyle} type="text" placeholder="Ex: João da Silva"
                 value={form.nome} onChange={e => setF('nome', e.target.value)} />
             </div>
             <div>
@@ -752,7 +752,7 @@ function AbaUsuarios() {
             {modo === 'novo' && (
               <div>
                 <label style={labelStyle}>Senha inicial *</label>
-                <input style={inputStyle} type="password" placeholder="MÃ­nimo 6 caracteres"
+                <input style={inputStyle} type="password" placeholder="Mínimo 6 caracteres"
                   value={form.senha} onChange={e => setF('senha', e.target.value)} />
               </div>
             )}
@@ -767,9 +767,9 @@ function AbaUsuarios() {
                 value={form.cargo} onChange={e => setF('cargo', e.target.value)} />
             </div>
 
-            {/* NÃ­vel de acesso */}
+            {/* Nível de acesso */}
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>NÃ­vel de Acesso *</label>
+              <label style={labelStyle}>Nível de Acesso *</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
                 {Object.entries(ROLE_LABELS).map(([value, label]) => (
                   <button key={value} onClick={() => setF('role', value)} style={{
@@ -789,9 +789,9 @@ function AbaUsuarios() {
               </div>
             </div>
 
-            {/* Margem e ComissÃ£o */}
+            {/* Margem e Comissão */}
             <div>
-              <label style={labelStyle}>Margem PadrÃ£o (%)</label>
+              <label style={labelStyle}>Margem Padrão (%)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input style={inputStyle} type="number" min={0} max={100}
                   value={form.margemPadrao}
@@ -799,11 +799,11 @@ function AbaUsuarios() {
                 <span style={{ color: C.textMuted, fontSize: 12 }}>%</span>
               </div>
               <p style={{ fontSize: 10, color: C.textDim, marginTop: 3 }}>
-                Se 0, usa a margem padrÃ£o da empresa
+                Se 0, usa a margem padrão da empresa
               </p>
             </div>
             <div>
-              <label style={labelStyle}>ComissÃ£o PadrÃ£o (%)</label>
+              <label style={labelStyle}>Comissão Padrão (%)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input style={inputStyle} type="number" min={0} max={100}
                   value={form.comissaoPadrao}
@@ -811,7 +811,7 @@ function AbaUsuarios() {
                 <span style={{ color: C.textMuted, fontSize: 12 }}>%</span>
               </div>
               <p style={{ fontSize: 10, color: C.textDim, marginTop: 3 }}>
-                Aplicada automaticamente nas propostas deste usuÃ¡rio
+                Aplicada automaticamente nas propostas deste usuário
               </p>
             </div>
           </div>
@@ -831,7 +831,7 @@ function AbaUsuarios() {
               Cancelar
             </Btn>
             <Btn onClick={handleSalvar} disabled={isPending}>
-              {isPending ? 'Salvando...' : modo === 'novo' ? 'Criar UsuÃ¡rio' : 'Salvar AlteraÃ§Ãµes'}
+              {isPending ? 'Salvando...' : modo === 'novo' ? 'Criar Usuário' : 'Salvar Alterações'}
             </Btn>
           </div>
         </Card>
@@ -848,21 +848,21 @@ function AbaUsuarios() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0 }}>
-            UsuÃ¡rios da Conta
+            Usuários da Conta
           </h2>
           <p style={{ color: C.textMuted, fontSize: 12, marginTop: 4 }}>
-            {lista.length} usuÃ¡rio{lista.length !== 1 ? 's' : ''} cadastrado{lista.length !== 1 ? 's' : ''}
+            {lista.length} usuário{lista.length !== 1 ? 's' : ''} cadastrado{lista.length !== 1 ? 's' : ''}
           </p>
         </div>
         {isAdmin && (
-          <Btn onClick={abrirNovo}>+ Novo UsuÃ¡rio</Btn>
+          <Btn onClick={abrirNovo}>+ Novo Usuário</Btn>
         )}
       </div>
 
       {/* Legenda de roles */}
       <Card style={{ padding: '14px 18px', marginBottom: 14 }}>
         <p style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10 }}>
-          NÃ­veis de Acesso
+          Níveis de Acesso
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
           {Object.entries(ROLE_LABELS).map(([role, label]) => (
@@ -878,11 +878,11 @@ function AbaUsuarios() {
         </div>
       </Card>
 
-      {/* Lista de usuÃ¡rios */}
+      {/* Lista de usuários */}
       {lista.length === 0 ? (
         <Card style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: C.textDim, fontSize: 14 }}>Nenhum usuÃ¡rio cadastrado ainda.</p>
-          {isAdmin && <Btn onClick={abrirNovo} style={{ marginTop: 12 }}>+ Criar primeiro usuÃ¡rio</Btn>}
+          <p style={{ color: C.textDim, fontSize: 14 }}>Nenhum usuário cadastrado ainda.</p>
+          {isAdmin && <Btn onClick={abrirNovo} style={{ marginTop: 12 }}>+ Criar primeiro usuário</Btn>}
         </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -917,19 +917,19 @@ function AbaUsuarios() {
                   </div>
                   <div style={{ fontSize: 12, color: C.textMuted }}>
                     {u.email}
-                    {u.cargo ? ` Â· ${u.cargo}` : ''}
-                    {u.telefone ? ` Â· ${u.telefone}` : ''}
+                    {u.cargo ? ` · ${u.cargo}` : ''}
+                    {u.telefone ? ` · ${u.telefone}` : ''}
                   </div>
                   {(Number(u.margemPadrao) > 0 || Number(u.comissaoPadrao) > 0) && (
                     <div style={{ fontSize: 11, color: C.textDim, marginTop: 3 }}>
                       {Number(u.margemPadrao) > 0 && `Margem: ${u.margemPadrao}%`}
-                      {Number(u.margemPadrao) > 0 && Number(u.comissaoPadrao) > 0 && ' Â· '}
-                      {Number(u.comissaoPadrao) > 0 && `ComissÃ£o: ${u.comissaoPadrao}%`}
+                      {Number(u.margemPadrao) > 0 && Number(u.comissaoPadrao) > 0 && ' · '}
+                      {Number(u.comissaoPadrao) > 0 && `Comissão: ${u.comissaoPadrao}%`}
                     </div>
                   )}
                 </div>
 
-                {/* AÃ§Ãµes */}
+                {/* Ações */}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {isAdmin && (
                     <button
@@ -989,13 +989,13 @@ function AbaUsuarios() {
               Redefinir Senha
             </h3>
             <p style={{ color: C.textMuted, fontSize: 12, margin: '0 0 16px' }}>
-              UsuÃ¡rio: <strong style={{ color: C.text }}>{senhaModal.nome}</strong>
+              Usuário: <strong style={{ color: C.text }}>{senhaModal.nome}</strong>
             </p>
             <label style={labelStyle}>Nova Senha</label>
             <input
               style={inputStyle}
               type="password"
-              placeholder="MÃ­nimo 6 caracteres"
+              placeholder="Mínimo 6 caracteres"
               value={novaSenha}
               onChange={e => setNovaSenha(e.target.value)}
               autoFocus
@@ -1030,7 +1030,7 @@ const CONFIG_ABAS = [
   { path: '', label: 'Empresa' },
   { path: 'premissas', label: 'Premissas' },
   { path: 'textos', label: 'Textos Institucionais' },
-  { path: 'usuarios', label: 'UsuÃ¡rios' },
+  { path: 'usuarios', label: 'Usuários' },
 ]
 
 export function ConfiguracoesPage() {
