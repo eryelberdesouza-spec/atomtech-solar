@@ -1,4 +1,4 @@
-﻿// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ConfiguraÃ§Ãµes â€” Empresa, Premissas, PrecificaÃ§Ã£o, Textos, UsuÃ¡rios
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
@@ -537,8 +537,8 @@ function AbaPremissas() {
 // â”€â”€â”€ ABA TEXTOS INSTITUCIONAIS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AbaTextos() {
-  const { data, isLoading, refetch } = trpc.premissas.getTextos.useQuery()
-  const updateMutation = trpc.premissas.updateTexto.useMutation({ onSuccess: () => refetch() })
+  const { data, isLoading, refetch } = trpc.textoInstitucional.list.useQuery()
+  const updateMutation = trpc.textoInstitucional.upsert.useMutation({ onSuccess: () => refetch() })
   const [chaveAtiva, setChaveAtiva] = useState('apresentacao_empresa')
   const [conteudo, setConteudo] = useState<Record<string, string>>({})
 
@@ -554,13 +554,15 @@ function AbaTextos() {
     { key: 'como_funciona', label: 'Como funciona' },
   ]
 
-  const getTexto = (chave: string) =>
-    conteudo[chave] !== undefined ? conteudo[chave] : ((data as any)?.[chave]?.conteudo ?? '')
+  const getTexto = (chave: string) => {
+    if (conteudo[chave] !== undefined) return conteudo[chave]
+    const item = (data as any[])?.find((t: any) => t.chave === chave)
+    return item?.conteudo ?? ''
+  }
 
   const handleSave = () => {
-    if (conteudo[chaveAtiva] !== undefined) {
-      updateMutation.mutate({ chave: chaveAtiva, conteudo: conteudo[chaveAtiva] })
-    }
+    const titulo = CHAVES.find(c => c.key === chaveAtiva)?.label ?? chaveAtiva
+    updateMutation.mutate({ chave: chaveAtiva, titulo, conteudo: conteudo[chaveAtiva] ?? getTexto(chaveAtiva) })
   }
 
   return (
