@@ -1,82 +1,105 @@
-// ═══════════════════════════════════════════════════════════════════
-// Layout — Sidebar + TopBar + Outlet
-// ═══════════════════════════════════════════════════════════════════
-
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import { trpc } from '../../lib/trpc'
 
 const NAV = [
-  { path: '/dashboard',     label: 'Dashboard',      icon: '⊞' },
-  { path: '/propostas',     label: 'Propostas',      icon: '📄' },
-  { path: '/clientes',      label: 'Clientes',       icon: '👥' },
-  { path: '/faturas',       label: 'Faturas',        icon: '⚡' },
-  { path: '/configuracoes', label: 'Configurações',  icon: '⚙' },
+  { path: '/dashboard',     label: 'Dashboard',       icon: '⊞', color: '#F0A500' },
+  { path: '/propostas',     label: 'Propostas',       icon: '📄', color: '#58A6FF' },
+  { path: '/clientes',      label: 'Clientes',        icon: '👥', color: '#3FB950' },
+  { path: '/faturas',       label: 'Faturas',         icon: '⚡', color: '#BC8CFF' },
+  { path: '/configuracoes', label: 'Configurações',   icon: '⚙️', color: '#8B949E' },
 ]
+
+const C = {
+  bg:      '#0D1117', bg2: '#161B22', bg3: '#1C2333',
+  border:  '#30363D', border2: '#21262D',
+  text:    '#E6EDF3', text2: '#8B949E', text3: '#6E7681',
+  solar:   '#F0A500', green: '#3FB950', blue: '#58A6FF',
+}
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
+  const { data: empresa } = trpc.empresa.get.useQuery()
 
   const pageTitle = NAV.find(n => location.pathname.startsWith(n.path))?.label ?? 'Atom Tech'
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0F1923', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', background: C.bg, overflow: 'hidden', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       {/* Sidebar */}
       <aside style={{
-        width: collapsed ? 60 : 220,
-        background: '#1A2535',
-        borderRight: '1px solid #2D3F58',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width 0.2s ease',
-        flexShrink: 0,
+        width: collapsed ? 64 : 220, background: C.bg2,
+        borderRight: `1px solid ${C.border2}`,
+        display: 'flex', flexDirection: 'column',
+        transition: 'width 0.2s ease', flexShrink: 0,
       }}>
         {/* Logo */}
         <div style={{
-          padding: collapsed ? '18px 0' : '18px 20px',
-          borderBottom: '1px solid #2D3F58',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: 10,
+          padding: collapsed ? '16px 0' : '16px 18px',
+          borderBottom: `1px solid ${C.border2}`,
+          display: 'flex', alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
+          minHeight: 64,
         }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: 'linear-gradient(135deg, #F5A623, #D4881A)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, color: '#fff', fontWeight: 900,
-          }}>A</div>
-          {!collapsed && (
-            <div>
-              <div style={{ color: '#E8EDF5', fontWeight: 800, fontSize: 14, lineHeight: 1 }}>
-                <span style={{ color: '#F5A623' }}>ATOM</span>TECH
-              </div>
-              <div style={{ color: '#2D9C4E', fontSize: 9, letterSpacing: '0.15em' }}>SOLAR</div>
-            </div>
+          {empresa?.logoUrl ? (
+            <img
+              src={empresa.logoUrl}
+              alt="Logo"
+              style={{
+                height: collapsed ? 32 : 36,
+                maxWidth: collapsed ? 32 : 160,
+                objectFit: 'contain',
+                transition: 'all 0.2s',
+              }}
+            />
+          ) : (
+            <>
+              <div style={{
+                width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                background: 'linear-gradient(135deg, #F0A500, #E8720C)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, color: '#fff', fontWeight: 900,
+                boxShadow: '0 4px 12px rgba(240,165,0,0.35)',
+              }}>A</div>
+              {!collapsed && (
+                <div>
+                  <div style={{ color: C.text, fontWeight: 800, fontSize: 14, lineHeight: 1 }}>
+                    <span style={{ color: C.solar }}>ATOM</span>TECH
+                  </div>
+                  <div style={{ color: C.green, fontSize: 9, letterSpacing: '0.15em', marginTop: 2 }}>SOLAR</div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Nav */}
-        <nav style={{ padding: '12px 8px', flex: 1 }}>
+        <nav style={{ padding: '14px 8px', flex: 1 }}>
+          {!collapsed && (
+            <div style={{ fontSize: 9, color: C.text3, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '4px 8px 8px' }}>
+              Menu
+            </div>
+          )}
           {NAV.map(item => (
             <NavLink
               key={item.path}
               to={item.path}
               style={({ isActive }) => ({
-                display: 'flex',
-                alignItems: 'center',
+                display: 'flex', alignItems: 'center',
                 gap: 10,
-                padding: collapsed ? '10px 0' : '10px 12px',
+                padding: collapsed ? '11px 0' : '10px 12px',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                borderRadius: 9,
-                marginBottom: 3,
+                borderRadius: 9, marginBottom: 3,
                 textDecoration: 'none',
-                background: isActive ? 'rgba(245,166,35,0.12)' : 'transparent',
-                color: isActive ? '#F5A623' : '#8A9BB5',
+                background: isActive ? `${item.color}18` : 'transparent',
+                color: isActive ? item.color : C.text2,
                 fontWeight: isActive ? 600 : 400,
-                fontSize: 13,
+                fontSize: 13.5,
                 transition: 'all 0.15s',
+                position: 'relative' as any,
+                borderLeft: isActive && !collapsed ? `3px solid ${item.color}` : '3px solid transparent',
               })}
+              title={collapsed ? item.label : undefined}
             >
               <span style={{ fontSize: 16, minWidth: 20, textAlign: 'center' }}>{item.icon}</span>
               {!collapsed && <span>{item.label}</span>}
@@ -84,30 +107,31 @@ export function Layout() {
           ))}
         </nav>
 
-        {/* Collapse button */}
+        {/* Collapse */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           style={{
             margin: 8, padding: 8, borderRadius: 8,
-            border: '1px solid #2D3F58', background: 'transparent',
-            color: '#4A5E7A', cursor: 'pointer', fontSize: 14,
+            border: `1px solid ${C.border2}`, background: 'transparent',
+            color: C.text3, cursor: 'pointer', fontSize: 14,
+            transition: 'all 0.15s',
           }}
         >
           {collapsed ? '→' : '←'}
         </button>
       </aside>
 
-      {/* Main area */}
+      {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* TopBar */}
         <div style={{
-          height: 56, background: '#1A2535',
-          borderBottom: '1px solid #2D3F58',
+          height: 58, background: C.bg2,
+          borderBottom: `1px solid ${C.border2}`,
           display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px', flexShrink: 0,
+          padding: '0 28px', flexShrink: 0,
         }}>
-          <h1 style={{ color: '#E8EDF5', fontSize: 16, fontWeight: 600, margin: 0 }}>
+          <h1 style={{ color: C.text, fontSize: 17, fontWeight: 700, margin: 0 }}>
             {pageTitle}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -118,23 +142,25 @@ export function Layout() {
                 window.location.href = '/login'
               }}
               style={{
-                padding: '6px 14px', borderRadius: 8, border: '1px solid #2D3F58',
-                background: 'transparent', color: '#4A5E7A', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600,
+                padding: '7px 16px', borderRadius: 8, border: `1px solid ${C.border}`,
+                background: 'transparent', color: C.text2, cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', sans-serif",
+                transition: 'all 0.15s',
               }}
             >
-              ⎋ Sair
+              Sair
             </button>
             <div style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #F5A623, #2D9C4E)',
+              width: 35, height: 35, borderRadius: '50%',
+              background: `linear-gradient(135deg, ${C.solar}, ${C.green})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 13, fontWeight: 700, color: '#fff',
-            }} title="Eryelber Correia">E</div>
+              cursor: 'pointer',
+            }}>E</div>
           </div>
         </div>
 
-        {/* Page content */}
+        {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <Outlet />
         </div>
