@@ -42,7 +42,11 @@ export function formatPayback(meses: number): string {
 // Data BR
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
-  const [y, m, d] = dateStr.split('-')
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return '—'
+  const d = String(date.getDate()).padStart(2, '0')
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const y = date.getFullYear()
   return `${d}/${m}/${y}`
 }
 
