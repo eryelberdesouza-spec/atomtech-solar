@@ -629,8 +629,7 @@ function AbaTextos() {
 //    A função começa em: function AbaUsuarios() {
 //    e termina no segundo } antes de: // ─── LAYOUT DA CONFIGURAÇÃO
 // ═══════════════════════════════════════════════════════════════════
-<Route path="blocos"    element={<AbaBlocos />} />   {/* ← linha nova */}
-  <Route path="usuarios"  element={<AbaUsuarios />} />
+
 const ROLE_LABELS: Record<string, string> = {
   admin:        'Administrador',
   comercial:    'Comercial',
@@ -1033,13 +1032,6 @@ function AbaUsuarios() {
 
 // ─── LAYOUT DA CONFIGURAÇÃO ───────────────────────────────────────────────────
 
-const CONFIG_ABAS = [
-  { path: '', label: 'Empresa' },
-  { path: 'premissas', label: 'Premissas' },
-  { path: 'textos', label: 'Textos Institucionais' },
-  { path: 'usuarios', label: 'Usuários' },
-]
-
 export function ConfiguracoesPage() {
   const navigate = useNavigate()
   const path = window.location.pathname.split('/configuracoes/')[1] ?? ''
@@ -1070,6 +1062,7 @@ export function ConfiguracoesPage() {
           <Route path=""          element={<AbaEmpresa />} />
           <Route path="premissas" element={<AbaPremissas />} />
           <Route path="textos"    element={<AbaTextos />} />
+          <Route path="blocos"    element={<AbaBlocos />} />
           <Route path="usuarios"  element={<AbaUsuarios />} />
         </Routes>
       </div>
