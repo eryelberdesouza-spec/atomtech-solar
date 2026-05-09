@@ -190,7 +190,44 @@ interface KpiCardProps {
   value: string
   sub?: string
   trend?: number
+  icon?: string
   color?: string
+}
+
+export function KpiCard({ label, value, sub, trend, icon, color = C.solar }: KpiCardProps) {
+  return (
+    <Card style={{ padding: '20px', position: 'relative', overflow: 'hidden', borderTop: `3px solid ${color}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+            {label}
+          </p>
+          <p style={{ color: C.text, fontSize: 28, fontWeight: 800, lineHeight: 1, margin: '0 0 8px' }}>
+            {value}
+          </p>
+          {sub && <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>{sub}</p>}
+          {trend !== undefined && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 8,
+              fontSize: 11, fontWeight: 600,
+              color: trend >= 0 ? C.green : C.error,
+            }}>
+              {trend >= 0 ? '▲' : '▼'} {Math.abs(trend)}% vs. mês anterior
+            </div>
+          )}
+        </div>
+        {icon && (
+          <div style={{
+            width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+            background: `${color}18`, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 20,
+          }}>
+            {icon}
+          </div>
+        )}
+      </div>
+    </Card>
+  )
 }
 
 export function KpiCard({ label, value, sub, trend, color = C.solar }: KpiCardProps) {
