@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { Btn, Input, Select, Toggle, Card, Spinner, C } from '../../components/ui'
-
+import { AbaBlocos } from './AbaBlocos'
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 
 interface ItemAdicional {
@@ -535,7 +535,13 @@ function AbaPremissas() {
 }
 
 // ─── ABA TEXTOS INSTITUCIONAIS ────────────────────────────────────────────────
-
+const CONFIG_ABAS = [
+  { path: '',         label: 'Empresa' },
+  { path: 'premissas', label: 'Premissas' },
+  { path: 'textos',   label: 'Textos Institucionais' },
+  { path: 'blocos',   label: 'Blocos da Proposta' },   // ← inserir aqui
+  { path: 'usuarios', label: 'Usuários' },
+]
 function AbaTextos() {
   const { data, isLoading, refetch } = trpc.textoInstitucional.list.useQuery()
   const updateMutation = trpc.textoInstitucional.upsert.useMutation({ onSuccess: () => refetch() })
@@ -623,7 +629,8 @@ function AbaTextos() {
 //    A função começa em: function AbaUsuarios() {
 //    e termina no segundo } antes de: // ─── LAYOUT DA CONFIGURAÇÃO
 // ═══════════════════════════════════════════════════════════════════
-
+<Route path="blocos"    element={<AbaBlocos />} />   {/* ← linha nova */}
+  <Route path="usuarios"  element={<AbaUsuarios />} />
 const ROLE_LABELS: Record<string, string> = {
   admin:        'Administrador',
   comercial:    'Comercial',
