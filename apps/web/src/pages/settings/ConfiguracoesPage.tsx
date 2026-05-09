@@ -1,13 +1,13 @@
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Configurações â€” Empresa, Premissas, Precificação, Textos, Usuários
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════════════════════════
+// Configurações — Empresa, Premissas, Precificação, Textos, Usuários
+// ═══════════════════════════════════════════════════════════════════
 
 import { useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { Btn, Input, Select, Toggle, Card, Spinner, C } from '../../components/ui'
 
-// â”€â”€â”€ TIPOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── TIPOS ────────────────────────────────────────────────────────────────────
 
 interface ItemAdicional {
   id: string
@@ -28,7 +28,7 @@ const ITEM_VAZIO: Omit<ItemAdicional, 'id'> = {
   descricao: '', tipoCusto: 'fixo', valorFixo: 0, ativo: true, unidade: 'unidade',
 }
 
-// â”€â”€â”€ ABA EMPRESA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ABA EMPRESA ──────────────────────────────────────────────────────────────
 
 function AbaEmpresa() {
   const { data, isLoading, refetch } = trpc.empresa.get.useQuery()
@@ -85,7 +85,7 @@ function AbaEmpresa() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
           <Input label="Nome do Banco" value={val('bancoNome')} onChange={e => set('bancoNome', e.target.value)} />
           <Input label="Código do Banco" value={val('bancoCodigo')} onChange={e => set('bancoCodigo', e.target.value)} />
-          <Input label="AgÃªncia" value={val('bancoAgencia')} onChange={e => set('bancoAgencia', e.target.value)} />
+          <Input label="Agência" value={val('bancoAgencia')} onChange={e => set('bancoAgencia', e.target.value)} />
           <Input label="Conta" value={val('bancoConta')} onChange={e => set('bancoConta', e.target.value)} />
           <Select label="Tipo" value={val('bancoTipo') || ''} onChange={e => set('bancoTipo', e.target.value)}
             options={[{ value: '', label: 'Selecione...' }, { value: 'corrente', label: 'Corrente' }, { value: 'poupança', label: 'Poupança' }]} />
@@ -108,13 +108,13 @@ function AbaEmpresa() {
             background: C.dark, border: `1px solid ${C.darkBorder}`,
             color: C.text, fontSize: 13, resize: 'vertical', outline: 'none',
           }}
-          placeholder="Atom Tech â€” Energia Solar e Tecnologia | Brasília/DF | contato@atomtech.tec.br"
+          placeholder="Atom Tech — Energia Solar e Tecnologia | Brasília/DF | contato@atomtech.tec.br"
         />
       </Card>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         {updateMutation.isSuccess && (
-          <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>âœ” Salvo com sucesso</span>
+          <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>✔ Salvo com sucesso</span>
         )}
         <Btn onClick={handleSave} disabled={updateMutation.isPending}>
           {updateMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
@@ -124,7 +124,7 @@ function AbaEmpresa() {
   )
 }
 
-// â”€â”€â”€ ABA PREMISSAS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ABA PREMISSAS ────────────────────────────────────────────────────────────
 
 function AbaPremissas() {
   const { data, isLoading, refetch } = trpc.premissas.get.useQuery()
@@ -144,7 +144,7 @@ function AbaPremissas() {
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
   const num = (k: string) => ({ value: val(k), onChange: (e: any) => set(k, Number(e.target.value)), type: 'number' as const })
 
-  // Itens adicionais â€” lÃª do form local ou dos dados do banco
+  // Itens adicionais — lê do form local ou dos dados do banco
   const itensAdicionais: ItemAdicional[] = (
     form.itensAdicionaisPadrao !== undefined
       ? form.itensAdicionaisPadrao
@@ -223,9 +223,9 @@ function AbaPremissas() {
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           <Input label="Sobredimensionamento (%)" {...num('sobredimensionamentoPadrao')} suffix="%" />
-          <Input label="Margem PotÃªncia Ideal (%)" {...num('margemPotenciaIdeal')} suffix="%" />
-          <Input label="Desvio Azimutal Padrão (Â°)" {...num('desvioAzimutalPadrao')} suffix="Â°" />
-          <Input label="Inclinação Padrão (Â°)" {...num('inclinacaoPadrao')} suffix="Â°" />
+          <Input label="Margem Potência Ideal (%)" {...num('margemPotenciaIdeal')} suffix="%" />
+          <Input label="Desvio Azimutal Padrão (°)" {...num('desvioAzimutalPadrao')} suffix="°" />
+          <Input label="Inclinação Padrão (°)" {...num('inclinacaoPadrao')} suffix="°" />
           <Input label="Perda Efic. Anual Trad. (%)" {...num('perdaEficienciaAnualTradicional')} suffix="%" />
           <Input label="Perda Efic. Anual Micro. (%)" {...num('perdaEficienciaAnualMicroinversor')} suffix="%" />
           <Input label="Perda Efic. Anual Otim. (%)" {...num('perdaEficienciaAnualOtimizador')} suffix="%" />
@@ -237,13 +237,13 @@ function AbaPremissas() {
         </div>
       </Card>
 
-      {/* Ãrea por telhado */}
+      {/* Área por telhado */}
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>
-          Ãrea Ãštil por Tipo de Telhado
+          Área Útil por Tipo de Telhado
         </p>
         <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 14px' }}>
-          mÂ² de área necessária por mÂ² de módulo instalado
+          m² de área necessária por m² de módulo instalado
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           {[
@@ -252,7 +252,7 @@ function AbaPremissas() {
             ['Shingle', 'areaShingle'], ['Metálico', 'areaMetalico'],
             ['Zipado', 'areaZipado'], ['Solo', 'areaSolo'],
           ].map(([label, key]) => (
-            <Input key={key} label={label} {...num(key)} suffix="mÂ²/mÂ²" />
+            <Input key={key} label={label} {...num(key)} suffix="m²/m²" />
           ))}
         </div>
       </Card>
@@ -277,7 +277,7 @@ function AbaPremissas() {
         </div>
       </Card>
 
-      {/* â”€â”€ COMPOSIÃ‡ÃƒO DE CUSTOS PADRÃƒO (NOVO) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── COMPOSIÇÃO DE CUSTOS PADRÃO (NOVO) ─────────────────────────────── */}
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>
           Composição de Custos Padrão
@@ -289,7 +289,7 @@ function AbaPremissas() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Mão de obra módulos */}
           <div>
-            <label style={labelBase}>Mão de Obra â€” Módulos (R$/módulo)</label>
+            <label style={labelBase}>Mão de Obra — Módulos (R$/módulo)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input style={inputBaseStyle} type="number" min={0} step={5}
                 value={val('custoMaoObraModulo') !== '' ? val('custoMaoObraModulo') : custoModulo}
@@ -297,13 +297,13 @@ function AbaPremissas() {
               <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: 'nowrap' }}>R$/módulo</span>
             </div>
             <p style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
-              Exemplo: 10 módulos Ã— R$ {custoModulo} = R$ {(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              Exemplo: 10 módulos × R$ {custoModulo} = R$ {(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>
 
           {/* Mão de obra inversor */}
           <div>
-            <label style={labelBase}>Mão de Obra â€” Inversor (R$/inversor)</label>
+            <label style={labelBase}>Mão de Obra — Inversor (R$/inversor)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input style={inputBaseStyle} type="number" min={0} step={10}
                 value={val('custoMaoObraInversor') !== '' ? val('custoMaoObraInversor') : custoInversor}
@@ -350,25 +350,25 @@ function AbaPremissas() {
           border: `1px solid ${C.darkBorder}`, marginTop: 16,
         }}>
           <p style={{ fontSize: 10, color: C.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            Simulação â€” Sistema 10 módulos / 1 inversor
+            Simulação — Sistema 10 módulos / 1 inversor
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
             {[
-              { label: 'Kit (informado na proposta)', valor: 'â€”' },
+              { label: 'Kit (informado na proposta)', valor: '—' },
               { label: `Instalação módulos`, valor: `R$ ${(10 * custoModulo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
               { label: `Instalação inversor`, valor: `R$ ${custoInversor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
               { label: 'Projeto de engenharia', valor: `R$ ${custoProjeto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
             ].map(item => (
               <div key={item.label}>
                 <div style={{ fontSize: 9, color: C.textDim, marginBottom: 2 }}>{item.label}</div>
-                <div style={{ fontSize: 13, color: item.valor === 'â€”' ? C.textDim : C.solar, fontWeight: 700 }}>{item.valor}</div>
+                <div style={{ fontSize: 13, color: item.valor === '—' ? C.textDim : C.solar, fontWeight: 700 }}>{item.valor}</div>
               </div>
             ))}
           </div>
         </div>
       </Card>
 
-      {/* â”€â”€ ITENS ADICIONAIS (NOVO) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── ITENS ADICIONAIS (NOVO) ──────────────────────────────────────────── */}
       <Card style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
@@ -383,7 +383,7 @@ function AbaPremissas() {
             style={btnSmall(C.accent, true)}
             onClick={() => { setMostrarFormItem(!mostrarFormItem); setNovoItem(ITEM_VAZIO) }}
           >
-            {mostrarFormItem ? 'âœ• Cancelar' : '+ Adicionar Item'}
+            {mostrarFormItem ? '✕ Cancelar' : '+ Adicionar Item'}
           </button>
         </div>
 
@@ -425,7 +425,7 @@ function AbaPremissas() {
                 Ativo por padrão nas novas propostas
               </label>
               <button style={btnSmall(C.accent)} onClick={adicionarItem} disabled={!novoItem.descricao.trim()}>
-                âœ“ Adicionar
+                ✓ Adicionar
               </button>
             </div>
           </div>
@@ -478,8 +478,8 @@ function AbaPremissas() {
                       <button style={btnSmall('#3B82F6', true)} onClick={() => {
                         setEditandoItemId(item.id)
                         setFormItem({ descricao: item.descricao, tipoCusto: item.tipoCusto, valorFixo: item.valorFixo, ativo: item.ativo, unidade: item.unidade })
-                      }}>âœ Editar</button>
-                      <button style={btnSmall('#EF4444', true)} onClick={() => removerItem(item.id)}>âœ•</button>
+                      }}>✏ Editar</button>
+                      <button style={btnSmall('#EF4444', true)} onClick={() => removerItem(item.id)}>✕</button>
                     </div>
                   </div>
                 ) : (
@@ -511,7 +511,7 @@ function AbaPremissas() {
                     </div>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button style={btnSmall(C.textMuted, true)} onClick={() => setEditandoItemId(null)}>Cancelar</button>
-                      <button style={btnSmall(C.accent)} onClick={() => salvarEdicaoItem(item.id)}>âœ“ Salvar</button>
+                      <button style={btnSmall(C.accent)} onClick={() => salvarEdicaoItem(item.id)}>✓ Salvar</button>
                     </div>
                   </div>
                 )}
@@ -524,7 +524,7 @@ function AbaPremissas() {
       {/* Botão salvar */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         {updateMutation.isSuccess && (
-          <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>âœ” Salvo com sucesso</span>
+          <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>✔ Salvo com sucesso</span>
         )}
         <Btn onClick={handleSave} disabled={updateMutation.isPending}>
           {updateMutation.isPending ? 'Salvando...' : 'Salvar Premissas'}
@@ -534,7 +534,7 @@ function AbaPremissas() {
   )
 }
 
-// â”€â”€â”€ ABA TEXTOS INSTITUCIONAIS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ABA TEXTOS INSTITUCIONAIS ────────────────────────────────────────────────
 
 function AbaTextos() {
   const { data, isLoading, refetch } = trpc.textoInstitucional.list.useQuery()
@@ -598,7 +598,7 @@ function AbaTextos() {
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           {updateMutation.isSuccess && (
-            <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>âœ” Salvo</span>
+            <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>✔ Salvo</span>
           )}
           <Btn onClick={handleSave} disabled={updateMutation.isPending || conteudo[chaveAtiva] === undefined}>
             {updateMutation.isPending ? 'Salvando...' : 'Salvar Texto'}
@@ -609,20 +609,20 @@ function AbaTextos() {
   )
 }
 
-// â”€â”€â”€ ABA USUÃRIOS (stub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ABA USUÁRIOS (stub) ──────────────────────────────────────────────────────
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// AbaUsuarios â€” Gestão completa de usuários com níveis de acesso
+// ═══════════════════════════════════════════════════════════════════
+// AbaUsuarios — Gestão completa de usuários com níveis de acesso
 // Substitui o stub existente na ConfiguracoesPage.tsx
 //
-// INSTRUÃ‡Ã•ES DE INTEGRAÃ‡ÃƒO:
+// INSTRUÇÕES DE INTEGRAÇÃO:
 // 1. Adicione este import no topo da ConfiguracoesPage.tsx:
 //    (os hooks do trpc já estão disponíveis)
 //
 // 2. Substitua a função AbaUsuarios() existente por esta abaixo.
 //    A função começa em: function AbaUsuarios() {
-//    e termina no segundo } antes de: // â”€â”€â”€ LAYOUT DA CONFIGURAÃ‡ÃƒO
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//    e termina no segundo } antes de: // ─── LAYOUT DA CONFIGURAÇÃO
+// ═══════════════════════════════════════════════════════════════════
 
 const ROLE_LABELS: Record<string, string> = {
   admin:        'Administrador',
@@ -639,10 +639,10 @@ const ROLE_CORES: Record<string, string> = {
 }
 
 const ROLE_DESCRICOES: Record<string, string> = {
-  admin:        'Acesso total â€” configurações, usuários, todas as propostas',
+  admin:        'Acesso total — configurações, usuários, todas as propostas',
   comercial:    'Cria e edita propostas e clientes',
   tecnico:      'Visualiza e edita dimensionamentos, exporta PDFs',
-  visualizador: 'Somente leitura â€” visualiza propostas e clientes',
+  visualizador: 'Somente leitura — visualiza propostas e clientes',
 }
 
 function BadgeRole({ role }: { role: string }) {
@@ -721,7 +721,7 @@ function AbaUsuarios() {
     <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
   )
 
-  // â”€â”€ FORMULÃRIO (novo/editar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── FORMULÁRIO (novo/editar) ──────────────────────────────────────
   if (modo === 'novo' || modo === 'editar') {
     const isPending = createMutation.isPending || updateMutation.isPending
     const erro = createMutation.error?.message || updateMutation.error?.message
@@ -731,7 +731,7 @@ function AbaUsuarios() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <button onClick={() => setModo('lista')} style={{
             background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 13,
-          }}>â† Voltar</button>
+          }}>← Voltar</button>
           <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0 }}>
             {modo === 'novo' ? 'Novo Usuário' : 'Editar Usuário'}
           </h2>
@@ -839,7 +839,7 @@ function AbaUsuarios() {
     )
   }
 
-  // â”€â”€ LISTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── LISTA ─────────────────────────────────────────────────────────
   const lista = usuarios ?? []
 
   return (
@@ -940,7 +940,7 @@ function AbaUsuarios() {
                       }}
                       title="Redefinir senha"
                     >
-                      ðŸ”‘ Senha
+                      🔑 Senha
                     </button>
                   )}
                   {(isAdmin || u.id === (meData as any)?.id) && (
@@ -951,7 +951,7 @@ function AbaUsuarios() {
                         background: '#3B82F610', color: '#3B82F6', cursor: 'pointer', fontSize: 11, fontWeight: 600,
                       }}
                     >
-                      âœ Editar
+                      ✏ Editar
                     </button>
                   )}
                   {isAdmin && u.id !== (meData as any)?.id && (
@@ -1024,7 +1024,7 @@ function AbaUsuarios() {
 }
 
 
-// â”€â”€â”€ LAYOUT DA CONFIGURAÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── LAYOUT DA CONFIGURAÇÃO ───────────────────────────────────────────────────
 
 const CONFIG_ABAS = [
   { path: '', label: 'Empresa' },
@@ -1069,4 +1069,3 @@ export function ConfiguracoesPage() {
     </div>
   )
 }
-
