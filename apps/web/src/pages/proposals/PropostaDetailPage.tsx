@@ -468,6 +468,10 @@ export function PropostaDetailPage() {
   const { data: empresa } = trpc.empresa.get.useQuery()
   const { data: textosData } = trpc.textoInstitucional.list.useQuery()
   const updateStatus = trpc.proposta.updateStatus.useMutation()
+  const { data: clienteData } = (trpc as any).cliente.byId.useQuery(
+  { id: data?.proposta?.clienteId },
+  { enabled: !!data?.proposta?.clienteId }
+)
   const utils = trpc.useUtils()
 
   const handleGerarPdf = () => {
@@ -477,7 +481,7 @@ export function PropostaDetailPage() {
       try {
         const textos: Record<string, any> = {}
         if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
-        abrirPdfNoNavegador({ ...data, empresa: { ...data.empresa, ...empresa }, textos })
+        abrirPdfNoNavegador({ ...data, empresa: { ...data.empresa, ...empresa }, textos, cliente: clienteData })
       } catch (e) {
         alert('Erro ao gerar PDF. Verifique se popups estão permitidos neste site.')
         console.error(e)
