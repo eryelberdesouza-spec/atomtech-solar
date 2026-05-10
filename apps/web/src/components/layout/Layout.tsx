@@ -3,12 +3,66 @@ import { useState } from 'react'
 import { trpc } from '../../lib/trpc'
 
 const NAV = [
-  { path: '/dashboard',    label: 'Dashboard',      icon: '◈', color: '#F5A623', desc: 'Visão geral'       },
-  { path: '/propostas',    label: 'Propostas',      icon: '◧', color: '#58A6FF', desc: 'Gestão comercial'  },
-  { path: '/clientes',     label: 'Clientes',       icon: '◉', color: '#3EBB7A', desc: 'Base de clientes'  },
-  { path: '/faturas',      label: 'Faturas',        icon: '◈', color: '#BC8CFF', desc: 'Contas de energia' },
-  { path: '/configuracoes',label: 'Configurações',  icon: '◎', color: '#8B949E', desc: 'Sistema'           },
+  { path: '/dashboard',    label: 'Dashboard',     icon: '◈', color: '#F5A623', desc: 'Visão geral'       },
+  { path: '/propostas',    label: 'Propostas',     icon: '◧', color: '#58A6FF', desc: 'Gestão comercial'  },
+  { path: '/clientes',     label: 'Clientes',      icon: '◉', color: '#3EBB7A', desc: 'Base de clientes'  },
+  { path: '/faturas',      label: 'Faturas',       icon: '◈', color: '#BC8CFF', desc: 'Contas de energia' },
+  { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#8B949E', desc: 'Sistema'           },
 ]
+
+function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean }) {
+  const location = useLocation()
+  const isActive = location.pathname.startsWith(item.path)
+  return (
+    <NavLink
+      to={item.path}
+      title={collapsed ? item.label : undefined}
+      style={{
+        display: 'flex', alignItems: 'center',
+        gap: 12,
+        padding: collapsed ? '10px 0' : '10px 12px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderRadius: 10, marginBottom: 2, textDecoration: 'none',
+        background: isActive ? item.color + '14' : 'transparent',
+        color: isActive ? item.color : '#5A7090',
+        fontWeight: isActive ? 700 : 400, fontSize: 13.5,
+        transition: 'all 0.15s',
+        borderLeft: isActive && !collapsed ? '3px solid ' + item.color : '3px solid transparent',
+        paddingLeft: isActive && !collapsed ? 9 : 12,
+      }}
+    >
+      <div style={{
+        width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+        background: isActive ? item.color + '22' : 'transparent',
+        border: '1px solid ' + (isActive ? item.color + '44' : 'transparent'),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, color: isActive ? item.color : '#4A6080',
+        transition: 'all 0.15s',
+        boxShadow: isActive ? '0 0 12px ' + item.color + '30' : 'none',
+      }}>
+        {item.icon}
+      </div>
+      {!collapsed && (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ lineHeight: 1.2 }}>{item.label}</div>
+          {isActive && (
+            <div style={{ fontSize: 10, color: item.color + 'AA', fontWeight: 400, marginTop: 1 }}>
+              {item.desc}
+            </div>
+          )}
+        </div>
+      )}
+      {isActive && !collapsed && (
+        <div style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: item.color,
+          boxShadow: '0 0 8px ' + item.color,
+          flexShrink: 0,
+        }} />
+      )}
+    </NavLink>
+  )
+}
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -26,19 +80,18 @@ export function Layout() {
     window.location.href = '/login'
   }
 
-  const usuario = (() => {
+  const usuario: any = (() => {
     try { return JSON.parse(localStorage.getItem('atomtech_usuario') || '{}') } catch { return {} }
   })()
 
   return (
     <div style={{
       display: 'flex', height: '100vh',
-      background: '#0C1421',
-      overflow: 'hidden',
+      background: '#0C1421', overflow: 'hidden',
       fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
     }}>
 
-      {/* ── SIDEBAR ─────────────────────────────────────────────── */}
+      {/* ── SIDEBAR ──────────────────────────────────────────── */}
       <aside style={{
         width: collapsed ? 68 : 240,
         background: 'linear-gradient(180deg, #111D2E 0%, #0D1828 100%)',
@@ -57,8 +110,11 @@ export function Layout() {
           gap: 12, minHeight: 70,
         }}>
           {empresa?.logoUrl ? (
-            <img src={empresa.logoUrl} alt="Logo"
-              style={{ height: collapsed ? 30 : 38, maxWidth: collapsed ? 30 : 160, objectFit: 'contain', transition: 'all 0.25s' }} />
+            <img src={empresa.logoUrl} alt="Logo" style={{
+              height: collapsed ? 30 : 38,
+              maxWidth: collapsed ? 30 : 160,
+              objectFit: 'contain', transition: 'all 0.25s',
+            }} />
           ) : (
             <>
               <div style={{
@@ -85,61 +141,18 @@ export function Layout() {
         {/* Nav */}
         <nav style={{ padding: '12px 8px', flex: 1 }}>
           {!collapsed && (
-            <div style={{ fontSize: 9, color: '#3A5070', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '4px 10px 10px' }}>
-              Menu
-            </div>
+            <div style={{
+              fontSize: 9, color: '#3A5070', fontWeight: 700,
+              letterSpacing: '0.12em', textTransform: 'uppercase',
+              padding: '4px 10px 10px',
+            }}>Menu</div>
           )}
           {NAV.map(item => (
-            <NavLink
-              key={item.path} to={item.path}
-              title={collapsed ? item.label : undefined}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: collapsed ? '12px 0' : '10px 12px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                borderRadius: 10, marginBottom: 2, textDecoration: 'none',
-                background: isActive ? (item.color + '14') : 'transparent',
-                color: isActive ? item.color : '#5A7090',
-                fontWeight: isActive ? 700 : 400, fontSize: 13.5,
-                transition: 'all 0.15s',
-                borderLeft: isActive && !collapsed ? ('3px solid ' + item.color) : '3px solid transparent',
-                paddingLeft: isActive && !collapsed ? 9 : 12,
-              })}
-            >
-              {({ isActive }) => (
-                <>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                    background: isActive ? (item.color + '22') : 'transparent',
-                    border: '1px solid ' + (isActive ? item.color + '44' : 'transparent'),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 15, color: isActive ? item.color : '#4A6080',
-                    transition: 'all 0.15s',
-                    boxShadow: isActive ? ('0 0 12px ' + item.color + '30') : 'none',
-                  }}>{item.icon}</div>
-                  {!collapsed && (
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ lineHeight: 1.2 }}>{item.label}</div>
-                      {isActive && (
-                        <div style={{ fontSize: 10, color: item.color + 'AA', fontWeight: 400, marginTop: 1 }}>
-                          {item.desc}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {isActive && !collapsed && (
-                    <div style={{
-                      width: 6, height: 6, borderRadius: '50%',
-                      background: item.color, boxShadow: '0 0 8px ' + item.color, flexShrink: 0,
-                    }} />
-                  )}
-                </>
-              )}
-            </NavLink>
+            <NavItem key={item.path} item={item} collapsed={collapsed} />
           ))}
         </nav>
 
-        {/* User + Collapse */}
+        {/* Usuário + Recolher */}
         <div style={{ borderTop: '1px solid #1E3050', padding: '12px 8px' }}>
           {!collapsed && (
             <div style={{
@@ -153,35 +166,39 @@ export function Layout() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0,
               }}>
-                {((usuario as any)?.nome || 'U')[0].toUpperCase()}
+                {(usuario?.nome || 'U')[0].toUpperCase()}
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#C8D8EC', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {(usuario as any)?.nome?.split(' ')[0] || 'Usuário'}
+                <div style={{
+                  fontSize: 12, fontWeight: 600, color: '#C8D8EC',
+                  lineHeight: 1.2, whiteSpace: 'nowrap',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {usuario?.nome?.split(' ')[0] || 'Usuário'}
                 </div>
                 <div style={{ fontSize: 10, color: '#3A5070' }}>Admin</div>
               </div>
-              <button onClick={logout} title="Sair"
-                style={{ background: 'none', border: 'none', color: '#3A5070', cursor: 'pointer', fontSize: 14, padding: 4, borderRadius: 6, transition: 'color 0.15s' }}
-                onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = '#F85149')}
-                onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = '#3A5070')}
-              >↗</button>
+              <button onClick={logout} title="Sair" style={{
+                background: 'none', border: 'none', color: '#3A5070',
+                cursor: 'pointer', fontSize: 14, padding: 4, borderRadius: 6,
+              }}>↗</button>
             </div>
           )}
-          <button onClick={() => setCollapsed(!collapsed)}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
             style={{
               width: '100%', padding: '8px', borderRadius: 8,
               border: '1px solid #1E3050', background: 'transparent',
               color: '#3A5070', cursor: 'pointer', fontSize: 12,
               transition: 'all 0.15s', fontFamily: 'inherit',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#F5A623'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#F5A62344' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#3A5070'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#1E3050' }}
-          >{collapsed ? '→' : '← Recolher'}</button>
+          >
+            {collapsed ? '→' : '← Recolher'}
+          </button>
         </div>
       </aside>
 
-      {/* ── MAIN ───────────────────────────────────────────────── */}
+      {/* ── MAIN ─────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* TopBar */}
@@ -193,12 +210,20 @@ export function Layout() {
           padding: '0 28px', flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 4, height: 20, borderRadius: 2, background: 'linear-gradient(180deg, ' + pageColor + ', ' + pageColor + '88)' }} />
+            <div style={{
+              width: 4, height: 20, borderRadius: 2,
+              background: 'linear-gradient(180deg, ' + pageColor + ', ' + pageColor + '88)',
+            }} />
             <div>
-              <h1 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>{pageTitle}</h1>
-              <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>Atom Tech · Sistema de Propostas Fotovoltaicas</div>
+              <h1 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+                {pageTitle}
+              </h1>
+              <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>
+                Atom Tech · Sistema de Propostas Fotovoltaicas
+              </div>
             </div>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               onClick={() => navigate('/propostas/nova')}
@@ -207,18 +232,20 @@ export function Layout() {
                 background: 'linear-gradient(135deg, #F5A623, #E8720C)',
                 color: '#fff', cursor: 'pointer', fontSize: 12,
                 fontWeight: 700, fontFamily: 'inherit',
-                boxShadow: '0 2px 10px rgba(245,166,35,0.35)', transition: 'opacity 0.15s',
+                boxShadow: '0 2px 10px rgba(245,166,35,0.35)',
               }}
-              onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.88')}
-              onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
-            >+ Nova Proposta</button>
+            >
+              + Nova Proposta
+            </button>
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
               background: 'linear-gradient(135deg, #F5A623, #3EBB7A)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer',
+              fontSize: 13, fontWeight: 800, color: '#fff',
               boxShadow: '0 2px 8px rgba(245,166,35,0.3)',
-            }}>{((usuario as any)?.nome || 'E')[0].toUpperCase()}</div>
+            }}>
+              {(usuario?.nome || 'E')[0].toUpperCase()}
+            </div>
           </div>
         </div>
 
