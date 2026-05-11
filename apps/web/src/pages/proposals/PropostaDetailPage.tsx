@@ -597,7 +597,15 @@ export function PropostaDetailPage() {
   )
   const updateStatus = trpc.proposta.updateStatus.useMutation()
   const utils = trpc.useUtils()
+const deleteMutation = trpc.proposta.delete.useMutation({
+    onSuccess: () => navigate('/propostas'),
+    onError: (e) => alert('Erro ao excluir: ' + e.message),
+  })
 
+  function handleDelete() {
+    if (!window.confirm(`Excluir a proposta ${proposta?.numero}? Esta ação não pode ser desfeita.`)) return
+    deleteMutation.mutate({ id: propostaId })
+  }
   const handleGerarPdf = () => {
     if (!data) { alert('Dados da proposta ainda não carregados.'); return }
     setGerandoPdf(true)
@@ -666,7 +674,15 @@ export function PropostaDetailPage() {
           </Btn>
         </div>
       </div>
-
+<Btn
+            variant="ghost"
+            size="sm"
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            style={{ color: C.danger, borderColor: C.danger + '50' }}
+          >
+            {deleteMutation.isPending ? '⏳ Excluindo...' : '🗑 Excluir'}
+          </Btn>
       <div style={{ background: C.darkMid, padding: '0 24px', borderBottom: `1px solid ${C.darkBorder}` }}>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
       </div>

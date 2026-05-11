@@ -936,4 +936,35 @@ export const propostaRouter = router({
 
       return { ok: true, sizing: novoSizing }
     }),
-})
+// Exclui proposta e todos os registros relacionados
+  delete: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+
+      const [prop] = await ctx.db
+        .select()
+        .from(proposta)
+        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, empresaId)))
+        .limit(1)
+
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      // Cascata manual: parcelas → condicoes → itens → prec → af → blocos → equips → dim → snapshot → proposta
+      const conds = await ctx.db.select({ id: ccTable.id }).from(ccTable).where(eq(ccTable.propostaId, input.id))
+      for (const c of conds) {
+        await ctx.db.delete(ppTable).where(eq(ppTable.condicaoId, c.id!)).execute()
+      }
+      await ctx.db.delete(ccTable)             .where(eq(ccTable.propostaId,            input.id)).execute()
+      await ctx.db.delete(itemPrecTable)        .where(eq(itemPrecTable.propostaId,       input.id)).execute()
+      await ctx.db.delete(precTable)            .where(eq(precTable.propostaId,           input.id)).execute()
+      await ctx.db.delete(afTable)              .where(eq(afTable.propostaId,             input.id)).execute()
+      await ctx.db.delete(blocoTable)           .where(eq(blocoTable.propostaId,          input.id)).execute()
+      await ctx.db.delete(equipamentoProposta)  .where(eq(equipamentoProposta.propostaId, input.id)).execute()
+      await ctx.db.delete(dimTable)             .where(eq(dimTable.propostaId,            input.id)).execute()
+      await ctx.db.delete(premissasSnapshot)    .where(eq(premissasSnapshot.propostaId,   input.id)).execute()
+      await ctx.db.delete(proposta)             .where(eq(proposta.id,                    input.id)).execute()
+
+      return { ok: true }
+    }),
+  })
