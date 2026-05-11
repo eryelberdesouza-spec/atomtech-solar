@@ -686,6 +686,41 @@ export const propostaRouter = router({
         }
       }
 
+      // ── Atualiza condições comerciais proporcionalmente ao novo preço ──────
+      const precAnteriorValor = Number(prec.precoFinal)
+      if (precAnteriorValor > 0 && Math.abs(precoFinal - precAnteriorValor) > 0.01) {
+        const ratio = precoFinal / precAnteriorValor
+        const condicoesList = await ctx.db
+          .select()
+          .from(ccTable)
+          .where(eq(ccTable.propostaId, propostaId))
+
+        for (const cond of condicoesList) {
+          const novoValorCond = Number(cond.valorTotal) * ratio
+          await ctx.db
+            .update(ccTable)
+            .set({ valorTotal: String(novoValorCond) })
+            .where(eq(ccTable.id, cond.id!))
+            .execute()
+
+          if (cond.id) {
+            const parcelas = await ctx.db
+              .select()
+              .from(ppTable)
+              .where(eq(ppTable.condicaoId, cond.id))
+
+            for (const p of parcelas) {
+              await ctx.db
+                .update(ppTable)
+                .set({ valor: String(Number(p.valor) * ratio) })
+                .where(eq(ppTable.id, p.id!))
+                .execute()
+            }
+          }
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       return { ok: true, precoFinal }
     }),
 
