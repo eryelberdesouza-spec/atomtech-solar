@@ -171,7 +171,9 @@ function TabFinanceiro({ af }: any) {
   )
 }
 
-// ─── TAB PRECIFICAÇÃO — com inicialização correta e modo preço direto ─────────
+// ─── TAB PRECIFICAÇÃO — REVISÃO COMPLETA ─────────────────────────
+// Fixes: busca de itens com includes(), fórmula consistente com engine,
+// modo "Preço Final Direto" sem comissão adicional, display transparente
 function TabPrecificacao({ prec, propostaId }: any) {
   const utils = trpc.useUtils()
   const updatePrec = trpc.proposta.updatePrecificacao.useMutation({
@@ -182,12 +184,23 @@ function TabPrecificacao({ prec, propostaId }: any) {
   const [editando,        setEditando]        = useState(false)
   const [modoPrecoFinal,  setModoPrecoFinal]  = useState(false)
 
-  // Identifica os itens reais para inicializar o formulário corretamente
+  // Busca com includes() — descrições no banco incluem quantidade: "Instalação dos Módulos (19 un.)"
   const itens: any[] = prec?.itens ?? []
-  const itemKit     = itens.find((i: any) => i.tipoCusto === 'avancado' || i.descricao?.toLowerCase().includes('material') || i.descricao?.toLowerCase().includes('kit'))
-  const itemInstMod = itens.find((i: any) => i.descricao === 'Instalação dos Módulos')
-  const itemInstInv = itens.find((i: any) => i.descricao === 'Instalação do Inversor')
-  const itemProjeto = itens.find((i: any) => i.descricao === 'Projeto de Engenharia')
+  const itemKit = itens.find((i: any) =>
+    i.tipoCusto === 'avancado' ||
+    (i.descricao && (i.descricao.toLowerCase().includes('material') || i.descricao.toLowerCase().includes('kit')))
+  )
+  const itemInstMod = itens.find((i: any) =>
+    i.descricao && (i.descricao.toLowerCase().includes('módulo') || i.descricao.toLowerCase().includes('modulo'))
+  )
+  const itemInstInv = itens.find((i: any) =>
+    i.descricao &&
+    (i.descricao.toLowerCase().includes('inversor') || i.descricao.toLowerCase().includes('micro')) &&
+    !i.descricao.toLowerCase().includes('kit')
+  )
+  const itemProjeto = itens.find((i: any) =>
+    i.descricao && (i.descricao.toLowerCase().includes('projeto') || i.descricao.toLowerCase().includes('engenhar'))
+  )
 
   const custoKitReal      = Number(itemKit?.custoTotal      ?? prec?.custoTotal ?? 0)
   const custoInstModReal  = Number(itemInstMod?.custoTotal  ?? 0)
@@ -201,7 +214,6 @@ function TabPrecificacao({ prec, propostaId }: any) {
     custoProjeto:           custoProjetoReal,
     comissao:               Number(prec?.comissaoAplicada ?? 0),
     margemOverride:         Number(prec?.margemAplicada   ?? 33),
-    descontoAplicado:       Number(prec?.descontoAplicado ?? 0),
     precoFinalDireto:       '',
   })
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
@@ -214,7 +226,6 @@ function TabPrecificacao({ prec, propostaId }: any) {
       custoProjeto:           custoProjetoReal,
       comissao:               Number(prec?.comissaoAplicada ?? 0),
       margemOverride:         Number(prec?.margemAplicada   ?? 33),
-      descontoAplicado:       Number(prec?.descontoAplicado ?? 0),
       precoFinalDireto:       '',
     })
     setModoPrecoFinal(false)
@@ -223,32 +234,45 @@ function TabPrecificacao({ prec, propostaId }: any) {
 
   if (!prec) return <EmptyState icon="💰" title="Precificação não disponível" />
 
-  // Preview (modo componentes)
+  // Preview modo componentes (consistente com engine: precoFinal = precoVenda + comissao)
   const custoTotalPreview = form.custoKit + form.custoInstalacaoModulos + form.custoInstalacaoInversor + form.custoProjeto
   const precoVendaPreview = custoTotalPreview * (1 + form.margemOverride / 100)
-  const precoComComissao  = precoVendaPreview * (1 + form.comissao / 100)
-  const precoFinalPreview = precoComComissao  * (1 - form.descontoAplicado / 100)
+  const comissaoValPreview = precoVendaPreview * (form.comissao / 100)
+  const precoFinalPreview  = precoVendaPreview + comissaoValPreview
 
-  // Modo preço direto
+  // Modo preço direto — comissão NÃO é somada (já está embutida no preço informado)
   const precoFinalDiretoNum = form.precoFinalDireto ? Number(String(form.precoFinalDireto).replace(',', '.')) : 0
   const margemImplicita = custoTotalPreview > 0 && precoFinalDiretoNum > 0
     ? ((precoFinalDiretoNum / custoTotalPreview) - 1) * 100
     : null
 
+  // Display — usa o precoFinal e precoVenda do banco para mostrar o breakdown real
+  const precoVendaReal  = Number(prec.precoVenda  ?? 0)
+  const precoFinalReal  = Number(prec.precoFinal  ?? 0)
+  const custoTotalReal  = Number(prec.custoTotal  ?? 0)
+  const comissaoReal    = Number(prec.comissaoAplicada ?? 0)
+  const markupReal      = precoVendaReal - custoTotalReal
+  const comissaoValReal = precoVendaReal * comissaoReal / 100
+
   function handleSalvar() {
-    let margemParaEnviar = form.margemOverride
+    let margemParaEnviar  = form.margemOverride
+    let comissaoParaEnviar = form.comissao
+
     if (modoPrecoFinal && precoFinalDiretoNum > 0 && custoTotalPreview > 0) {
-      margemParaEnviar = ((precoFinalDiretoNum / custoTotalPreview) - 1) * 100
+      // Back-calcula margem; comissão já está no preço informado → passa 0
+      margemParaEnviar   = ((precoFinalDiretoNum / custoTotalPreview) - 1) * 100
+      comissaoParaEnviar = 0
     }
+
     updatePrec.mutate({
       propostaId,
       custoKit:               form.custoKit               > 0 ? form.custoKit               : undefined,
-      custoInstalacaoModulos: form.custoInstalacaoModulos > 0 ? form.custoInstalacaoModulos  : undefined,
+      custoInstalacaoModulos: form.custoInstalacaoModulos  > 0 ? form.custoInstalacaoModulos  : undefined,
       custoInstalacaoInversor:form.custoInstalacaoInversor > 0 ? form.custoInstalacaoInversor : undefined,
-      custoProjeto:           form.custoProjeto           > 0 ? form.custoProjeto            : undefined,
-      comissao:               form.comissao,
+      custoProjeto:           form.custoProjeto            > 0 ? form.custoProjeto            : undefined,
+      comissao:               comissaoParaEnviar,
       margemOverride:         margemParaEnviar,
-      descontoAplicado:       form.descontoAplicado,
+      descontoAplicado:       0,
     })
   }
 
@@ -262,88 +286,99 @@ function TabPrecificacao({ prec, propostaId }: any) {
           </Btn>
         </div>
 
-        {/* VISUALIZAÇÃO */}
+        {/* ── VISUALIZAÇÃO ─────────────────────────────────────── */}
         {!editando && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {/* Breakdown dos itens */}
             {itens.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, margin: '0 0 8px' }}>Composição do Custo</p>
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, margin: '0 0 8px' }}>Itens de Custo</p>
                 {itens.map((item: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.darkBorder}20` }}>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px solid ${C.darkBorder}18` }}>
                     <span style={{ color: C.textDim, fontSize: 12 }}>{item.descricao}</span>
-                    <span style={{ color: C.text, fontSize: 12, fontWeight: 500, fontFamily: 'monospace' }}>{formatCurrency(item.custoTotal)}</span>
+                    <span style={{ color: C.textMuted, fontSize: 12, fontFamily: 'monospace' }}>{formatCurrency(item.custoTotal)}</span>
                   </div>
                 ))}
               </div>
             )}
-            {/* Totais */}
+
+            {/* Fluxo de cálculo — transparente e claro */}
             {[
-              { label: 'Custo Total',                                                          value: prec.custoTotal,  color: C.text,    isPercent: false },
-              { label: `Margem (${Number(prec.margemAplicada).toFixed(1)}%)`,                  value: Number(prec.custoTotal) * Number(prec.margemAplicada) / 100, color: C.textMuted, isPercent: false },
-              { label: 'Preço de Venda',                                                        value: prec.precoVenda,  color: C.text,    isPercent: false },
-              Number(prec.descontoAplicado) > 0
-                ? { label: `Desconto (${Number(prec.descontoAplicado).toFixed(1)}%)`,           value: prec.descontoAplicado, color: C.danger, isPercent: false }
+              { label: 'Custo Total',                                       value: custoTotalReal,  color: C.text,    bold: false },
+              { label: `+ Markup (${Number(prec.margemAplicada).toFixed(1)}%)`, value: markupReal, color: C.textMuted, bold: false },
+              { label: 'Preço de Venda',                                    value: precoVendaReal,  color: C.text,    bold: false },
+              comissaoReal > 0
+                ? { label: `+ Comissão (${comissaoReal.toFixed(1)}%)`,      value: comissaoValReal, color: C.textMuted, bold: false }
                 : null,
-            ].filter(Boolean).map((r: any) => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${C.darkBorder}40` }}>
+            ].filter(Boolean).map((r: any, i: number) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.darkBorder}40` }}>
                 <span style={{ color: C.textMuted, fontSize: 13 }}>{r.label}</span>
                 <span style={{ color: r.color, fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{formatCurrency(r.value)}</span>
               </div>
             ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', borderTop: `1px solid ${C.darkBorder}`, marginTop: 6 }}>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0', borderTop: `2px solid ${C.darkBorder}`, marginTop: 4 }}>
               <span style={{ color: C.text, fontSize: 15, fontWeight: 700 }}>Preço Final</span>
-              <span style={{ color: C.solar, fontSize: 18, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(prec.precoFinal)}</span>
+              <span style={{ color: C.solar, fontSize: 18, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(precoFinalReal)}</span>
             </div>
           </div>
         )}
 
-        {/* EDIÇÃO */}
+        {/* ── EDIÇÃO ─────────────────────────────────────────── */}
         {editando && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* Toggle modo */}
-            <div style={{ display: 'flex', gap: 6, padding: '8px', background: C.dark, borderRadius: 8, border: `1px solid ${C.darkBorder}` }}>
+            <div style={{ display: 'flex', gap: 6, padding: '6px', background: C.dark, borderRadius: 8, border: `1px solid ${C.darkBorder}` }}>
               <button onClick={() => setModoPrecoFinal(false)} style={{
-                flex: 1, padding: '7px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                flex: 1, padding: '8px', borderRadius: 6, border: 'none', cursor: 'pointer',
                 fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
                 background: !modoPrecoFinal ? C.solar : 'transparent',
                 color: !modoPrecoFinal ? '#000' : C.textMuted,
               }}>⚙ Por componentes</button>
               <button onClick={() => setModoPrecoFinal(true)} style={{
-                flex: 1, padding: '7px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                flex: 1, padding: '8px', borderRadius: 6, border: 'none', cursor: 'pointer',
                 fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
                 background: modoPrecoFinal ? C.solar : 'transparent',
                 color: modoPrecoFinal ? '#000' : C.textMuted,
-              }}>💰 Preço final direto</button>
+              }}>💰 Definir preço final direto</button>
             </div>
 
             {/* MODO: Preço Final Direto */}
             {modoPrecoFinal && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ background: `${C.solar}10`, border: `1px solid ${C.solar}30`, borderRadius: 8, padding: '10px 14px' }}>
-                  <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 2px' }}>
-                    Custo Total atual: {formatCurrency(prec.custoTotal)}
-                  </p>
-                  <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
-                    Digite o preço final desejado — a margem será back-calculada automaticamente.
+                <div style={{ background: `${C.solar}10`, border: `1px solid ${C.solar}30`, borderRadius: 8, padding: '12px 14px' }}>
+                  <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, margin: '0 0 4px' }}>Como funciona</p>
+                  <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.6 }}>
+                    Informe quanto o cliente pagará. O sistema calcula a margem automaticamente.
+                    Neste modo, <strong style={{ color: C.text }}>não há comissão adicional</strong> — inclua no preço se necessário.
                   </p>
                 </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>Custo Total dos Itens</p>
+                    <p style={{ color: C.text, fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(custoTotalPreview > 0 ? custoTotalPreview : custoTotalReal)}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>Preço atual</p>
+                    <p style={{ color: C.textMuted, fontSize: 16, fontFamily: 'monospace' }}>{formatCurrency(precoFinalReal)}</p>
+                  </div>
+                </div>
                 <Input
-                  label="Preço Final Desejado (R$)"
+                  label="Preço Final Desejado (R$) — o que o cliente paga"
                   type="number"
                   value={form.precoFinalDireto}
                   onChange={e => set('precoFinalDireto', e.target.value)}
                   placeholder={Number(prec.precoFinal).toFixed(2)}
                 />
                 {margemImplicita !== null && (
-                  <div style={{ background: `${C.green}10`, border: `1px solid ${C.green}30`, borderRadius: 8, padding: '10px 14px' }}>
-                    <p style={{ color: C.green, fontSize: 12, fontWeight: 600, margin: 0 }}>
-                      Margem implícita: {margemImplicita.toFixed(2)}% &nbsp;·&nbsp; Custo base: {formatCurrency(custoTotalPreview)}
+                  <div style={{ background: margemImplicita > 0 ? `${C.green}10` : `${C.danger}10`, border: `1px solid ${margemImplicita > 0 ? C.green : C.danger}30`, borderRadius: 8, padding: '10px 14px' }}>
+                    <p style={{ color: margemImplicita > 0 ? C.green : C.danger, fontSize: 12, fontWeight: 600, margin: 0 }}>
+                      Markup implícito: {margemImplicita.toFixed(2)}%
+                      {margemImplicita < 0 && ' ⚠ Abaixo do custo!'}
                     </p>
                   </div>
                 )}
-                <Input label="Desconto à Vista (%)" type="number" value={form.descontoAplicado || ''} onChange={e => set('descontoAplicado', Number(e.target.value))} placeholder="0" suffix="%" />
               </div>
             )}
 
@@ -351,27 +386,42 @@ function TabPrecificacao({ prec, propostaId }: any) {
             {!modoPrecoFinal && (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Input label="Custo do Kit (R$)"             type="number" value={form.custoKit               || ''} onChange={e => set('custoKit',               Number(e.target.value))} />
-                  <Input label="Instalação Módulos (R$)"       type="number" value={form.custoInstalacaoModulos  || ''} onChange={e => set('custoInstalacaoModulos',  Number(e.target.value))} placeholder="0" />
-                  <Input label="Instalação Inversor (R$)"      type="number" value={form.custoInstalacaoInversor || ''} onChange={e => set('custoInstalacaoInversor', Number(e.target.value))} placeholder="0" />
-                  <Input label="Projeto de Engenharia (R$)"    type="number" value={form.custoProjeto            || ''} onChange={e => set('custoProjeto',            Number(e.target.value))} placeholder="0" />
-                  <Input label="Margem (%)"                    type="number" value={form.margemOverride          || ''} onChange={e => set('margemOverride',          Number(e.target.value))} suffix="%" />
-                  <Input label="Comissão (%)"                  type="number" value={form.comissao               || ''} onChange={e => set('comissao',               Number(e.target.value))} placeholder="0" suffix="%" />
-                  <Input label="Desconto à Vista (%)"          type="number" value={form.descontoAplicado        || ''} onChange={e => set('descontoAplicado',        Number(e.target.value))} placeholder="0" suffix="%" />
+                  <Input label="Custo do Kit (R$)"          type="number" value={form.custoKit               || ''} onChange={e => set('custoKit',               Number(e.target.value))} />
+                  <Input label="Instalação Módulos (R$)"    type="number" value={form.custoInstalacaoModulos  || ''} onChange={e => set('custoInstalacaoModulos',  Number(e.target.value))} placeholder="0" />
+                  <Input label="Instalação Inversor (R$)"   type="number" value={form.custoInstalacaoInversor || ''} onChange={e => set('custoInstalacaoInversor', Number(e.target.value))} placeholder="0" />
+                  <Input label="Projeto de Engenharia (R$)" type="number" value={form.custoProjeto            || ''} onChange={e => set('custoProjeto',            Number(e.target.value))} placeholder="0" />
+                  <Input label="Markup (%)"                 type="number" value={form.margemOverride          || ''} onChange={e => set('margemOverride',          Number(e.target.value))} suffix="%" />
+                  <Input label="Comissão do Vendedor (%)"   type="number" value={form.comissao               || ''} onChange={e => set('comissao',               Number(e.target.value))} placeholder="0" suffix="%" />
                 </div>
-                <div style={{ background: `${C.solar}10`, border: `1px solid ${C.solar}30`, borderRadius: 10, padding: '12px 16px' }}>
-                  <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 8px' }}>Preview</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                    <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>Custo Total</p><p style={{ color: C.text,  fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(custoTotalPreview)}</p></div>
-                    <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>Preço de Venda</p><p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(precoVendaPreview)}</p></div>
-                    <div><p style={{ color: C.textDim, fontSize: 10, margin: '0 0 2px' }}>Preço Final</p><p style={{ color: C.solar, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(precoFinalPreview)}</p></div>
+
+                {/* Preview fluxo de cálculo */}
+                <div style={{ background: `${C.solar}10`, border: `1px solid ${C.solar}30`, borderRadius: 10, padding: '14px 16px' }}>
+                  <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 10px' }}>Preview do Novo Preço</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {[
+                      { label: 'Custo Total',               value: custoTotalPreview,                         color: C.text     },
+                      { label: `+ Markup ${form.margemOverride}%`, value: custoTotalPreview * form.margemOverride / 100, color: C.textMuted },
+                      { label: 'Preço de Venda',             value: precoVendaPreview,                         color: C.text     },
+                      form.comissao > 0
+                        ? { label: `+ Comissão ${form.comissao}%`, value: comissaoValPreview, color: C.textMuted }
+                        : null,
+                    ].filter(Boolean).map((r: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: C.textMuted, fontSize: 12 }}>{r.label}</span>
+                        <span style={{ color: r.color, fontSize: 12, fontFamily: 'monospace' }}>{formatCurrency(r.value)}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.solar}40`, paddingTop: 6, marginTop: 2 }}>
+                      <span style={{ color: C.solar, fontSize: 13, fontWeight: 700 }}>Preço Final</span>
+                      <span style={{ color: C.solar, fontSize: 14, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(precoFinalPreview)}</span>
+                    </div>
                   </div>
                 </div>
               </>
             )}
 
             <div style={{ background: `${C.accent}10`, border: `1px solid ${C.accent}30`, borderRadius: 8, padding: '8px 14px' }}>
-              <p style={{ color: C.accent, fontSize: 11, margin: 0 }}>ℹ As Condições Comerciais serão atualizadas automaticamente com o novo preço.</p>
+              <p style={{ color: C.accent, fontSize: 11, margin: 0 }}>ℹ As Condições Comerciais serão recalculadas automaticamente com o novo preço.</p>
             </div>
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -597,15 +647,7 @@ export function PropostaDetailPage() {
   )
   const updateStatus = trpc.proposta.updateStatus.useMutation()
   const utils = trpc.useUtils()
-const deleteMutation = trpc.proposta.delete.useMutation({
-    onSuccess: () => navigate('/propostas'),
-    onError: (e) => alert('Erro ao excluir: ' + e.message),
-  })
 
-  function handleDelete() {
-    if (!window.confirm(`Excluir a proposta ${proposta?.numero}? Esta ação não pode ser desfeita.`)) return
-    deleteMutation.mutate({ id: propostaId })
-  }
   const handleGerarPdf = () => {
     if (!data) { alert('Dados da proposta ainda não carregados.'); return }
     setGerandoPdf(true)
@@ -674,15 +716,7 @@ const deleteMutation = trpc.proposta.delete.useMutation({
           </Btn>
         </div>
       </div>
-<Btn
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            style={{ color: C.danger, borderColor: C.danger + '50' }}
-          >
-            {deleteMutation.isPending ? '⏳ Excluindo...' : '🗑 Excluir'}
-          </Btn>
+
       <div style={{ background: C.darkMid, padding: '0 24px', borderBottom: `1px solid ${C.darkBorder}` }}>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
       </div>

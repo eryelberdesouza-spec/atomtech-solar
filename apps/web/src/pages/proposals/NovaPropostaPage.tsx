@@ -1,4 +1,3 @@
-
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
@@ -7,23 +6,29 @@ import { Btn, Input, Select, Card, Spinner, C, PageWrapper } from '../../compone
 
 const TOPOLOGIA_OPTIONS = [
   { value: 'microinversor', label: 'Microinversor (recomendado)' },
-  { value: 'tradicional', label: 'Tradicional (String)' },
-  { value: 'otimizador', label: 'Otimizador de Potência' },
+  { value: 'tradicional',   label: 'Tradicional (String)'        },
+  { value: 'otimizador',    label: 'Otimizador de Potência'       },
 ]
-
 const TELHADO_OPTIONS = [
-  { value: 'ceramico', label: 'Cerâmico' },
-  { value: 'fibrocimento', label: 'Fibrocimento' },
-  { value: 'metalico', label: 'Metálico' },
-  { value: 'laje', label: 'Laje' },
-  { value: 'shingle', label: 'Shingle' },
-  { value: 'carport', label: 'Carport' },
-  { value: 'zipado', label: 'Zipado (Standing Seam)' },
-  { value: 'solo', label: 'Solo' },
+  { value: 'ceramico',     label: 'Cerâmico'              },
+  { value: 'fibrocimento', label: 'Fibrocimento'           },
+  { value: 'metalico',     label: 'Metálico'               },
+  { value: 'laje',         label: 'Laje'                   },
+  { value: 'shingle',      label: 'Shingle'                },
+  { value: 'carport',      label: 'Carport'                },
+  { value: 'zipado',       label: 'Zipado (Standing Seam)' },
+  { value: 'solo',         label: 'Solo'                   },
 ]
 
-const hoje = new Date().toISOString().split('T')[0]
+const hoje    = new Date().toISOString().split('T')[0]
 const validade = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0]
+
+const MARCOES_PADRAO = [
+  { descricao: 'Entrada — assinatura do contrato',      percentual: 50, prazoDias: 2,  tipoPrazo: 'uteis'   },
+  { descricao: '2ª parcela — entrega dos equipamentos', percentual: 20, prazoDias: 2,  tipoPrazo: 'uteis'   },
+  { descricao: '3ª parcela — conclusão dos serviços',   percentual: 20, prazoDias: 2,  tipoPrazo: 'uteis'   },
+  { descricao: '4ª parcela — 28 dias corridos após 3ª', percentual: 10, prazoDias: 28, tipoPrazo: 'corridos' },
+]
 
 const FORM_INICIAL = {
   clienteId: '', dataEmissao: hoje, dataValidade: validade,
@@ -34,29 +39,38 @@ const FORM_INICIAL = {
   fabricanteInversor: '', modeloInversor: '', potenciaInversorKw: 0,
   overloadInversor: 0, entradasPorMicro: 1, quantidadeInversoresManual: 0,
   custoKitFotovoltaico: 0, comissao: 0, descontoAvista: 0,
-  marcoParcelas: [
-    { descricao: 'Entrada — assinatura do contrato', percentual: 50, prazoDias: 2, tipoPrazo: 'uteis' },
-    { descricao: '2ª parcela — entrega dos equipamentos', percentual: 20, prazoDias: 2, tipoPrazo: 'uteis' },
-    { descricao: '3ª parcela — conclusão dos serviços', percentual: 20, prazoDias: 2, tipoPrazo: 'uteis' },
-    { descricao: '4ª parcela — 28 dias corridos após 3ª', percentual: 10, prazoDias: 28, tipoPrazo: 'corridos' },
-  ],
+  marcoParcelas: MARCOES_PADRAO,
   observacoes: '',
 }
 
 const STEPS = ['Cliente', 'Dados Técnicos', 'Precificação']
 
+// Estimativa de instalação baseada nos defaults do engine
+function estimarCustosInstalacao(qtdModulos: number, qtdInversores: number) {
+  const maoObraModulo   = 70    // R$/módulo  (default engine)
+  const maoObraInversor = 150   // R$/inversor
+  const projeto         = 800   // R$ fixo
+  return {
+    instModulos:  qtdModulos   * maoObraModulo,
+    instInversor: qtdInversores * maoObraInversor,
+    projeto,
+    total: qtdModulos * maoObraModulo + qtdInversores * maoObraInversor + projeto,
+  }
+}
+
 export function NovaPropostaPage() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState(FORM_INICIAL)
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [step, setStep]                         = useState(1)
+  const [form, setForm]                         = useState(FORM_INICIAL)
+  const [mostrarParcelamento, setMostrarParcela] = useState(false)
+  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
   const { data: clientes } = trpc.cliente.list.useQuery({ porPagina: 200 })
 
   const { data: sizingPreview, isLoading: loadingSizing } = trpc.calculo.sizing.useQuery(
     {
-      consumoMedioMensalKwh: form.modoCalculo === 'kwh' ? form.consumoMensalKwh : undefined,
-      potenciaFinalKwpManual: form.modoCalculo === 'kwp' ? form.potenciaKwpManual : undefined,
+      consumoMedioMensalKwh:   form.modoCalculo === 'kwh' ? form.consumoMensalKwh    : undefined,
+      potenciaFinalKwpManual:  form.modoCalculo === 'kwp' ? form.potenciaKwpManual   : undefined,
       topologia: form.topologia, tipoTelhado: form.tipoTelhado,
       desvioAzimutal: form.desvioAzimutal, inclinacaoGraus: form.inclinacaoGraus,
       sobredimensionamento: form.sobredimensionamento, empresaId: 1,
@@ -70,41 +84,54 @@ export function NovaPropostaPage() {
   )
 
   const createMutation = trpc.proposta.create.useMutation({
-    onSuccess: (data) => navigate(`/propostas/${data.propostaId}`),
+    onSuccess: (data: any) => navigate(`/propostas/${data.propostaId}`),
   })
 
   const handleCreate = () => {
     if (!form.clienteId || form.custoKitFotovoltaico <= 0) return
     createMutation.mutate({
-      clienteId: Number(form.clienteId),
-      faturaId: undefined,
-      consumoMedioMensalKwh: form.modoCalculo === 'kwh' ? form.consumoMensalKwh : undefined,
-      potenciaFinalKwpManual: form.modoCalculo === 'kwp' ? form.potenciaKwpManual : undefined,
+      clienteId:              Number(form.clienteId),
+      consumoMedioMensalKwh:  form.modoCalculo === 'kwh' ? form.consumoMensalKwh    : undefined,
+      potenciaFinalKwpManual: form.modoCalculo === 'kwp' ? form.potenciaKwpManual   : undefined,
       topologia: form.topologia, tipoTelhado: form.tipoTelhado,
       desvioAzimutal: form.desvioAzimutal, inclinacaoGraus: form.inclinacaoGraus,
       sobredimensionamento: form.sobredimensionamento,
-      custoKitFotovoltaico: form.custoKitFotovoltaico, comissao: form.comissao,
-      dataEmissao: form.dataEmissao, dataValidade: form.dataValidade,
-      fabricanteModulo: form.fabricanteModulo || undefined,
-      modeloModulo: form.modeloModulo || undefined,
-      potenciaModuloWp: form.potenciaModuloWp,
-      quantidadeModulosManual: form.quantidadeModulosManual || undefined,
-      fabricanteInversor: form.fabricanteInversor || undefined,
-      modeloInversor: form.modeloInversor || undefined,
-      potenciaInversorKw: form.potenciaInversorKw || undefined,
-      overloadInversor: form.overloadInversor || 0,
-      entradasPorMicro: form.entradasPorMicro || 1,
+      custoKitFotovoltaico:   form.custoKitFotovoltaico,
+      comissao:               form.comissao,
+      dataEmissao:            form.dataEmissao,
+      dataValidade:           form.dataValidade,
+      fabricanteModulo:       form.fabricanteModulo  || undefined,
+      modeloModulo:           form.modeloModulo      || undefined,
+      potenciaModuloWp:       form.potenciaModuloWp,
+      quantidadeModulosManual:   form.quantidadeModulosManual   || undefined,
+      fabricanteInversor:     form.fabricanteInversor || undefined,
+      modeloInversor:         form.modeloInversor    || undefined,
+      potenciaInversorKw:     form.potenciaInversorKw || undefined,
+      overloadInversor:       form.overloadInversor  || 0,
+      entradasPorMicro:       form.entradasPorMicro  || 1,
       quantidadeInversoresManual: form.quantidadeInversoresManual || undefined,
-      observacoesInternas: form.observacoes || undefined,
-      descontoAvista: form.descontoAvista || undefined,
-      marcoParcelas: form.marcoParcelas,
-    })
+      observacoesInternas:    form.observacoes       || undefined,
+      descontoAvista:         form.descontoAvista    || undefined,
+      marcoParcelas:          form.marcoParcelas,
+    } as any)
   }
 
   const clienteOptions = [
     { value: '', label: 'Selecione o cliente...' },
-    ...(clientes?.data ?? []).map(c => ({ value: String(c.id), label: c.nome })),
+    ...(clientes?.data ?? []).map((c: any) => ({ value: String(c.id), label: c.nome })),
   ]
+
+  // Cálculo da estimativa de preço (inclui instalação)
+  const qtdModulos    = (sizingPreview as any)?.quantidadeModulosAproximada ?? 0
+  const qtdInversores = form.topologia === 'microinversor'
+    ? Math.ceil(qtdModulos / (form.entradasPorMicro || 1))
+    : sizingPreview ? 1 : 0
+  const instEstimativa = qtdModulos > 0 ? estimarCustosInstalacao(qtdModulos, qtdInversores) : null
+  const custoTotalEstimado = form.custoKitFotovoltaico + (instEstimativa?.total ?? 0)
+  const MARGEM_PADRAO = 33
+  const precoVendaEstimado = custoTotalEstimado * (1 + MARGEM_PADRAO / 100)
+  const comissaoEstimada   = precoVendaEstimado * (form.comissao / 100)
+  const precoFinalEstimado = precoVendaEstimado + comissaoEstimada
 
   const StepBar = () => (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
@@ -135,14 +162,15 @@ export function NovaPropostaPage() {
       <Card style={{ padding: '28px 32px', maxWidth: 820 }}>
         <StepBar />
 
+        {/* ── STEP 1: CLIENTE ─────────────────────────────────────────── */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Selecione o Cliente</h3>
-            <Select label="Cliente *" options={clienteOptions} value={form.clienteId} onChange={e => set('clienteId', e.target.value)} />
+            <Select label="Cliente *" options={clienteOptions} value={form.clienteId} onChange={(e: any) => set('clienteId', e.target.value)} />
             {form.clienteId && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <Input label="Data de Emissão" type="date" value={form.dataEmissao} onChange={e => set('dataEmissao', e.target.value)} />
-                <Input label="Data de Validade" type="date" value={form.dataValidade} onChange={e => set('dataValidade', e.target.value)} />
+                <Input label="Data de Emissão" type="date" value={form.dataEmissao} onChange={(e: any) => set('dataEmissao', e.target.value)} />
+                <Input label="Data de Validade" type="date" value={form.dataValidade} onChange={(e: any) => set('dataValidade', e.target.value)} />
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
@@ -151,6 +179,7 @@ export function NovaPropostaPage() {
           </div>
         )}
 
+        {/* ── STEP 2: DADOS TÉCNICOS ──────────────────────────────────── */}
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Dados Técnicos do Sistema</h3>
@@ -160,7 +189,7 @@ export function NovaPropostaPage() {
               <div style={{ display: 'flex', gap: 10 }}>
                 {[
                   { value: 'kwh', label: '⚡ Por Consumo (kWh/mês)', desc: 'Informa o consumo médio e o sistema calcula a potência' },
-                  { value: 'kwp', label: '☀️ Por Potência (kWp)', desc: 'Informa diretamente a potência desejada do sistema' },
+                  { value: 'kwp', label: '☀️ Por Potência (kWp)',    desc: 'Informa diretamente a potência desejada do sistema' },
                 ].map(opt => (
                   <div key={opt.value} onClick={() => set('modoCalculo', opt.value)} style={{ flex: 1, padding: '14px 16px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${form.modoCalculo === opt.value ? C.solar : C.darkBorder}`, background: form.modoCalculo === opt.value ? `${C.solar}10` : C.dark }}>
                     <p style={{ color: form.modoCalculo === opt.value ? C.solar : C.text, fontWeight: 600, fontSize: 13, margin: '0 0 4px' }}>{opt.label}</p>
@@ -172,29 +201,27 @@ export function NovaPropostaPage() {
 
             {form.modoCalculo === 'kwh' ? (
               <div>
-                <Input label="Consumo Médio Mensal (kWh) *" type="number" value={form.consumoMensalKwh || ''} onChange={e => set('consumoMensalKwh', Number(e.target.value))} placeholder="Ex: 1500" />
+                <Input label="Consumo Médio Mensal (kWh) *" type="number" value={form.consumoMensalKwh || ''} onChange={(e: any) => set('consumoMensalKwh', Number(e.target.value))} placeholder="Ex: 1500" />
                 <p style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>Consumo médio dos últimos 12 meses ou valor atual da conta de energia</p>
               </div>
             ) : (
               <div>
-                <Input label="Potência do Sistema (kWp) *" type="number" value={form.potenciaKwpManual || ''} onChange={e => set('potenciaKwpManual', Number(e.target.value))} placeholder="Ex: 10.5" />
+                <Input label="Potência do Sistema (kWp) *" type="number" value={form.potenciaKwpManual || ''} onChange={(e: any) => set('potenciaKwpManual', Number(e.target.value))} placeholder="Ex: 10.5" />
                 <p style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>Potência total desejada para o sistema fotovoltaico</p>
               </div>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <Select label="Topologia" options={TOPOLOGIA_OPTIONS} value={form.topologia} onChange={e => set('topologia', e.target.value)} />
-              <Select label="Tipo de Telhado" options={TELHADO_OPTIONS} value={form.tipoTelhado} onChange={e => set('tipoTelhado', e.target.value)} />
-              <Input label="Desvio Azimutal (°)" type="number" value={form.desvioAzimutal} onChange={e => set('desvioAzimutal', Number(e.target.value))} suffix="°" />
-              <Input label="Inclinação (°)" type="number" value={form.inclinacaoGraus} onChange={e => set('inclinacaoGraus', Number(e.target.value))} suffix="°" />
+              <Select label="Topologia"        options={TOPOLOGIA_OPTIONS} value={form.topologia}   onChange={(e: any) => set('topologia',   e.target.value)} />
+              <Select label="Tipo de Telhado"  options={TELHADO_OPTIONS}   value={form.tipoTelhado} onChange={(e: any) => set('tipoTelhado', e.target.value)} />
+              <Input  label="Desvio Azimutal (°)" type="number" value={form.desvioAzimutal}   onChange={(e: any) => set('desvioAzimutal',   Number(e.target.value))} suffix="°" />
+              <Input  label="Inclinação (°)"       type="number" value={form.inclinacaoGraus}  onChange={(e: any) => set('inclinacaoGraus',  Number(e.target.value))} suffix="°" />
             </div>
 
             <div>
-              <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>
-                Sobredimensionamento (50% a 80%)
-              </label>
+              <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 8 }}>Sobredimensionamento (50% a 80%)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="range" min={50} max={80} step={5} value={form.sobredimensionamento} onChange={e => set('sobredimensionamento', Number(e.target.value))} style={{ flex: 1 }} />
+                <input type="range" min={50} max={80} step={5} value={form.sobredimensionamento} onChange={(e: any) => set('sobredimensionamento', Number(e.target.value))} style={{ flex: 1 }} />
                 <span style={{ color: C.solar, fontWeight: 700, fontSize: 16, minWidth: 40, fontFamily: 'monospace' }}>{form.sobredimensionamento}%</span>
               </div>
             </div>
@@ -205,11 +232,11 @@ export function NovaPropostaPage() {
                 <p style={{ color: C.green, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 10px' }}>Preview do Dimensionamento</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                   {[
-                    { label: 'Potência Final', value: `${Number(sizingPreview.potenciaFinalKwp).toFixed(2)} kWp`, color: C.solar },
-                    { label: 'Geração Anual', value: `${Number(sizingPreview.geracaoAnualKwh).toLocaleString('pt-BR')} kWh`, color: C.green },
-                    { label: 'Área Estimada', value: `${Number(sizingPreview.areaEstimadaM2).toFixed(0)} m²`, color: C.text },
-                    { label: '% Compensação', value: `${Number(sizingPreview.percentualCompensacao).toFixed(0)}%`, color: C.accent },
-                  ].map(k => (
+                    { label: 'Potência Final', value: `${Number((sizingPreview as any).potenciaFinalKwp).toFixed(2)} kWp`, color: C.solar },
+                    { label: 'Geração Anual',  value: `${Number((sizingPreview as any).geracaoAnualKwh).toLocaleString('pt-BR')} kWh`, color: C.green },
+                    { label: 'Área Estimada',  value: `${Number((sizingPreview as any).areaEstimadaM2).toFixed(0)} m²`, color: C.text },
+                    { label: '% Compensação',  value: `${Number((sizingPreview as any).percentualCompensacao).toFixed(0)}%`, color: C.accent },
+                  ].map((k: any) => (
                     <div key={k.label} style={{ textAlign: 'center' }}>
                       <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', margin: '0 0 2px' }}>{k.label}</p>
                       <p style={{ color: k.color, fontSize: 15, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{k.value}</p>
@@ -222,29 +249,28 @@ export function NovaPropostaPage() {
             <div style={{ borderTop: `1px solid ${C.darkBorder}`, paddingTop: 16 }}>
               <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 12px' }}>Módulos Fotovoltaicos</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px', gap: 12, marginBottom: 16 }}>
-                <Input label="Fabricante" value={form.fabricanteModulo} onChange={e => set('fabricanteModulo', e.target.value)} placeholder="Ex: JA Solar" />
-                <Input label="Modelo" value={form.modeloModulo} onChange={e => set('modeloModulo', e.target.value)} placeholder="Ex: JAM72S30-620" />
-                <Input label="Potência (Wp)" type="number" value={form.potenciaModuloWp || ''} onChange={e => set('potenciaModuloWp', Number(e.target.value))} placeholder="620" />
-                <Input label="Qtd. Manual" type="number" value={form.quantidadeModulosManual || ''} onChange={e => set('quantidadeModulosManual', Number(e.target.value))} placeholder="Auto" />
+                <Input label="Fabricante"    value={form.fabricanteModulo}       onChange={(e: any) => set('fabricanteModulo',       e.target.value)} placeholder="Ex: JA Solar" />
+                <Input label="Modelo"        value={form.modeloModulo}           onChange={(e: any) => set('modeloModulo',           e.target.value)} placeholder="Ex: JAM72S30-620" />
+                <Input label="Potência (Wp)" type="number" value={form.potenciaModuloWp || ''}       onChange={(e: any) => set('potenciaModuloWp',       Number(e.target.value))} placeholder="620" />
+                <Input label="Qtd. Manual"   type="number" value={form.quantidadeModulosManual || ''} onChange={(e: any) => set('quantidadeModulosManual', Number(e.target.value))} placeholder="Auto" />
               </div>
-
               <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 12px' }}>
                 {form.topologia === 'microinversor' ? 'Microinversores' : 'Inversores'}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px', gap: 12 }}>
-                <Input label="Fabricante" value={form.fabricanteInversor} onChange={e => set('fabricanteInversor', e.target.value)} placeholder="Ex: Sungrow" />
-                <Input label="Modelo" value={form.modeloInversor} onChange={e => set('modeloInversor', e.target.value)} placeholder="Ex: SG5.0RT" />
-                <Input label={form.topologia === 'microinversor' ? 'Potência (Wp)' : 'Potência (kW)'} type="number" value={form.potenciaInversorKw || ''} onChange={e => set('potenciaInversorKw', Number(e.target.value))} placeholder={form.topologia === 'microinversor' ? '2000' : '12'} />
+                <Input label="Fabricante" value={form.fabricanteInversor} onChange={(e: any) => set('fabricanteInversor', e.target.value)} placeholder="Ex: Sungrow" />
+                <Input label="Modelo"     value={form.modeloInversor}     onChange={(e: any) => set('modeloInversor',     e.target.value)} placeholder="Ex: SG5.0RT" />
+                <Input label={form.topologia === 'microinversor' ? 'Potência (Wp)' : 'Potência (kW)'} type="number" value={form.potenciaInversorKw || ''} onChange={(e: any) => set('potenciaInversorKw', Number(e.target.value))} placeholder={form.topologia === 'microinversor' ? '2000' : '12'} />
                 {form.topologia === 'microinversor' ? (
                   <div>
-                    <Input label="Entradas/Micro" type="number" value={form.entradasPorMicro || ''} onChange={e => set('entradasPorMicro', Number(e.target.value))} placeholder="1" />
+                    <Input label="Entradas/Micro" type="number" value={form.entradasPorMicro || ''} onChange={(e: any) => set('entradasPorMicro', Number(e.target.value))} placeholder="1" />
                     {sizingPreview && form.entradasPorMicro > 0 && (
-                      <p style={{ color: C.textDim, fontSize: 11, margin: '2px 0 0' }}>Auto: {Math.ceil(sizingPreview.quantidadeModulosAproximada / form.entradasPorMicro)}</p>
+                      <p style={{ color: C.textDim, fontSize: 11, margin: '2px 0 0' }}>Auto: {Math.ceil((sizingPreview as any).quantidadeModulosAproximada / form.entradasPorMicro)}</p>
                     )}
                   </div>
                 ) : (
                   <div>
-                    <Input label="Overload (%)" type="number" value={form.overloadInversor || ''} onChange={e => set('overloadInversor', Number(e.target.value))} placeholder="Ex: 80" />
+                    <Input label="Overload (%)" type="number" value={form.overloadInversor || ''} onChange={(e: any) => set('overloadInversor', Number(e.target.value))} placeholder="Ex: 80" />
                     {form.potenciaInversorKw > 0 && form.overloadInversor > 0 && (
                       <p style={{ color: C.green, fontSize: 11, margin: '2px 0 0' }}>Cap: {(form.potenciaInversorKw * (1 + form.overloadInversor / 100)).toFixed(1)} kW</p>
                     )}
@@ -260,87 +286,171 @@ export function NovaPropostaPage() {
           </div>
         )}
 
+        {/* ── STEP 3: PRECIFICAÇÃO ────────────────────────────────────── */}
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Precificação e Condições</h3>
 
+            {/* Custo do Kit */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <Input label="Custo do Kit Fotovoltaico (R$) *" type="number" value={form.custoKitFotovoltaico || ''} onChange={e => set('custoKitFotovoltaico', Number(e.target.value))} placeholder="Ex: 18500" />
-              <Input label="Comissão do Vendedor (%)" type="number" value={form.comissao || ''} onChange={e => set('comissao', Number(e.target.value))} placeholder="0" suffix="%" />
+              <div>
+                <Input
+                  label="Custo do Kit Fotovoltaico (R$) *"
+                  type="number"
+                  value={form.custoKitFotovoltaico || ''}
+                  onChange={(e: any) => set('custoKitFotovoltaico', Number(e.target.value))}
+                  placeholder="Ex: 18500"
+                />
+                <p style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>
+                  Custo dos equipamentos (kit). Instalação e projeto são calculados automaticamente.
+                </p>
+              </div>
+              <div>
+                <Input
+                  label="Comissão do Vendedor (%)"
+                  type="number"
+                  value={form.comissao || ''}
+                  onChange={(e: any) => set('comissao', Number(e.target.value))}
+                  placeholder="0"
+                  suffix="%"
+                />
+                <p style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>
+                  Adicionada ao preço de venda. Deixe 0 se não houver comissão.
+                </p>
+              </div>
             </div>
 
+            {/* Preview de preço */}
             {form.custoKitFotovoltaico > 0 && (
-              <div style={{ background: `${C.solar}10`, borderRadius: 10, padding: '14px 18px', border: `1px solid ${C.solar}30` }}>
-                <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 10px' }}>Estimativa com Margem de 33%</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  <div>
-                    <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', margin: '0 0 2px' }}>Custo Total</p>
-                    <p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(form.custoKitFotovoltaico)}</p>
+              <div style={{ background: `${C.solar}10`, borderRadius: 10, padding: '16px 18px', border: `1px solid ${C.solar}30` }}>
+                <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 12px' }}>
+                  Estimativa de Preço — Margem padrão de {MARGEM_PADRAO}%
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: C.textDim, fontSize: 12 }}>Custo do Kit</span>
+                    <span style={{ color: C.text, fontSize: 12, fontFamily: 'monospace' }}>{formatCurrency(form.custoKitFotovoltaico)}</span>
                   </div>
-                  <div>
-                    <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', margin: '0 0 2px' }}>Preço de Venda</p>
-                    <p style={{ color: C.solar, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatCurrency(form.custoKitFotovoltaico * 1.33)}</p>
+                  {instEstimativa && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: C.textDim, fontSize: 12 }}>Instalação estimada ({qtdModulos} mód. + {qtdInversores} inv.)</span>
+                        <span style={{ color: C.textDim, fontSize: 12, fontFamily: 'monospace' }}>{formatCurrency(instEstimativa.instModulos + instEstimativa.instInversor)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: C.textDim, fontSize: 12 }}>Projeto de engenharia</span>
+                        <span style={{ color: C.textDim, fontSize: 12, fontFamily: 'monospace' }}>{formatCurrency(instEstimativa.projeto)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.darkBorder}40`, paddingTop: 6 }}>
+                        <span style={{ color: C.text, fontSize: 12, fontWeight: 600 }}>Custo Total Estimado</span>
+                        <span style={{ color: C.text, fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(custoTotalEstimado)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: C.textDim, fontSize: 12 }}>Markup {MARGEM_PADRAO}%</span>
+                    <span style={{ color: C.textDim, fontSize: 12, fontFamily: 'monospace' }}>+{formatCurrency(custoTotalEstimado * MARGEM_PADRAO / 100)}</span>
                   </div>
-                  {sizingPreview && (
-                    <div>
-                      <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', margin: '0 0 2px' }}>Payback Est.</p>
-                      <p style={{ color: C.green, fontSize: 14, fontWeight: 700, margin: 0 }}>~{Math.round((form.custoKitFotovoltaico * 1.33) / Number(sizingPreview.economiaMensalEstimada))} meses</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: C.textDim, fontSize: 12 }}>Preço de Venda</span>
+                    <span style={{ color: C.text, fontSize: 12, fontFamily: 'monospace' }}>{formatCurrency(precoVendaEstimado)}</span>
+                  </div>
+                  {form.comissao > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: C.textDim, fontSize: 12 }}>Comissão {form.comissao}%</span>
+                      <span style={{ color: C.textDim, fontSize: 12, fontFamily: 'monospace' }}>+{formatCurrency(comissaoEstimada)}</span>
                     </div>
                   )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.solar}40`, paddingTop: 6, marginTop: 2 }}>
+                    <span style={{ color: C.solar, fontSize: 14, fontWeight: 700 }}>Preço Final Estimado</span>
+                    <span style={{ color: C.solar, fontSize: 16, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(precoFinalEstimado)}</span>
+                  </div>
+                  <p style={{ color: C.textDim, fontSize: 10, margin: '4px 0 0', fontStyle: 'italic' }}>
+                    * Estimativa. A margem definitiva pode ser ajustada após criar a proposta.
+                    Instalação calculada com valores padrão (R$70/módulo · R$150/inversor · R$800 projeto).
+                  </p>
                 </div>
               </div>
             )}
 
+            {/* Desconto à vista */}
             <div style={{ background: C.dark, borderRadius: 10, padding: '14px 16px', border: `1px solid ${C.darkBorder}` }}>
               <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 10px' }}>💰 Desconto à Vista</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="number" min={0} max={30} value={form.descontoAvista || ''} onChange={e => set('descontoAvista', Number(e.target.value))} placeholder="0"
+                <input type="number" min={0} max={30} value={form.descontoAvista || ''} onChange={(e: any) => set('descontoAvista', Number(e.target.value))} placeholder="0"
                   style={{ width: 80, padding: '8px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none' }} />
                 <span style={{ color: C.textMuted }}>%</span>
                 {form.descontoAvista > 0 && form.custoKitFotovoltaico > 0 && (
-                  <span style={{ color: C.green, fontSize: 13, fontWeight: 600 }}>→ {formatCurrency(form.custoKitFotovoltaico * 1.33 * (1 - form.descontoAvista / 100))}</span>
+                  <span style={{ color: C.green, fontSize: 13, fontWeight: 600 }}>
+                    À vista: {formatCurrency(precoFinalEstimado * (1 - form.descontoAvista / 100))}
+                  </span>
                 )}
               </div>
+              <p style={{ color: C.textDim, fontSize: 11, margin: '4px 0 0' }}>Aplicado apenas na condição de pagamento à vista.</p>
             </div>
 
-            <div style={{ background: C.dark, borderRadius: 10, padding: '14px 16px', border: `1px solid ${C.darkBorder}` }}>
-              <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 12px' }}>📋 Parcelamento por Marcos</p>
-              {form.marcoParcelas.map((p, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 90px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                  <input value={p.descricao} onChange={e => { const n = [...form.marcoParcelas]; n[i] = { ...n[i], descricao: e.target.value }; set('marcoParcelas', n) }}
-                    style={{ padding: '6px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <input type="number" min={1} max={100} value={p.percentual} onChange={e => { const n = [...form.marcoParcelas]; n[i] = { ...n[i], percentual: Number(e.target.value) }; set('marcoParcelas', n) }}
-                      style={{ width: '100%', padding: '6px 6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} />
-                    <span style={{ color: C.textDim, fontSize: 10 }}>%</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <input type="number" min={0} value={p.prazoDias} onChange={e => { const n = [...form.marcoParcelas]; n[i] = { ...n[i], prazoDias: Number(e.target.value) }; set('marcoParcelas', n) }}
-                      style={{ width: '100%', padding: '6px 6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
-                    <span style={{ color: C.textDim, fontSize: 10 }}>d</span>
-                  </div>
-                  <select value={p.tipoPrazo} onChange={e => { const n = [...form.marcoParcelas]; n[i] = { ...n[i], tipoPrazo: e.target.value }; set('marcoParcelas', n) }}
-                    style={{ padding: '6px 6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.textMuted, fontSize: 11, outline: 'none' }}>
-                    <option value="uteis">úteis</option>
-                    <option value="corridos">corridos</option>
-                  </select>
+            {/* Parcelamento — colapsado por padrão */}
+            <div style={{ background: C.dark, borderRadius: 10, border: `1px solid ${C.darkBorder}` }}>
+              <button
+                onClick={() => setMostrarParcela(!mostrarParcelamento)}
+                style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'inherit' }}
+              >
+                <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>📋 Parcelamento por Marcos</span>
+                <span style={{ color: C.textMuted, fontSize: 12 }}>
+                  {mostrarParcelamento ? '▲ Recolher' : '▼ Personalizar (opcional)'}
+                </span>
+              </button>
+
+              {!mostrarParcelamento && (
+                <div style={{ padding: '0 16px 14px' }}>
+                  <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                    Padrão Atom Tech: 50% entrada · 20% entrega · 20% conclusão · 10% após 28 dias.
+                    Clique em "Personalizar" para alterar.
+                  </p>
                 </div>
-              ))}
-              <div style={{ textAlign: 'right', paddingTop: 6, borderTop: `1px solid ${C.darkBorder}` }}>
-                {(() => { const total = form.marcoParcelas.reduce((s, p) => s + p.percentual, 0); return <span style={{ fontSize: 12, fontWeight: 700, color: total === 100 ? C.green : C.danger }}>Total: {total}% {total !== 100 ? '⚠ deve ser 100%' : '✓'}</span> })()}
-              </div>
+              )}
+
+              {mostrarParcelamento && (
+                <div style={{ padding: '0 16px 16px' }}>
+                  {form.marcoParcelas.map((p: any, i: number) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 90px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                      <input value={p.descricao} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], descricao: e.target.value }; set('marcoParcelas', n) }}
+                        style={{ padding: '6px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <input type="number" min={1} max={100} value={p.percentual} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], percentual: Number(e.target.value) }; set('marcoParcelas', n) }}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} />
+                        <span style={{ color: C.textDim, fontSize: 10 }}>%</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <input type="number" min={0} value={p.prazoDias} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], prazoDias: Number(e.target.value) }; set('marcoParcelas', n) }}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
+                        <span style={{ color: C.textDim, fontSize: 10 }}>d</span>
+                      </div>
+                      <select value={p.tipoPrazo} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], tipoPrazo: e.target.value }; set('marcoParcelas', n) }}
+                        style={{ padding: '6px 6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.textMuted, fontSize: 11, outline: 'none' }}>
+                        <option value="uteis">úteis</option>
+                        <option value="corridos">corridos</option>
+                      </select>
+                    </div>
+                  ))}
+                  <div style={{ textAlign: 'right', paddingTop: 6, borderTop: `1px solid ${C.darkBorder}` }}>
+                    {(() => { const total = form.marcoParcelas.reduce((s: number, p: any) => s + p.percentual, 0); return <span style={{ fontSize: 12, fontWeight: 700, color: total === 100 ? C.green : C.danger }}>Total: {total}% {total !== 100 ? '⚠ deve ser 100%' : '✓'}</span> })()}
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Observações */}
             <div>
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Observações</label>
-              <textarea value={form.observacoes} onChange={e => set('observacoes', e.target.value)} rows={3}
+              <textarea value={form.observacoes} onChange={(e: any) => set('observacoes', e.target.value)} rows={2}
                 placeholder="Informações adicionais ou peculiaridades da instalação..."
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
             </div>
 
             {createMutation.error && (
               <div style={{ background: '#3A1A1A', border: `1px solid ${C.danger}`, borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}>
-                {createMutation.error.message}
+                {(createMutation.error as any).message}
               </div>
             )}
 
