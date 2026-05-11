@@ -40,76 +40,245 @@ function renderTexto(txt: string | undefined | null): string {
 }
 
 const CSS = `
+  /* ─── RESET ──────────────────────────────────────────────────── */
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #222; background: white; font-size: 14px; line-height: 1.7; }
-  .page { width: 210mm; min-height: 297mm; position: relative; display: flex; flex-direction: column; page-break-after: always; break-after: page; }
+
+  /* ─── TIPOGRAFIA — Calibri Light (sistema Windows) ───────────── */
+  body {
+    font-family: 'Calibri Light', Calibri, Candara, 'Segoe UI', 'Trebuchet MS', sans-serif;
+    font-weight: 300;
+    font-size: 11.5px;
+    line-height: 1.75;
+    color: #1C1C2E;
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "liga" 0, "kern" 1;
+  }
+
+  /* Parágrafo e texto corrido */
+  p {
+    font-size: 11.5px;
+    font-weight: 300;
+    color: #333;
+    line-height: 1.8;
+    margin-bottom: 9px;
+  }
+
+  /* Negrito explícito com Calibri regular (não Bold) */
+  strong, b {
+    font-family: Calibri, Candara, 'Segoe UI', sans-serif;
+    font-weight: 600;
+    color: #0E2040;
+  }
+
+  /* Listas */
+  ul { padding-left: 18px; margin: 6px 0 10px; }
+  li { font-size: 11.5px; font-weight: 300; color: #444; line-height: 1.9; }
+
+  /* ─── PÁGINA A4 ───────────────────────────────────────────────── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* ─── CAPA ────────────────────────────────────────────────────── */
   .capa { background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%); }
   .capa-top { padding: 28px 36px 0; display: flex; justify-content: space-between; align-items: center; }
   .capa-body { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 36px; }
-  .capa-pretitle { font-size: 11px; color: #F5A623; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 16px; }
-  .capa-title { font-size: 48px; font-weight: 900; color: #fff; line-height: 1.1; margin-bottom: 8px; }
+  .capa-pretitle {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 10px; font-weight: 400;
+    color: #F5A623; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 16px;
+  }
+  .capa-title {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 48px; font-weight: 700;
+    color: #fff; line-height: 1.1; margin-bottom: 8px;
+  }
   .capa-title span { color: #F5A623; }
-  .capa-divider { width: 60px; height: 3px; background: #F5A623; margin: 20px 0; border-radius: 2px; }
-  .capa-cliente-label { font-size: 9px; color: rgba(255,255,255,0.45); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 8px; }
-  .capa-cliente-nome { font-size: 30px; font-weight: 800; color: #fff; line-height: 1.15; letter-spacing: -0.5px; }
+  .capa-divider { width: 60px; height: 3px; background: #F5A623; margin: 18px 0; border-radius: 2px; }
+  .capa-cliente-label {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 9px; font-weight: 300;
+    color: rgba(255,255,255,0.5); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px;
+  }
+  .capa-cliente-nome {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 30px; font-weight: 600;
+    color: #fff; line-height: 1.15;
+  }
   .capa-meta { display: flex; gap: 32px; margin-top: 20px; }
-  .capa-meta-label { font-size: 9px; color: rgba(255,255,255,0.4); letter-spacing: 2px; text-transform: uppercase; }
-  .capa-meta-value { font-size: 13px; color: rgba(255,255,255,0.85); font-weight: 600; margin-top: 2px; }
+  .capa-meta-label {
+    font-size: 9px; font-weight: 300;
+    color: rgba(255,255,255,0.4); letter-spacing: 2px; text-transform: uppercase;
+  }
+  .capa-meta-value {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 13px; font-weight: 400;
+    color: rgba(255,255,255,0.85); margin-top: 2px;
+  }
   .capa-footer { padding: 20px 36px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .capa-footer-left { font-size: 9px; color: rgba(255,255,255,0.3); line-height: 1.6; }
-  .capa-footer-right { font-size: 9px; color: rgba(255,255,255,0.3); text-align: right; }
-  .header-interno { background: #0E2040; padding: 13px 36px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-  .header-logo { font-size: 14px; font-weight: 900; color: #fff; letter-spacing: 1px; }
+  .capa-footer-left { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.3); line-height: 1.6; }
+  .capa-footer-right { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.3); text-align: right; }
+
+  /* ─── HEADER INTERNO ─────────────────────────────────────────── */
+  .header-interno {
+    background: #0E2040;
+    padding: 12px 36px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+  }
+  .header-logo {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px;
+  }
   .header-logo span { color: #F5A623; }
-  .header-tag { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 3px; text-transform: uppercase; }
-  .footer { background: #0E2040; padding: 13px 36px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-top: auto; }
-  .footer-text { font-size: 9px; color: rgba(255,255,255,0.45); line-height: 1.5; }
-  .footer-numero { font-size: 9px; color: rgba(255,255,255,0.3); font-family: monospace; }
+  .header-tag {
+    font-size: 9px; font-weight: 300;
+    color: rgba(255,255,255,0.4); letter-spacing: 3px; text-transform: uppercase;
+  }
+
+  /* ─── FOOTER ─────────────────────────────────────────────────── */
+  .footer {
+    background: #0E2040;
+    padding: 12px 36px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0; margin-top: auto;
+  }
+  .footer-text { font-size: 8.5px; font-weight: 300; color: rgba(255,255,255,0.45); line-height: 1.5; }
+  .footer-numero { font-size: 8.5px; color: rgba(255,255,255,0.3); font-family: Calibri, Candara, monospace; }
+
+  /* ─── SEÇÃO CONTEÚDO ─────────────────────────────────────────── */
   .section { padding: 20px 36px; flex: 1; overflow: hidden; }
-  .section-title { font-size: 19px; font-weight: 800; color: #0E2040; border-left: 4px solid #F5A623; padding-left: 12px; margin-bottom: 14px; }
-  .section-sub { font-size: 14px; font-weight: 700; color: #0E2040; margin: 16px 0 8px; }
+  .section-title {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 18px; font-weight: 600;
+    color: #0E2040;
+    border-left: 4px solid #F5A623; padding-left: 12px;
+    margin-bottom: 14px;
+  }
+  .section-sub {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 13px; font-weight: 600;
+    color: #0E2040; margin: 14px 0 8px;
+  }
+
+  /* ─── KPIs ────────────────────────────────────────────────────── */
   .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
-  .kpi-card { background: #f8f9fc; border-radius: 8px; padding: 12px 14px; border-top: 3px solid #F5A623; }
+  .kpi-card {
+    background: #f7f8fc; border-radius: 8px;
+    padding: 13px 14px; border-top: 3px solid #F5A623;
+  }
   .kpi-card-green { border-top-color: #2D9C4E; }
-  .kpi-label { font-size: 9px; color: #888; letter-spacing: 2px; text-transform: uppercase; }
-  .kpi-value { font-size: 20px; font-weight: 800; color: #0E2040; margin-top: 3px; }
-  .kpi-unit { font-size: 10px; color: #888; font-weight: 400; }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
-  th { background: #0E2040; color: #fff; padding: 7px 8px; text-align: left; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
+  .kpi-label {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 8.5px; font-weight: 400; color: #888;
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+  .kpi-value {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 21px; font-weight: 700; color: #0E2040; margin-top: 3px;
+  }
+  .kpi-unit {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 10px; font-weight: 300; color: #888;
+  }
+
+  /* ─── TABELAS ─────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th {
+    background: #0E2040; color: #fff;
+    padding: 7px 8px;
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 8.5px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase;
+    text-align: left;
+  }
   th:last-child, td:last-child { text-align: right; }
-  td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 11px; }
+  td {
+    padding: 6px 8px; border-bottom: 1px solid #f0f0f0;
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 11px; font-weight: 300; color: #333;
+  }
   tr:nth-child(even) td { background: #fafafa; }
-  .fluxo-positivo { color: #2D9C4E; font-weight: 700; }
-  .fluxo-negativo { color: #e53e3e; }
-  p { font-size: 12px; color: #444; line-height: 1.8; margin-bottom: 8px; }
-  ul { padding-left: 20px; margin: 6px 0 8px; }
-  li { font-size: 12px; color: #444; line-height: 1.9; }
-  strong { font-weight: 700; color: #0E2040; }
-  .pagamento-box { border: 2px solid #F5A623; border-radius: 10px; padding: 12px; margin: 8px 0; }
-  .pagamento-tipo { font-size: 12px; font-weight: 700; color: #0E2040; margin-bottom: 6px; }
-  .pagamento-linha { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
-  .pagamento-linha:last-child { border-bottom: none; }
+  .fluxo-positivo { color: #2D9C4E; font-weight: 600; }
+  .fluxo-negativo { color: #d32f2f; }
+
+  /* ─── CAIXAS HIGHLIGHT ────────────────────────────────────────── */
+  .highlight-box {
+    background: linear-gradient(135deg, #fff8e8, #fff3d0);
+    border-left: 4px solid #F5A623;
+    padding: 11px 16px; border-radius: 0 8px 8px 0;
+    margin: 8px 0 12px;
+  }
+  .highlight-box p {
+    margin: 0; font-weight: 400; color: #0E2040; font-size: 12px;
+  }
+
+  /* ─── COMPARATIVO ─────────────────────────────────────────────── */
   .comparativo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
-  .comp-card { border-radius: 10px; padding: 12px; text-align: center; }
+  .comp-card { border-radius: 10px; padding: 13px; text-align: center; }
   .comp-poupanca { background: #f0f7f0; }
   .comp-rf { background: #f0f4f7; }
   .comp-solar { background: linear-gradient(135deg, #fff8e8, #fff3d0); border: 2px solid #F5A623; }
-  .comp-label { font-size: 9px; color: #888; letter-spacing: 2px; text-transform: uppercase; }
-  .comp-value { font-size: 13px; font-weight: 800; color: #0E2040; margin-top: 5px; }
-  .comp-badge { font-size: 11px; color: #F5A623; font-weight: 700; margin-top: 3px; }
-  .highlight-box { background: linear-gradient(135deg, #fff8e8, #fff3d0); border-left: 4px solid #F5A623; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 8px 0 12px; }
-  .highlight-box p { margin: 0; color: #0E2040; font-weight: 600; font-size: 13px; }
+  .comp-label { font-size: 8.5px; font-weight: 300; color: #888; letter-spacing: 2px; text-transform: uppercase; }
+  .comp-value {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 13px; font-weight: 700; color: #0E2040; margin-top: 5px;
+  }
+  .comp-badge { font-size: 10.5px; color: #F5A623; font-weight: 600; margin-top: 3px; }
+
+  /* ─── REDUÇÃO DA CONTA ────────────────────────────────────────── */
   .reducao-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; margin: 8px 0; }
-  .reducao-header { background: #0E2040; color: #fff; padding: 8px 12px; font-size: 9px; font-weight: 600; }
-  .reducao-cell { background: #f8f9fc; padding: 10px 12px; }
-  .reducao-label { font-size: 8px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-  .reducao-value { font-size: 14px; font-weight: 700; color: #0E2040; margin-top: 2px; }
+  .reducao-header {
+    background: #0E2040; color: #fff;
+    padding: 8px 12px;
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 9px; font-weight: 400;
+  }
+  .reducao-cell { background: #f7f8fc; padding: 10px 12px; }
+  .reducao-label { font-size: 8px; font-weight: 300; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .reducao-value {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 15px; font-weight: 700; color: #0E2040; margin-top: 2px;
+  }
   .reducao-value.economia { color: #2D9C4E; }
-  .aceite-box { background: #f8f9fc; border-radius: 10px; padding: 18px; margin: 12px 0; }
+
+  /* ─── PAGAMENTO ───────────────────────────────────────────────── */
+  .pagamento-box { border: 2px solid #F5A623; border-radius: 10px; padding: 12px; margin: 8px 0; }
+  .pagamento-tipo {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 12px; font-weight: 600; color: #0E2040; margin-bottom: 6px;
+  }
+  .pagamento-linha {
+    display: flex; justify-content: space-between;
+    padding: 4px 0; border-bottom: 1px solid #f5f5f5;
+    font-size: 11.5px; font-weight: 300;
+  }
+  .pagamento-linha:last-child { border-bottom: none; }
+
+  /* ─── ACEITE ──────────────────────────────────────────────────── */
+  .aceite-box { background: #f7f8fc; border-radius: 10px; padding: 18px; margin: 12px 0; }
   .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; }
-  .assinatura-linha { border-top: 1px solid #333; padding-top: 8px; text-align: center; font-size: 10px; color: #555; }
+  .assinatura-linha {
+    border-top: 1px solid #333; padding-top: 8px; text-align: center;
+    font-size: 10px; font-weight: 300; color: #555;
+  }
+
+  /* ─── PRINT ───────────────────────────────────────────────────── */
   @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body {
+      font-family: 'Calibri Light', Calibri, Candara, sans-serif;
+      font-weight: 300;
+    }
     .page { page-break-after: always; break-after: page; }
     @page { size: A4; margin: 0; }
   }
