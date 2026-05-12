@@ -4,6 +4,87 @@ import { trpc } from '../../lib/trpc'
 import { formatCurrency } from '../../lib/utils'
 import { Btn, Input, Select, Card, Spinner, C, PageWrapper } from '../../components/ui'
 
+// ─── AUTOCOMPLETE DE CLIENTE ────────────────────────────────────────
+function ClienteAutocomplete({ clientes, value, onChange }: {
+  clientes: { id: number; nome: string; cpfCnpj?: string; cidade?: string; estado?: string }[]
+  value: string
+  onChange: (id: string) => void
+}) {
+  const [busca, setBusca] = useState('')
+  const [aberto, setAberto] = useState(false)
+
+  const selecionado = clientes.find(c => String(c.id) === value)
+
+  const filtrados = busca.length >= 1
+    ? clientes.filter(c =>
+        c.nome.toLowerCase().includes(busca.toLowerCase()) ||
+        (c.cpfCnpj ?? '').includes(busca)
+      ).slice(0, 8)
+    : clientes.slice(0, 8)
+
+  const selecionar = (c: typeof clientes[0]) => {
+    onChange(String(c.id))
+    setBusca('')
+    setAberto(false)
+  }
+
+  const limpar = () => {
+    onChange('')
+    setBusca('')
+    setAberto(false)
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <label style={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+        Cliente *
+      </label>
+
+      {/* Campo de busca ou cliente selecionado */}
+      {selecionado && !aberto ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', borderRadius: 9, background: C.dark,
+          border: `2px solid ${C.solar}50`, cursor: 'pointer',
+        }} onClick={() => setAberto(true)}>
+          <div>
+            <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>{selecionado.nome}</p>
+            {(selecionado.cidade || selecionado.cpfCnpj) && (
+              <p style={{ color: C.textDim, fontSize: 11, margin: '2px 0 0' }}>
+                {[selecionado.cpfCnpj, selecionado.cidade && selecionado.estado ? `${selecionado.cidade}/${selecionado.estado}` : null].filter(Boolean).join(' · ')}
+              </p>
+            )}
+          </div>
+          <button onClick={e => { e.stopPropagation(); limpar() }}
+            style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+            color: C.textMuted, fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+          <input
+            autoFocus={aberto}
+            value={busca}
+            onChange={e => { setBusca(e.target.value); setAberto(true) }}
+            onFocus={() => setAberto(true)}
+            onBlur={() => setTimeout(() => setAberto(false), 150)}
+            placeholder="Digite o nome do cliente..."
+            style={{
+              width: '100%', padding: '10px 14px 10px 36px', borderRadius: 9,
+              background: C.dark, border: `1px solid ${C.darkBorder}`,
+              color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Dropdown de resultados */}
+      {aberto && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          background: C.darkCard, border: `1px solid ${C.darkBorder}`,
+          borderRadius: 10, marginTop: 4, overflow: 'hidden',
 const TOPOLOGIA_OPTIONS = [
   { value: 'microinversor', label: 'Microinversor (recomendado)' },
   { value: 'tradicional',   label: 'Tradicional (String)'        },
@@ -116,12 +197,7 @@ export function NovaPropostaPage() {
     } as any)
   }
 
-  const clienteOptions = [
-    { value: '', label: 'Selecione o cliente...' },
-    ...(clientes?.data ?? []).map((c: any) => ({ value: String(c.id), label: c.nome })),
-  ]
-
-  // Cálculo da estimativa de preço (inclui instalação)
+   // Cálculo da estimativa de preço (inclui instalação)
   const qtdModulos    = (sizingPreview as any)?.quantidadeModulosAproximada ?? 0
   const qtdInversores = form.topologia === 'microinversor'
     ? Math.ceil(qtdModulos / (form.entradasPorMicro || 1))
@@ -166,7 +242,11 @@ export function NovaPropostaPage() {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Selecione o Cliente</h3>
-            <Select label="Cliente *" options={clienteOptions} value={form.clienteId} onChange={(e: any) => set('clienteId', e.target.value)} />
+            <ClienteAutocomplete
+  clientes={clientes?.data ?? []}
+  value={form.clienteId}
+  onChange={id => set('clienteId', id)}
+/>
             {form.clienteId && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <Input label="Data de Emissão" type="date" value={form.dataEmissao} onChange={(e: any) => set('dataEmissao', e.target.value)} />
