@@ -53,8 +53,16 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
     try {
       const res = await fetch(`https://viacep.com.br/ws/${limpo}/json/`)
       const data = await res.json()
-      if (data.erro) { setCepErro('CEP não encontrado') } else {
-        setForm(f => ({ ...f, endereco: data.logradouro || f.endereco, bairro: data.bairro || f.bairro, cidade: data.localidade || f.cidade, estado: data.uf || f.estado }))
+      if (data.erro) {
+        setCepErro('CEP não encontrado')
+      } else {
+        setForm(f => ({
+          ...f,
+          endereco: data.logradouro || f.endereco,
+          bairro:   data.bairro     || f.bairro,
+          cidade:   data.localidade || f.cidade,
+          estado:   data.uf         || f.estado,
+        }))
       }
     } catch { setCepErro('Erro ao buscar CEP') } finally { setCepLoading(false) }
   }
@@ -65,8 +73,11 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
   )
 
   const sectionLabel = (label: string) => (
-    <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ flex: 1, height: 1, background: C.darkBorder, display: 'inline-block' }} />{label}<span style={{ flex: 1, height: 1, background: C.darkBorder, display: 'inline-block' }} />
+    <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+      letterSpacing: '0.08em', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ flex: 1, height: 1, background: C.darkBorder, display: 'inline-block' }} />
+      {label}
+      <span style={{ flex: 1, height: 1, background: C.darkBorder, display: 'inline-block' }} />
     </p>
   )
 
@@ -90,11 +101,14 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <Select label="Tipo de Pessoa" value={form.tipoPessoa} onChange={e => set('tipoPessoa', e.target.value as any)} options={[{ value: 'fisica', label: 'Pessoa Física' }, { value: 'juridica', label: 'Pessoa Jurídica' }]} />
+            <Select label="Tipo de Pessoa" value={form.tipoPessoa} onChange={e => set('tipoPessoa', e.target.value as any)}
+              options={[{ value: 'fisica', label: 'Pessoa Física' }, { value: 'juridica', label: 'Pessoa Jurídica' }]} />
             <Input label="CPF / CNPJ" value={form.cpfCnpj} onChange={e => set('cpfCnpj', e.target.value)} placeholder="000.000.000-00" />
           </div>
           <Input label="Nome / Razão Social *" value={form.nome} onChange={e => set('nome', e.target.value)} />
-          {form.tipoPessoa === 'juridica' && <Input label="Nome do Responsável" value={form.nomeResponsavel} onChange={e => set('nomeResponsavel', e.target.value)} />}
+          {form.tipoPessoa === 'juridica' && (
+            <Input label="Nome do Responsável" value={form.nomeResponsavel} onChange={e => set('nomeResponsavel', e.target.value)} />
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <Input label="Telefone *" value={form.telefone} onChange={e => set('telefone', e.target.value)} placeholder="(61) 9xxxx-xxxx" />
             <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
@@ -102,12 +116,20 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
 
           <div style={{ paddingTop: 8 }}>
             {sectionLabel('Endereço')}
-            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 80px', gap: 10, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 80px', gap: 10, marginBottom: 10 }}>
               <div>
-                <Input label="CEP *" value={form.cep} onChange={e => { set('cep', e.target.value); setCepErro('') }} onBlur={e => buscarCep(e.target.value)} placeholder="70000-000" maxLength={9} />
-                {cepLoading && <p style={{ color: C.accent, fontSize: 10, margin: '3px 0 0' }}>⏳ Buscando endereço...</p>}
+                <label style={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>CEP *</label>
+                <input
+                  value={form.cep}
+                  onChange={e => { set('cep', e.target.value); setCepErro('') }}
+                  onBlur={e => buscarCep(e.target.value)}
+                  placeholder="70000-000"
+                  maxLength={9}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, outline: 'none', boxSizing: 'border-box' }}
+                />
+                {cepLoading && <p style={{ color: C.accent, fontSize: 10, margin: '3px 0 0' }}>⏳ Buscando...</p>}
                 {cepErro && <p style={{ color: C.danger, fontSize: 10, margin: '3px 0 0' }}>⚠ {cepErro}</p>}
-                {!cepLoading && !cepErro && form.cidade && <p style={{ color: C.green, fontSize: 10, margin: '3px 0 0' }}>✓ Endereço preenchido</p>}
+                {!cepLoading && !cepErro && form.cidade && <p style={{ color: C.green, fontSize: 10, margin: '3px 0 0' }}>✓ Preenchido</p>}
               </div>
               <Input label="Logradouro" value={form.endereco} onChange={e => set('endereco', e.target.value)} />
               <Input label="Número" value={form.numero} onChange={e => set('numero', e.target.value)} />
@@ -115,13 +137,15 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 10 }}>
               <Input label="Bairro" value={form.bairro} onChange={e => set('bairro', e.target.value)} />
               <Input label="Cidade" value={form.cidade} onChange={e => set('cidade', e.target.value)} />
-              <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)} options={[{ value: '', label: 'UF' }, ...ESTADOS.map(e => ({ value: e, label: e }))]} />
+              <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)}
+                options={[{ value: '', label: 'UF' }, ...ESTADOS.map(e => ({ value: e, label: e }))]} />
             </div>
           </div>
 
           <div style={{ paddingTop: 4 }}>
             {sectionLabel('Energia')}
-            <Select label="Distribuidora de Energia" value={form.distribuidora} onChange={e => set('distribuidora', e.target.value)} options={[{ value: '', label: 'Selecione...' }, ...DISTRIBUIDORAS.map(d => ({ value: d, label: d }))]} />
+            <Select label="Distribuidora de Energia" value={form.distribuidora} onChange={e => set('distribuidora', e.target.value)}
+              options={[{ value: '', label: 'Selecione...' }, ...DISTRIBUIDORAS.map(d => ({ value: d, label: d }))]} />
           </div>
         </div>
 
@@ -156,7 +180,11 @@ export function ClientesPage() {
 
       {lista.length > 0 && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-          {[{ label: 'Total', value: lista.length, color: C.accent }, { label: 'Pessoas Físicas', value: pf, color: C.solar }, { label: 'Pessoas Jurídicas', value: pj, color: C.green }].map(s => (
+          {[
+            { label: 'Total', value: lista.length, color: C.accent },
+            { label: 'Pessoas Físicas', value: pf, color: C.solar },
+            { label: 'Pessoas Jurídicas', value: pj, color: C.green },
+          ].map(s => (
             <div key={s.label} style={{ background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 10, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ color: s.color, fontSize: 18, fontWeight: 800, fontFamily: 'monospace' }}>{s.value}</span>
               <span style={{ color: C.textDim, fontSize: 12 }}>{s.label}</span>
@@ -173,9 +201,13 @@ export function ClientesPage() {
         {busca && <button onClick={() => setBusca('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16 }}>×</button>}
       </div>
 
-      {isLoading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
-      : lista.length === 0 ? <EmptyState icon="👥" title="Nenhum cliente encontrado" description={busca ? 'Tente outra busca' : 'Cadastre seu primeiro cliente'} action={!busca ? <Btn onClick={() => setShowModal(true)}>+ Novo Cliente</Btn> : undefined} />
-      : (
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
+      ) : lista.length === 0 ? (
+        <EmptyState icon="👥" title="Nenhum cliente encontrado"
+          description={busca ? 'Tente outra busca' : 'Cadastre seu primeiro cliente'}
+          action={!busca ? <Btn onClick={() => setShowModal(true)}>+ Novo Cliente</Btn> : undefined} />
+      ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {lista.map(c => {
             const cor = avatarColor(c.nome)
@@ -237,7 +269,9 @@ export function ClienteDetailPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <button onClick={() => navigate('/clientes')} style={{ background: `${C.darkBorder}40`, border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: `${cor}18`, border: `2px solid ${cor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: cor }}>{cliente.nome.charAt(0).toUpperCase()}</div>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: `${cor}18`, border: `2px solid ${cor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: cor }}>
+            {cliente.nome.charAt(0).toUpperCase()}
+          </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <h1 style={{ color: C.text, fontSize: 18, fontWeight: 700, margin: 0 }}>{cliente.nome}</h1>
@@ -254,7 +288,11 @@ export function ClienteDetailPage() {
 
       {totalFaturas > 0 && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-          {[{ label: 'Faturas', value: String(totalFaturas), color: C.accent }, { label: 'Consumo Total', value: `${consumoTotal.toLocaleString('pt-BR')} kWh`, color: C.solar }, { label: 'Total Pago', value: `R$ ${valorTotal.toFixed(2).replace('.', ',')}`, color: C.green }].map(s => (
+          {[
+            { label: 'Faturas', value: String(totalFaturas), color: C.accent },
+            { label: 'Consumo Total', value: `${consumoTotal.toLocaleString('pt-BR')} kWh`, color: C.solar },
+            { label: 'Total Pago', value: `R$ ${valorTotal.toFixed(2).replace('.', ',')}`, color: C.green },
+          ].map(s => (
             <div key={s.label} style={{ background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 10, padding: '10px 16px', flex: 1 }}>
               <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 4px' }}>{s.label}</p>
               <p style={{ color: s.color, fontSize: 15, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{s.value}</p>
@@ -266,7 +304,12 @@ export function ClienteDetailPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
         <Card style={{ padding: '16px 20px' }}>
           <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 14px' }}>Dados Cadastrais</p>
-          {[['CPF/CNPJ', cliente.cpfCnpj], ['Telefone', cliente.telefone], ['E-mail', cliente.email], ['CEP', cliente.cep], ['Endereço', [cliente.endereco, cliente.numero, cliente.complemento].filter(Boolean).join(', ')], ['Bairro', cliente.bairro], ['Cidade/UF', cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : null], ['Distribuidora', cliente.distribuidora], ['Cadastrado em', formatDate(cliente.createdAt)]].filter(([, v]) => v).map(([k, v]) => (
+          {[
+            ['CPF/CNPJ', cliente.cpfCnpj], ['Telefone', cliente.telefone], ['E-mail', cliente.email],
+            ['CEP', cliente.cep], ['Endereço', [cliente.endereco, cliente.numero, cliente.complemento].filter(Boolean).join(', ')],
+            ['Bairro', cliente.bairro], ['Cidade/UF', cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : null],
+            ['Distribuidora', cliente.distribuidora], ['Cadastrado em', formatDate(cliente.createdAt)],
+          ].filter(([, v]) => v).map(([k, v]) => (
             <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.darkBorder}30` }}>
               <span style={{ color: C.textMuted, fontSize: 11 }}>{k}</span>
               <span style={{ color: C.text, fontSize: 12, fontWeight: 500, textAlign: 'right', maxWidth: 175, wordBreak: 'break-word' }}>{v}</span>
@@ -284,10 +327,21 @@ export function ClienteDetailPage() {
               </div>
               <Btn variant="ghost" size="sm" onClick={() => navigate('/faturas/nova')}>+ Lançar</Btn>
             </div>
-            {!faturas?.length ? <div style={{ padding: '24px', textAlign: 'center', color: C.textDim, fontSize: 13 }}>Nenhuma fatura cadastrada</div> : (
+            {!faturas?.length ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: C.textDim, fontSize: 13 }}>Nenhuma fatura cadastrada</div>
+            ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead><tr style={{ borderBottom: `1px solid ${C.darkBorder}40` }}>{['Referência','Distribuidora','Consumo','Total'].map((h,i) => <th key={h} style={{ padding: '8px 16px', color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', textAlign: i > 1 ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
-                <tbody>{faturas.map(f => <tr key={f.id} style={{ borderBottom: `1px solid ${C.darkBorder}30` }}><td style={{ padding: '10px 16px', color: C.accent, fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{f.referencia}</td><td style={{ padding: '10px 16px', color: C.textMuted, fontSize: 12 }}>{f.distribuidora}</td><td style={{ padding: '10px 16px', color: C.solar, fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{f.consumoKwh ? `${Number(f.consumoKwh).toLocaleString('pt-BR')} kWh` : '—'}</td><td style={{ padding: '10px 16px', color: C.green, fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{f.valorTotal ? `R$ ${Number(f.valorTotal).toFixed(2).replace('.', ',')}` : '—'}</td></tr>)}</tbody>
+                <thead><tr style={{ borderBottom: `1px solid ${C.darkBorder}40` }}>
+                  {['Referência','Distribuidora','Consumo','Total'].map((h,i) => <th key={h} style={{ padding: '8px 16px', color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', textAlign: i > 1 ? 'right' : 'left' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>{faturas.map(f => (
+                  <tr key={f.id} style={{ borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    <td style={{ padding: '10px 16px', color: C.accent, fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{f.referencia}</td>
+                    <td style={{ padding: '10px 16px', color: C.textMuted, fontSize: 12 }}>{f.distribuidora}</td>
+                    <td style={{ padding: '10px 16px', color: C.solar, fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{f.consumoKwh ? `${Number(f.consumoKwh).toLocaleString('pt-BR')} kWh` : '—'}</td>
+                    <td style={{ padding: '10px 16px', color: C.green, fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{f.valorTotal ? `R$ ${Number(f.valorTotal).toFixed(2).replace('.', ',')}` : '—'}</td>
+                  </tr>
+                ))}</tbody>
               </table>
             )}
           </Card>
@@ -301,10 +355,21 @@ export function ClienteDetailPage() {
               </div>
               <Btn variant="ghost" size="sm" onClick={() => navigate('/propostas/nova')}>+ Nova</Btn>
             </div>
-            {!propostas?.data?.length ? <div style={{ padding: '24px', textAlign: 'center', color: C.textDim, fontSize: 13 }}>Nenhuma proposta para este cliente</div> : (
+            {!propostas?.data?.length ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: C.textDim, fontSize: 13 }}>Nenhuma proposta para este cliente</div>
+            ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead><tr style={{ borderBottom: `1px solid ${C.darkBorder}40` }}>{['Número','Status','Emissão',''].map((h,i) => <th key={i} style={{ padding: '8px 16px', color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', textAlign: 'left' }}>{h}</th>)}</tr></thead>
-                <tbody>{propostas.data.map(p => <tr key={p.id} style={{ borderBottom: `1px solid ${C.darkBorder}30`, cursor: 'pointer' }} onClick={() => navigate(`/propostas/${p.id}`)}><td style={{ padding: '10px 16px', color: C.accent, fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{p.numero}</td><td style={{ padding: '10px 16px' }}><Badge status={p.status} /></td><td style={{ padding: '10px 16px', color: C.textDim, fontSize: 12 }}>{formatDate(p.dataEmissao)}</td><td style={{ padding: '10px 16px', textAlign: 'right', color: C.textDim, fontSize: 14 }}>›</td></tr>)}</tbody>
+                <thead><tr style={{ borderBottom: `1px solid ${C.darkBorder}40` }}>
+                  {['Número','Status','Emissão',''].map((h,i) => <th key={i} style={{ padding: '8px 16px', color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', textAlign: 'left' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>{propostas.data.map(p => (
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.darkBorder}30`, cursor: 'pointer' }} onClick={() => navigate(`/propostas/${p.id}`)}>
+                    <td style={{ padding: '10px 16px', color: C.accent, fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{p.numero}</td>
+                    <td style={{ padding: '10px 16px' }}><Badge status={p.status} /></td>
+                    <td style={{ padding: '10px 16px', color: C.textDim, fontSize: 12 }}>{formatDate(p.dataEmissao)}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', color: C.textDim, fontSize: 14 }}>›</td>
+                  </tr>
+                ))}</tbody>
               </table>
             )}
           </Card>
