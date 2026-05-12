@@ -60,7 +60,36 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
   loading?: boolean
 }) {
   const [form, setForm] = useState<ClienteForm>(inicial)
+  const [cepLoading, setCepLoading] = useState(false)
+  const [cepErro, setCepErro] = useState('')
   const set = (k: keyof ClienteForm, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  // ─── Busca automática de endereço via ViaCEP ──────────────────────
+  const buscarCep = async (cep: string) => {
+    const limpo = cep.replace(/\D/g, '')
+    if (limpo.length !== 8) return
+    setCepLoading(true)
+    setCepErro('')
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${limpo}/json/`)
+      const data = await res.json()
+      if (data.erro) {
+        setCepErro('CEP não encontrado')
+      } else {
+        setForm(f => ({
+          ...f,
+          endereco:  data.logradouro  || f.endereco,
+          bairro:    data.bairro      || f.bairro,
+          cidade:    data.localidade  || f.cidade,
+          estado:    data.uf          || f.estado,
+        }))
+      }
+    } catch {
+      setCepErro('Erro ao buscar CEP')
+    } finally {
+      setCepLoading(false)
+    }
+  }
 
   const { data: dup } = trpc.cliente.checkDuplicidade.useQuery(
     { nome: form.nome, cpfCnpj: form.cpfCnpj, email: form.email || undefined },
@@ -143,11 +172,38 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
           {/* Endereço */}
           <div style={{ paddingTop: 8 }}>
             {sectionLabel('Endereço')}
-            <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr 80px', gap: 10, marginBottom: 10 }}>
-              <Input label="CEP *" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="70000-000" />
+
+            {/* Linha do CEP com feedback visual */}
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 80px', gap: 10, marginBottom: 10 }}>
+              <div>
+                <div style={{ position: 'relative' }}>
+                  <Input
+                    label="CEP *"
+                    value={form.cep}
+                    onChange={e => { set('cep', e.target.value); setCepErro('') }}
+                    onBlur={e => buscarCep(e.target.value)}
+                    placeholder="70000-000"
+                    maxLength={9}
+                  />
+                  {/* Indicador de loading/erro abaixo do campo */}
+                  {cepLoading && (
+                    <p style={{ color: C.accent, fontSize: 10, margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ display: 'inline-block', width: 8, height: 8, border: `2px solid ${C.accent}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                      Buscando endereço...
+                    </p>
+                  )}
+                  {cepErro && (
+                    <p style={{ color: C.danger, fontSize: 10, margin: '3px 0 0' }}>⚠ {cepErro}</p>
+                  )}
+                  {!cepLoading && !cepErro && form.cidade && (
+                    <p style={{ color: C.green, fontSize: 10, margin: '3px 0 0' }}>✓ Endereço preenchido</p>
+                  )}
+                </div>
+              </div>
               <Input label="Logradouro" value={form.endereco} onChange={e => set('endereco', e.target.value)} />
               <Input label="Número" value={form.numero} onChange={e => set('numero', e.target.value)} />
             </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 10 }}>
               <Input label="Bairro" value={form.bairro} onChange={e => set('bairro', e.target.value)} />
               <Input label="Cidade" value={form.cidade} onChange={e => set('cidade', e.target.value)} />
