@@ -36,7 +36,7 @@ export const empresa = mysqlTable('empresa', {
   bancoCodigo: varchar('banco_codigo', { length: 10 }),
   bancoAgencia: varchar('banco_agencia', { length: 10 }),
   bancoConta: varchar('banco_conta', { length: 20 }),
-  bancoTipo: mysqlEnum('banco_tipo', ['corrente', 'poupanÃ§a']),
+  bancoTipo: mysqlEnum('banco_tipo', ['corrente', 'poupança']),
   bancoPixTipo: mysqlEnum('banco_pix_tipo', ['cpf', 'cnpj', 'email', 'telefone', 'aleatorio']),
   bancoPixChave: varchar('banco_pix_chave', { length: 150 }),
   rodapeTexto: text('rodape_texto'),
@@ -197,11 +197,6 @@ export const premissasConfig = mysqlTable('premissas_config', {
   metodoPrecificacao: mysqlEnum('metodo_precificacao', ['margem_custo','margem_venda']).default('margem_custo').notNull(),
   margemPadrao: decimal('margem_padrao', { precision: 5, scale: 2 }).default('33.00').notNull(),
   margemKitsUsarPadrao: boolean('margem_kits_usar_padrao').default(false).notNull(),
-  custoMaoObraModulo: decimal('custo_mao_obra_modulo', { precision: 10, scale: 2 }).default('70.00').notNull(),
-  custoMaoObraInversor: decimal('custo_mao_obra_inversor', { precision: 10, scale: 2 }).default('150.00').notNull(),
-  custoProjeto: decimal('custo_projeto', { precision: 10, scale: 2 }).default('800.00').notNull(),
-  custoAdmin: decimal('custo_admin', { precision: 10, scale: 2 }).default('0.00').notNull(),
-  itensAdicionaisPadrao: json('itens_adicionais_padrao'),
   margemKitsValor: decimal('margem_kits_valor', { precision: 5, scale: 2 }).default('0.00').notNull(),
 
   // â”€â”€â”€ COMPOSIÃ‡ÃƒO DE CUSTOS PADRÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -421,6 +416,32 @@ export const cronogracoMarco = mysqlTable('cronograma_marco', {
 
 // â”€â”€â”€ RELATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+
+export const catalogoModulo = mysqlTable('catalogo_modulo', {
+  id:            int('id').primaryKey().autoincrement(),
+  empresaId:     int('empresa_id').notNull().references(() => empresa.id),
+  fabricante:    varchar('fabricante', { length: 100 }).notNull(),
+  modelo:        varchar('modelo', { length: 200 }).notNull(),
+  potenciaWp:    int('potencia_wp').notNull(),
+  eficiencia:    decimal('eficiencia', { precision: 5, scale: 2 }),
+  garantiaAnos:  int('garantia_anos').default(12),
+  precoUnitario: decimal('preco_unitario', { precision: 10, scale: 2 }),
+  ativo:         boolean('ativo').default(true).notNull(),
+  createdAt:     timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
+
+export const catalogoInversor = mysqlTable('catalogo_inversor', {
+  id:            int('id').primaryKey().autoincrement(),
+  empresaId:     int('empresa_id').notNull().references(() => empresa.id),
+  fabricante:    varchar('fabricante', { length: 100 }).notNull(),
+  modelo:        varchar('modelo', { length: 200 }).notNull(),
+  potenciaW:     int('potencia_w').notNull(),
+  tipo:          mysqlEnum('tipo_inversor', ['microinversor','string','hibrido','otimizador']).notNull(),
+  garantiaAnos:  int('garantia_anos').default(12),
+  precoUnitario: decimal('preco_unitario', { precision: 10, scale: 2 }),
+  ativo:         boolean('ativo').default(true).notNull(),
+  createdAt:     timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
 export const empresaRelations = relations(empresa, ({ many }) => ({
   usuarios: many(usuario),
   clientes: many(cliente),

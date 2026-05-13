@@ -413,7 +413,33 @@ export const cronogracoMarco = mysqlTable('cronograma_marco', {
   prazoTexto: varchar('prazo_texto', { length: 100 }),
   ordem: int('ordem').notNull(),
 })
+// ─── CATÁLOGO DE EQUIPAMENTOS ─────────────────────────────────────────────────
 
+export const catalogoModulo = mysqlTable('catalogo_modulo', {
+  id:            int('id').primaryKey().autoincrement(),
+  empresaId:     int('empresa_id').notNull().references(() => empresa.id),
+  fabricante:    varchar('fabricante', { length: 100 }).notNull(),
+  modelo:        varchar('modelo', { length: 200 }).notNull(),
+  potenciaWp:    int('potencia_wp').notNull(),
+  eficiencia:    decimal('eficiencia', { precision: 5, scale: 2 }),
+  garantiaAnos:  int('garantia_anos').default(12),
+  precoUnitario: decimal('preco_unitario', { precision: 10, scale: 2 }),
+  ativo:         boolean('ativo').default(true).notNull(),
+  createdAt:     timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
+
+export const catalogoInversor = mysqlTable('catalogo_inversor', {
+  id:            int('id').primaryKey().autoincrement(),
+  empresaId:     int('empresa_id').notNull().references(() => empresa.id),
+  fabricante:    varchar('fabricante', { length: 100 }).notNull(),
+  modelo:        varchar('modelo', { length: 200 }).notNull(),
+  potenciaW:     int('potencia_w').notNull(),
+  tipo:          mysqlEnum('tipo', ['microinversor','string','hibrido','otimizador']).notNull(),
+  garantiaAnos:  int('garantia_anos').default(12),
+  precoUnitario: decimal('preco_unitario', { precision: 10, scale: 2 }),
+  ativo:         boolean('ativo').default(true).notNull(),
+  createdAt:     timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
 // ─── RELATIONS ────────────────────────────────────────────────────────────────
 
 export const empresaRelations = relations(empresa, ({ many }) => ({
