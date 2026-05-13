@@ -540,6 +540,7 @@ const CONFIG_ABAS = [
   { path: 'premissas', label: 'Premissas' },
   { path: 'textos',   label: 'Textos Institucionais' },
   { path: 'blocos',   label: 'Blocos da Proposta' },   // ← inserir aqui
+  { path: 'catalogo',  label: 'Catálogo de Equip.' },
   { path: 'usuarios', label: 'Usuários' },
 ]
 function AbaTextos() {
@@ -1028,7 +1029,190 @@ function AbaUsuarios() {
     </div>
   )
 }
+// ─── ABA CATÁLOGO DE EQUIPAMENTOS ────────────────────────────────────────────
 
+function AbaCatalogo() {
+  const [aba, setAba] = useState<'modulos' | 'inversores'>('modulos')
+  const [showForm, setShowForm] = useState(false)
+  const [editandoId, setEditandoId] = useState<number | null>(null)
+
+  // ── Módulos ──
+  const { data: modulos, refetch: refetchModulos } = trpc.equipamento.listModulos.useQuery({ apenasAtivos: false })
+  const createModulo = trpc.equipamento.createModulo.useMutation({ onSuccess: () => { refetchModulos(); setShowForm(false); resetForm() } })
+  const updateModulo = trpc.equipamento.updateModulo.useMutation({ onSuccess: () => { refetchModulos(); setEditandoId(null); resetForm() } })
+  const toggleModulo = trpc.equipamento.toggleModulo.useMutation({ onSuccess: () => refetchModulos() })
+  const deleteModulo = trpc.equipamento.deleteModulo.useMutation({ onSuccess: () => refetchModulos() })
+
+  // ── Inversores ──
+  const { data: inversores, refetch: refetchInversores } = trpc.equipamento.listInversores.useQuery({ apenasAtivos: false })
+  const createInversor = trpc.equipamento.createInversor.useMutation({ onSuccess: () => { refetchInversores(); setShowForm(false); resetForm() } })
+  const updateInversor = trpc.equipamento.updateInversor.useMutation({ onSuccess: () => { refetchInversores(); setEditandoId(null); resetForm() } })
+  const toggleInversor = trpc.equipamento.toggleInversor.useMutation({ onSuccess: () => refetchInversores() })
+  const deleteInversor = trpc.equipamento.deleteInversor.useMutation({ onSuccess: () => refetchInversores() })
+
+  const FORM_MOD_VAZIO = { fabricante: '', modelo: '', potenciaWp: 0, eficiencia: 0, garantiaAnos: 12, precoUnitario: 0 }
+  const FORM_INV_VAZIO = { fabricante: '', modelo: '', potenciaW: 0, tipo: 'microinversor' as const, garantiaAnos: 12, precoUnitario: 0 }
+  const [formMod, setFormMod] = useState(FORM_MOD_VAZIO)
+  const [formInv, setFormInv] = useState(FORM_INV_VAZIO)
+  const resetForm = () => { setFormMod(FORM_MOD_VAZIO); setFormInv(FORM_INV_VAZIO) }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: C.dark, border: `1px solid ${C.darkBorder}`,
+    borderRadius: 8, padding: '8px 12px', color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+  }
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10, fontWeight: 600, color: C.textMuted,
+    letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4, display: 'block',
+  }
+
+  const isModulos = aba === 'modulos'
+
+  const handleSalvar = () => {
+    if (isModulos) {
+      if (editandoId) updateModulo.mutate({ id: editandoId, ...formMod } as any)
+      else createModulo.mutate(formMod as any)
+    } else {
+      if (editandoId) updateInversor.mutate({ id: editandoId, ...formInv } as any)
+      else createInversor.mutate(formInv as any)
+    }
+  }
+
+  const abrirEditar = (item: any) => {
+    setEditandoId(item.id)
+    if (isModulos) setFormMod({ fabricante: item.fabricante, modelo: item.modelo, potenciaWp: item.potenciaWp, eficiencia: Number(item.eficiencia ?? 0), garantiaAnos: item.garantiaAnos ?? 12, precoUnitario: Number(item.precoUnitario ?? 0) })
+    else setFormInv({ fabricante: item.fabricante, modelo: item.modelo, potenciaW: item.potenciaW, tipo: item.tipo, garantiaAnos: item.garantiaAnos ?? 12, precoUnitario: Number(item.precoUnitario ?? 0) })
+    setShowForm(true)
+  }
+
+  const lista = isModulos ? (modulos ?? []) : (inversores ?? [])
+
+  return (
+    <div style={{ maxWidth: 900 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0 }}>Catálogo de Equipamentos</h2>
+          <p style={{ color: C.textMuted, fontSize: 12, marginTop: 4 }}>Módulos e inversores pré-cadastrados para uso nas propostas</p>
+        </div>
+        <Btn onClick={() => { setShowForm(!showForm); setEditandoId(null); resetForm() }}>
+          {showForm ? '✕ Cancelar' : '+ Adicionar'}
+        </Btn>
+      </div>
+
+      {/* Sub-abas */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: C.dark, borderRadius: 10, padding: 4, width: 'fit-content' }}>
+        {(['modulos', 'inversores'] as const).map(t => (
+          <button key={t} onClick={() => { setAba(t); setShowForm(false); setEditandoId(null); resetForm() }} style={{
+            padding: '7px 20px', borderRadius: 7, border: 'none', cursor: 'pointer',
+            background: aba === t ? C.solar : 'transparent',
+            color: aba === t ? '#000' : C.textMuted, fontWeight: 600, fontSize: 13,
+          }}>
+            {t === 'modulos' ? '🔆 Módulos' : '⚡ Inversores'}
+          </button>
+        ))}
+      </div>
+
+      {/* Formulário */}
+      {showForm && (
+        <Card style={{ padding: '18px 20px', marginBottom: 16, border: `1px solid ${C.accent}30` }}>
+          <p style={{ color: C.accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 14px' }}>
+            {editandoId ? 'Editar' : 'Novo'} {isModulos ? 'Módulo' : 'Inversor'}
+          </p>
+          {isModulos ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 100px 100px 120px', gap: 12 }}>
+              <div><label style={labelStyle}>Fabricante *</label><input style={inputStyle} value={formMod.fabricante} onChange={e => setFormMod(f => ({ ...f, fabricante: e.target.value }))} placeholder="Ex: JA Solar" /></div>
+              <div><label style={labelStyle}>Modelo *</label><input style={inputStyle} value={formMod.modelo} onChange={e => setFormMod(f => ({ ...f, modelo: e.target.value }))} placeholder="Ex: JAM72S30-620" /></div>
+              <div><label style={labelStyle}>Potência (Wp) *</label><input style={inputStyle} type="number" value={formMod.potenciaWp || ''} onChange={e => setFormMod(f => ({ ...f, potenciaWp: Number(e.target.value) }))} /></div>
+              <div><label style={labelStyle}>Eficiência (%)</label><input style={inputStyle} type="number" value={formMod.eficiencia || ''} onChange={e => setFormMod(f => ({ ...f, eficiencia: Number(e.target.value) }))} /></div>
+              <div><label style={labelStyle}>Garantia (anos)</label><input style={inputStyle} type="number" value={formMod.garantiaAnos || ''} onChange={e => setFormMod(f => ({ ...f, garantiaAnos: Number(e.target.value) }))} /></div>
+              <div><label style={labelStyle}>Preço Unit. (R$)</label><input style={inputStyle} type="number" value={formMod.precoUnitario || ''} onChange={e => setFormMod(f => ({ ...f, precoUnitario: Number(e.target.value) }))} /></div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 140px 100px 120px', gap: 12 }}>
+              <div><label style={labelStyle}>Fabricante *</label><input style={inputStyle} value={formInv.fabricante} onChange={e => setFormInv(f => ({ ...f, fabricante: e.target.value }))} placeholder="Ex: Hoymiles" /></div>
+              <div><label style={labelStyle}>Modelo *</label><input style={inputStyle} value={formInv.modelo} onChange={e => setFormInv(f => ({ ...f, modelo: e.target.value }))} placeholder="Ex: HMS-2250DW-4T" /></div>
+              <div><label style={labelStyle}>Potência (W) *</label><input style={inputStyle} type="number" value={formInv.potenciaW || ''} onChange={e => setFormInv(f => ({ ...f, potenciaW: Number(e.target.value) }))} /></div>
+              <div>
+                <label style={labelStyle}>Tipo *</label>
+                <select style={{ ...inputStyle, cursor: 'pointer' }} value={formInv.tipo} onChange={e => setFormInv(f => ({ ...f, tipo: e.target.value as any }))}>
+                  <option value="microinversor">Microinversor</option>
+                  <option value="string">String</option>
+                  <option value="hibrido">Híbrido</option>
+                  <option value="otimizador">Otimizador</option>
+                </select>
+              </div>
+              <div><label style={labelStyle}>Garantia (anos)</label><input style={inputStyle} type="number" value={formInv.garantiaAnos || ''} onChange={e => setFormInv(f => ({ ...f, garantiaAnos: Number(e.target.value) }))} /></div>
+              <div><label style={labelStyle}>Preço Unit. (R$)</label><input style={inputStyle} type="number" value={formInv.precoUnitario || ''} onChange={e => setFormInv(f => ({ ...f, precoUnitario: Number(e.target.value) }))} /></div>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+            <Btn onClick={handleSalvar} disabled={createModulo.isPending || updateModulo.isPending || createInversor.isPending || updateInversor.isPending}>
+              {editandoId ? '✔ Salvar Alterações' : '✔ Adicionar ao Catálogo'}
+            </Btn>
+          </div>
+        </Card>
+      )}
+
+      {/* Lista */}
+      {lista.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', border: `1px dashed ${C.darkBorder}`, borderRadius: 12, color: C.textDim }}>
+          Nenhum {isModulos ? 'módulo' : 'inversor'} cadastrado ainda. Clique em "+ Adicionar" para começar.
+        </div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${C.darkBorder}` }}>
+              {(isModulos
+                ? ['Fabricante / Modelo', 'Potência', 'Eficiência', 'Garantia', 'Preço Unit.', 'Status', '']
+                : ['Fabricante / Modelo', 'Tipo', 'Potência', 'Garantia', 'Preço Unit.', 'Status', '']
+              ).map((h, i) => (
+                <th key={i} style={{ padding: '8px 12px', color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((item: any) => (
+              <tr key={item.id} style={{ borderBottom: `1px solid ${C.darkBorder}30`, opacity: item.ativo ? 1 : 0.45 }}>
+                <td style={{ padding: '10px 12px' }}>
+                  <p style={{ color: C.text, fontWeight: 600, fontSize: 13, margin: '0 0 2px' }}>{item.modelo}</p>
+                  <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>{item.fabricante}</p>
+                </td>
+                {isModulos ? (
+                  <>
+                    <td style={{ padding: '10px 12px', color: C.solar, fontWeight: 700 }}>{item.potenciaWp} Wp</td>
+                    <td style={{ padding: '10px 12px', color: C.textDim }}>{item.eficiencia ? `${item.eficiencia}%` : '—'}</td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ background: `${C.accent}15`, color: C.accent, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{item.tipo}</span>
+                    </td>
+                    <td style={{ padding: '10px 12px', color: C.solar, fontWeight: 700 }}>{item.potenciaW >= 1000 ? `${(item.potenciaW/1000).toFixed(1)} kW` : `${item.potenciaW} W`}</td>
+                  </>
+                )}
+                <td style={{ padding: '10px 12px', color: C.green }}>{item.garantiaAnos ? `${item.garantiaAnos} anos` : '—'}</td>
+                <td style={{ padding: '10px 12px', color: C.textDim }}>{item.precoUnitario ? `R$ ${Number(item.precoUnitario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 5, padding: '2px 8px', background: item.ativo ? `${C.green}15` : `${C.darkBorder}40`, color: item.ativo ? C.green : C.textMuted }}>
+                    {item.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => abrirEditar(item)} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${C.accent}40`, background: `${C.accent}10`, color: C.accent, cursor: 'pointer', fontSize: 11 }}>✏</button>
+                    <button onClick={() => isModulos ? toggleModulo.mutate({ id: item.id, ativo: !item.ativo }) : toggleInversor.mutate({ id: item.id, ativo: !item.ativo })} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${C.darkBorder}`, background: 'transparent', color: C.textMuted, cursor: 'pointer', fontSize: 11 }}>
+                      {item.ativo ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button onClick={() => { if (confirm('Excluir este item?')) isModulos ? deleteModulo.mutate({ id: item.id }) : deleteInversor.mutate({ id: item.id }) }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid #EF444440`, background: '#EF444410', color: '#EF4444', cursor: 'pointer', fontSize: 11 }}>✕</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
 
 // ─── LAYOUT DA CONFIGURAÇÃO ───────────────────────────────────────────────────
 
@@ -1064,6 +1248,7 @@ export function ConfiguracoesPage() {
           <Route path="textos"    element={<AbaTextos />} />
           <Route path="blocos"    element={<AbaBlocos />} />
           <Route path="usuarios"  element={<AbaUsuarios />} />
+          <Route path="catalogo"  element={<AbaCatalogo />} />
         </Routes>
       </div>
     </div>
