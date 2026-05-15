@@ -238,6 +238,7 @@ export const proposta = mysqlTable('proposta', {
   id: int('id').primaryKey().autoincrement(),
   empresaId: int('empresa_id').notNull().references(() => empresa.id),
   numero: varchar('numero', { length: 20 }).notNull().unique(),
+  tipoProposta: mysqlEnum('tipo_proposta', ['fotovoltaico','servico_geral']).default('fotovoltaico').notNull(),
   clienteId: int('cliente_id').notNull().references(() => cliente.id),
   faturaId: int('fatura_id').references(() => fatura.id),
   usuarioId: int('usuario_id').references(() => usuario.id),
@@ -249,6 +250,7 @@ export const proposta = mysqlTable('proposta', {
   nomeTemplate: varchar('nome_template', { length: 100 }),
   dataEmissao: date('data_emissao').notNull(),
   dataValidade: date('data_validade'),
+  tituloServico: varchar('titulo_servico', { length: 200 }),
   observacoesInternas: text('observacoes_internas'),
   createdBy: int('created_by').references(() => usuario.id),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
@@ -462,12 +464,24 @@ export const faturaRelations = relations(fatura, ({ one, many }) => ({
   historicoConsumo: many(historicoConsumo),
 }))
 
+export const itemServicoProposta = mysqlTable('item_servico_proposta', {
+  id: int('id').primaryKey().autoincrement(),
+  propostaId: int('proposta_id').notNull().references(() => proposta.id, { onDelete: 'cascade' }),
+  descricao: varchar('descricao', { length: 300 }).notNull(),
+  unidade: varchar('unidade', { length: 30 }).default('un').notNull(),
+  quantidade: decimal('quantidade', { precision: 10, scale: 3 }).notNull(),
+  valorUnitario: decimal('valor_unitario', { precision: 10, scale: 2 }).notNull(),
+  valorTotal: decimal('valor_total', { precision: 10, scale: 2 }).notNull(),
+  ordem: int('ordem').default(0).notNull(),
+})
+
 export const propostaRelations = relations(proposta, ({ one, many }) => ({
   cliente: one(cliente, { fields: [proposta.clienteId], references: [cliente.id] }),
   fatura: one(fatura, { fields: [proposta.faturaId], references: [fatura.id] }),
   usuario: one(usuario, { fields: [proposta.usuarioId], references: [usuario.id] }),
   dimensionamento: one(dimensionamento, { fields: [proposta.id], references: [dimensionamento.propostaId] }),
   equipamentos: many(equipamentoProposta),
+  itensServico: many(itemServicoProposta),
   precificacao: one(precificacao, { fields: [proposta.id], references: [precificacao.propostaId] }),
   analiseFinanceira: one(analiseFinanceira, { fields: [proposta.id], references: [analiseFinanceira.propostaId] }),
   condicoesComerciais: many(condicaoComercial),

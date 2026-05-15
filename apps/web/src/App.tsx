@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { PropostasPage } from './pages/proposals/PropostasPage'
 import { PropostaDetailPage } from './pages/proposals/PropostaDetailPage'
 import { NovaPropostaPage } from './pages/proposals/NovaPropostaPage'
+import { NovaPropostaServicoPage } from './pages/proposals/NovaPropostaServicoPage'
 import { ClientesPage } from './pages/clients/ClientesPage'
 import { ClienteDetailPage } from './pages/clients/ClienteDetailPage'
 import { FaturasPage } from './pages/invoices/FaturasPage'
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/propostas" element={<PropostasPage />} />
               <Route path="/propostas/nova" element={<NovaPropostaPage />} />
+              <Route path="/propostas/nova-servico" element={<NovaPropostaServicoPage />} />
               <Route path="/propostas/:id" element={<PropostaDetailPage />} />
               <Route path="/clientes" element={<ClientesPage />} />
               <Route path="/clientes/:id" element={<ClienteDetailPage />} />
