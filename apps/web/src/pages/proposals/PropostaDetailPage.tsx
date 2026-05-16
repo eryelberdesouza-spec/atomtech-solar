@@ -669,29 +669,51 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
   )
 }
 
+const BLOCOS_TEXTO_EDITAVEL = new Set(['escopo_entregas', 'consideracoes_gerais'])
+const BLOCOS_LABELS: Record<string, string> = {
+  capa: 'Capa', apresentacao_empresa: 'Apresentação da Empresa',
+  o_que_inclui: 'O que inclui', como_funciona: 'Como funciona',
+  regulamentacao: 'Regulamentação', diferenciais: 'Diferenciais',
+  garantias: 'Garantias', fornecedores: 'Fornecedores',
+  dimensionamento: 'Dimensionamento', equipamentos: 'Equipamentos',
+  cronograma: 'Cronograma', analise_financeira: 'Análise Financeira',
+  indicadores_financeiros: 'Indicadores Financeiros', fluxo_caixa: 'Fluxo de Caixa',
+  reducao_conta: 'Redução da Conta', condicoes_comerciais: 'Condições Comerciais',
+  formas_pagamento: 'Formas de Pagamento', aceite: 'Aceite da Proposta',
+  contato: 'Contato e Endereço', escopo_servico: 'Escopo do Serviço',
+  escopo_entregas: 'O que Propomos Entregar', consideracoes_gerais: 'Considerações Gerais',
+}
+
 function TabBlocos({ blocos, propostaId }: any) {
   const utils = trpc.useUtils()
   const updateBlocos = trpc.proposta.updateBlocos.useMutation({
     onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }),
   })
   const [estado, setEstado] = useState<any[]>(blocos ?? [])
-  const LABELS: Record<string, string> = {
-    capa: 'Capa', apresentacao_empresa: 'Apresentação da Empresa',
-    o_que_inclui: 'O que inclui', como_funciona: 'Como funciona',
-    regulamentacao: 'Regulamentação', diferenciais: 'Diferenciais',
-    garantias: 'Garantias', fornecedores: 'Fornecedores',
-    dimensionamento: 'Dimensionamento', equipamentos: 'Equipamentos',
-    cronograma: 'Cronograma', analise_financeira: 'Análise Financeira',
-    indicadores_financeiros: 'Indicadores Financeiros', fluxo_caixa: 'Fluxo de Caixa',
-    reducao_conta: 'Redução da Conta', condicoes_comerciais: 'Condições Comerciais',
-    formas_pagamento: 'Formas de Pagamento', aceite: 'Aceite da Proposta',
-    contato: 'Contato e Endereço',
-  }
+  const [editandoTexto, setEditandoTexto] = useState<number | null>(null)
+  const [textoEditando, setTextoEditando] = useState('')
+
   const toggle = (id: number) => {
     const novos = estado.map(b => b.id === id ? { ...b, ativo: !b.ativo } : b)
     setEstado(novos)
     updateBlocos.mutate({ propostaId, blocos: novos.map(b => ({ id: b.id, ativo: b.ativo, ordem: b.ordem })) })
   }
+
+  const abrirTexto = (b: any) => {
+    setTextoEditando(b.textoOverride ?? '')
+    setEditandoTexto(b.id)
+  }
+
+  const salvarTexto = (b: any) => {
+    const novoTexto = textoEditando.trim() || null
+    updateBlocos.mutate({
+      propostaId,
+      blocos: [{ id: b.id, ativo: b.ativo, ordem: b.ordem, textoOverride: novoTexto }],
+    })
+    setEstado(est => est.map(x => x.id === b.id ? { ...x, textoOverride: novoTexto } : x))
+    setEditandoTexto(null)
+  }
+
   const ativos   = estado.filter(b => b.ativo).length
   const inativos = estado.length - ativos
 
@@ -706,11 +728,45 @@ function TabBlocos({ blocos, propostaId }: any) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {estado.map((b, i) => (
-          <Card key={b.id ?? i} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s', borderLeft: b.ativo ? `3px solid ${C.green}` : `3px solid ${C.darkBorder}` }}>
-            <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace', minWidth: 20, fontWeight: 700 }}>{String(i + 1).padStart(2, '0')}</span>
-            <span style={{ flex: 1, color: b.ativo ? C.text : C.textMuted, fontSize: 13, fontWeight: b.ativo ? 500 : 400 }}>{LABELS[b.tipoBloco] ?? b.tipoBloco}</span>
-            <Toggle checked={b.ativo} onChange={() => toggle(b.id)} />
-          </Card>
+          <div key={b.id ?? i}>
+            <Card style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s', borderLeft: b.ativo ? `3px solid ${C.green}` : `3px solid ${C.darkBorder}` }}>
+              <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace', minWidth: 20, fontWeight: 700 }}>{String(i + 1).padStart(2, '0')}</span>
+              <span style={{ flex: 1, color: b.ativo ? C.text : C.textMuted, fontSize: 13, fontWeight: b.ativo ? 500 : 400 }}>{BLOCOS_LABELS[b.tipoBloco] ?? b.tipoBloco}</span>
+              {BLOCOS_TEXTO_EDITAVEL.has(b.tipoBloco) && (
+                <button
+                  onClick={() => editandoTexto === b.id ? setEditandoTexto(null) : abrirTexto(b)}
+                  title="Editar texto do bloco"
+                  style={{ background: 'none', border: `1px solid ${C.darkBorder}`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: C.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  ✏️ {b.textoOverride ? 'Personalizado' : 'Texto padrão'}
+                </button>
+              )}
+              <Toggle checked={b.ativo} onChange={() => toggle(b.id)} />
+            </Card>
+            {editandoTexto === b.id && (
+              <div style={{ background: C.dark, border: `1px solid ${C.darkBorder}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                  Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas, <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>**negrito**</code> para destaque. Deixe vazio para usar o texto padrão.
+                </p>
+                <textarea
+                  value={textoEditando}
+                  onChange={e => setTextoEditando(e.target.value)}
+                  rows={8}
+                  style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
+                  placeholder={b.tipoBloco === 'escopo_entregas'
+                    ? '- Fornecimento e instalação do painel X\n- Configuração do sistema Y\n- Emissão de relatório técnico'
+                    : '- **Atendimento:** Horário comercial, segunda a sexta.\n- **Garantia:** 90 dias de garantia de execução.'
+                  }
+                />
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <Btn size="sm" variant="ghost" onClick={() => setEditandoTexto(null)}>Cancelar</Btn>
+                  <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
+                    {updateBlocos.isPending ? 'Salvando...' : 'Salvar texto'}
+                  </Btn>
+                </div>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>

@@ -449,6 +449,9 @@ export type TipoBloco =
   | 'reducao_conta'
   | 'condicoes_comerciais'
   | 'formas_pagamento'
+  | 'escopo_servico'
+  | 'escopo_entregas'
+  | 'consideracoes_gerais'
   | 'aceite'
   | 'contato'
 
@@ -480,19 +483,22 @@ export const BLOCOS_PADRAO: { tipo: TipoBloco; label: string; ordem: number }[] 
   { tipo: 'reducao_conta', label: 'Redução da Conta de Energia', ordem: 15 },
   { tipo: 'condicoes_comerciais', label: 'Condições Comerciais', ordem: 16 },
   { tipo: 'formas_pagamento', label: 'Formas de Pagamento', ordem: 17 },
-  { tipo: 'aceite', label: 'Aceite da Proposta', ordem: 18 },
-  { tipo: 'contato', label: 'Contato e Endereço', ordem: 19 },
+  { tipo: 'consideracoes_gerais', label: 'Considerações Gerais', ordem: 18 },
+  { tipo: 'aceite', label: 'Aceite da Proposta', ordem: 19 },
+  { tipo: 'contato', label: 'Contato e Endereço', ordem: 20 },
 ]
 
 export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number }[] = [
-  { tipo: 'capa',                 label: 'Capa',                     ordem: 1 },
-  { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa',  ordem: 2 },
-  { tipo: 'diferenciais',         label: 'Diferenciais',             ordem: 3 },
-  { tipo: 'garantias',            label: 'Garantias',                ordem: 4 },
-  { tipo: 'escopo_servico',       label: 'Escopo do Serviço',        ordem: 5 },
-  { tipo: 'condicoes_comerciais', label: 'Condições Comerciais',     ordem: 6 },
-  { tipo: 'aceite',               label: 'Aceite da Proposta',       ordem: 7 },
-  { tipo: 'contato',              label: 'Contato e Endereço',       ordem: 8 },
+  { tipo: 'capa',                 label: 'Capa',                       ordem: 1 },
+  { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa',    ordem: 2 },
+  { tipo: 'diferenciais',         label: 'Diferenciais',               ordem: 3 },
+  { tipo: 'garantias',            label: 'Garantias',                  ordem: 4 },
+  { tipo: 'escopo_entregas',      label: 'O que Propomos Entregar',    ordem: 5 },
+  { tipo: 'escopo_servico',       label: 'Escopo do Serviço',          ordem: 6 },
+  { tipo: 'condicoes_comerciais', label: 'Condições Comerciais',       ordem: 7 },
+  { tipo: 'consideracoes_gerais', label: 'Considerações Gerais',       ordem: 8 },
+  { tipo: 'aceite',               label: 'Aceite da Proposta',         ordem: 9 },
+  { tipo: 'contato',              label: 'Contato e Endereço',         ordem: 10 },
 ]
 
 // ─── TEXTO INSTITUCIONAL ──────────────────────────────────────────────────────

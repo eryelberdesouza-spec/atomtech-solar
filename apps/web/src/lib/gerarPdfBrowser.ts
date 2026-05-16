@@ -328,6 +328,8 @@ function gerarHTML(data: any): string {
 
   const blocosAtivos = (blocos ?? []).filter((b: any) => b.ativo).map((b: any) => b.tipoBloco)
   const tem = (tipo: string) => blocosAtivos.length === 0 || blocosAtivos.includes(tipo)
+  const textoOverrideBloco = (tipo: string): string | null =>
+    (blocos ?? []).find((b: any) => b.tipoBloco === tipo)?.textoOverride ?? null
 
   // ── CAPA ─────────────────────────────────────────────────────────────────
   const capa = tem('capa') ? `<div class="page capa">
@@ -513,6 +515,34 @@ function gerarHTML(data: any): string {
     ${footer(numero, emp)}
   </div>` : ''
 
+  // ── CONSIDERAÇÕES GERAIS ─────────────────────────────────────────────────
+  const DEFAULT_CONSIDERACOES_SOLAR = `- **Atendimento:** Prestado em horário comercial, de segunda a sexta-feira das 8h às 18h.
+- **Autoria do Orçamento:** Este documento é de uso exclusivo desta negociação e não deve ser repassado a terceiros.
+- **Encargos e Taxas:** Taxas de homologação junto à distribuidora, AVCB e outras licenças são responsabilidade do contratante, salvo se expressamente incluídas.
+- **Etapa Única:** Os serviços serão executados de forma contínua e em etapa única, salvo acordo formal em contrário.
+- **Garantia:** Os serviços possuem garantia de 5 anos na instalação e conforme fabricante para os equipamentos.
+- **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
+
+  const consideracoesBloco = tem('consideracoes_gerais') ? (() => {
+    const txt = textoOverrideBloco('consideracoes_gerais') || DEFAULT_CONSIDERACOES_SOLAR
+    const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
+    const itensHtml = linhas.map((linha: string, idx: number) => {
+      const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      return `<div style="display:flex;gap:12px;margin-bottom:10px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid #EEF2F7">
+        <span style="min-width:22px;height:22px;background:#F5A62315;color:#0E2040;border:1px solid #F5A62340;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:Calibri,sans-serif;flex-shrink:0;margin-top:1px">${idx + 1}</span>
+        <span style="font-size:11px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
+      </div>`
+    }).join('')
+    return `<div class="page">
+    ${headerInterno(numero, logoUrl)}
+    <div class="section">
+      <div class="section-title">LEIA COM ATENÇÃO — INFORMAÇÕES IMPORTANTES</div>
+      ${itensHtml}
+    </div>
+    ${footer(numero, emp)}
+  </div>`
+  })() : ''
+
   // ── ACEITE ───────────────────────────────────────────────────────────────
   const aceite = tem('aceite') ? `<div class="page">
     ${headerInterno(numero, logoUrl)}
@@ -548,7 +578,7 @@ function gerarHTML(data: any): string {
   <style>${CSS}</style>
 </head>
 <body>
-  ${capa}${apresentacao}${comoFunciona}${diferenciais}${garantias}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${aceite}
+  ${capa}${apresentacao}${comoFunciona}${diferenciais}${garantias}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${consideracoesBloco}${aceite}
   <script>window.onload = function() { setTimeout(function() { window.print(); }, 800); };</script>
 </body>
 </html>`
