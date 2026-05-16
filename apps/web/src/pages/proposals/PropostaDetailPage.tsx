@@ -684,7 +684,14 @@ const BLOCOS_LABELS: Record<string, string> = {
   escopo_entregas: 'O que Propomos Entregar', consideracoes_gerais: 'Considerações Gerais',
 }
 
-function TabBlocos({ blocos, propostaId }: any) {
+const DEFAULT_CONSIDERACOES_PREVIEW = `- **Atendimento:** Horário comercial, segunda a sexta das 8h às 18h.
+- **Autoria do Orçamento:** Uso exclusivo desta negociação.
+- **Encargos e Taxas:** Taxas e licenças são responsabilidade do contratante.
+- **Etapa Única:** Execução contínua, salvo acordo formal em contrário.
+- **Garantia:** 90 dias contra defeitos de execução.
+- **Horário Comercial:** Serviços noturnos ou fins de semana cobrados à parte.`
+
+function TabBlocos({ blocos, propostaId, textos }: any) {
   const utils = trpc.useUtils()
   const updateBlocos = trpc.proposta.updateBlocos.useMutation({
     onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }),
@@ -727,47 +734,110 @@ function TabBlocos({ blocos, propostaId }: any) {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {estado.map((b, i) => (
-          <div key={b.id ?? i}>
-            <Card style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s', borderLeft: b.ativo ? `3px solid ${C.green}` : `3px solid ${C.darkBorder}` }}>
-              <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace', minWidth: 20, fontWeight: 700 }}>{String(i + 1).padStart(2, '0')}</span>
-              <span style={{ flex: 1, color: b.ativo ? C.text : C.textMuted, fontSize: 13, fontWeight: b.ativo ? 500 : 400 }}>{BLOCOS_LABELS[b.tipoBloco] ?? b.tipoBloco}</span>
-              {BLOCOS_TEXTO_EDITAVEL.has(b.tipoBloco) && (
-                <button
-                  onClick={() => editandoTexto === b.id ? setEditandoTexto(null) : abrirTexto(b)}
-                  title="Editar texto do bloco"
-                  style={{ background: 'none', border: `1px solid ${C.darkBorder}`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: C.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  ✏️ {b.textoOverride ? 'Personalizado' : 'Texto padrão'}
-                </button>
-              )}
-              <Toggle checked={b.ativo} onChange={() => toggle(b.id)} />
-            </Card>
-            {editandoTexto === b.id && (
-              <div style={{ background: C.dark, border: `1px solid ${C.darkBorder}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
-                  Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas, <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>**negrito**</code> para destaque. Deixe vazio para usar o texto padrão.
-                </p>
-                <textarea
-                  value={textoEditando}
-                  onChange={e => setTextoEditando(e.target.value)}
-                  rows={8}
-                  style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
-                  placeholder={b.tipoBloco === 'escopo_entregas'
-                    ? '- Fornecimento e instalação do painel X\n- Configuração do sistema Y\n- Emissão de relatório técnico'
-                    : '- **Atendimento:** Horário comercial, segunda a sexta.\n- **Garantia:** 90 dias de garantia de execução.'
-                  }
-                />
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <Btn size="sm" variant="ghost" onClick={() => setEditandoTexto(null)}>Cancelar</Btn>
-                  <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
-                    {updateBlocos.isPending ? 'Salvando...' : 'Salvar texto'}
-                  </Btn>
+        {estado.map((b, i) => {
+          const isConsideracoes = b.tipoBloco === 'consideracoes_gerais'
+          const fixedText: string = textos?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES_PREVIEW
+          const temItensEspecificos = !!b.textoOverride?.trim()
+          const alertar = isConsideracoes && b.ativo && !temItensEspecificos
+
+          return (
+            <div key={b.id ?? i}>
+              <Card style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s', borderLeft: b.ativo ? `3px solid ${C.green}` : `3px solid ${C.darkBorder}` }}>
+                <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace', minWidth: 20, fontWeight: 700 }}>{String(i + 1).padStart(2, '0')}</span>
+                <span style={{ flex: 1, color: b.ativo ? C.text : C.textMuted, fontSize: 13, fontWeight: b.ativo ? 500 : 400 }}>{BLOCOS_LABELS[b.tipoBloco] ?? b.tipoBloco}</span>
+                {alertar && (
+                  <span style={{ fontSize: 10, background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40', borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
+                    ⚠️ Sem itens específicos
+                  </span>
+                )}
+                {temItensEspecificos && isConsideracoes && (
+                  <span style={{ fontSize: 10, background: `${C.green}15`, color: C.green, border: `1px solid ${C.green}30`, borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
+                    + itens desta proposta
+                  </span>
+                )}
+                {BLOCOS_TEXTO_EDITAVEL.has(b.tipoBloco) && (
+                  <button
+                    onClick={() => editandoTexto === b.id ? setEditandoTexto(null) : abrirTexto(b)}
+                    title="Editar itens desta proposta"
+                    style={{ background: 'none', border: `1px solid ${C.darkBorder}`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: C.textDim, cursor: 'pointer' }}
+                  >
+                    ✏️ {isConsideracoes ? 'Itens específicos' : (b.textoOverride ? 'Personalizado' : 'Texto padrão')}
+                  </button>
+                )}
+                <Toggle checked={b.ativo} onChange={() => toggle(b.id)} />
+              </Card>
+
+              {editandoTexto === b.id && (
+                <div style={{ background: C.dark, border: `1px solid ${C.darkBorder}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                  {isConsideracoes ? (
+                    <>
+                      {/* Seção: itens fixos (somente leitura) */}
+                      <div>
+                        <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          📌 Itens fixos (configuração da empresa)
+                        </p>
+                        <div style={{ background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', opacity: 0.6 }}>
+                          {fixedText.split('\n').filter(Boolean).map((l, idx) => (
+                            <div key={idx} style={{ color: C.textMuted, fontSize: 11.5, fontFamily: 'monospace', lineHeight: 1.7 }}>{l}</div>
+                          ))}
+                        </div>
+                        <p style={{ color: C.textDim, fontSize: 10, margin: '5px 0 0' }}>
+                          Para editar os itens fixos: <strong style={{ color: C.accent }}>Configurações → Textos Institucionais → Considerações Gerais</strong>
+                        </p>
+                      </div>
+
+                      {/* Seção: itens específicos desta proposta */}
+                      <div>
+                        <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          ✍️ Itens específicos desta proposta
+                        </p>
+                        {!temItensEspecificos && (
+                          <div style={{ background: '#F59E0B10', border: '1px solid #F59E0B30', borderRadius: 8, padding: '10px 14px', marginBottom: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: 14 }}>⚠️</span>
+                            <p style={{ color: '#F59E0B', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+                              Nenhum item específico cadastrado. Adicione abaixo as cláusulas particulares desta proposta (ex: condições de acesso ao local, materiais excluídos, responsabilidades específicas).
+                            </p>
+                          </div>
+                        )}
+                        <textarea
+                          value={textoEditando}
+                          onChange={e => setTextoEditando(e.target.value)}
+                          rows={6}
+                          style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
+                          placeholder={'- **Acesso ao local:** O contratante garantirá acesso livre durante o período de execução.\n- **Materiais excluídos:** Tubulações existentes não estão incluídas neste escopo.'}
+                        />
+                        <p style={{ color: C.textDim, fontSize: 10, margin: '5px 0 0' }}>
+                          Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para cada item. Estes itens aparecem após os itens fixos no PDF.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                        Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas e <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para destaque. Deixe vazio para usar o padrão.
+                      </p>
+                      <textarea
+                        value={textoEditando}
+                        onChange={e => setTextoEditando(e.target.value)}
+                        rows={8}
+                        style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
+                        placeholder={'- Fornecimento e instalação do painel X\n- Configuração do sistema Y\n- Emissão de relatório técnico'}
+                      />
+                    </>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <Btn size="sm" variant="ghost" onClick={() => setEditandoTexto(null)}>Cancelar</Btn>
+                    <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
+                      {updateBlocos.isPending ? 'Salvando...' : 'Salvar'}
+                    </Btn>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -1048,7 +1118,7 @@ export function PropostaDetailPage() {
           <>
             {tab === 'itens'    && <TabItensServico itens={itensServico ?? []} propostaId={propostaId} tituloServico={proposta.tituloServico} />}
             {tab === 'pagamento' && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} isServico={true} valorReferencia={itensServico?.reduce((s: number, i: any) => s + Number(i.valorTotal), 0)} />}
-            {tab === 'blocos'    && <TabBlocos blocos={blocos} propostaId={propostaId} />}
+            {tab === 'blocos'    && <TabBlocos blocos={blocos} propostaId={propostaId} textos={(() => { const t: Record<string, any> = {}; if (textosData) { (textosData as any[]).forEach((x: any) => { t[x.chave] = x }); } return t })()} />}
           </>
         ) : (
           <>

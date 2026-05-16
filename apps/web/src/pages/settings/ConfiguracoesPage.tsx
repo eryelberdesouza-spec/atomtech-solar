@@ -559,6 +559,7 @@ function AbaTextos() {
     { key: 'fornecedores', label: 'Fornecedores' },
     { key: 'regulamentacao', label: 'Regulamentação' },
     { key: 'como_funciona', label: 'Como funciona' },
+    { key: 'consideracoes_gerais', label: 'Considerações Gerais (Padrão)' },
   ]
 
   const getTexto = (chave: string) => {

@@ -524,7 +524,10 @@ function gerarHTML(data: any): string {
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
   const consideracoesBloco = tem('consideracoes_gerais') ? (() => {
-    const txt = textoOverrideBloco('consideracoes_gerais') || DEFAULT_CONSIDERACOES_SOLAR
+    // Itens fixos (empresa) + itens específicos desta proposta
+    const fixedTxt = (textos as any)?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES_SOLAR
+    const customTxt = textoOverrideBloco('consideracoes_gerais')?.trim() || ''
+    const txt = [fixedTxt, customTxt].filter(Boolean).join('\n')
     const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
     const itensHtml = linhas.map((linha: string, idx: number) => {
       const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
