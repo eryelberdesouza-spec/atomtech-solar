@@ -505,13 +505,17 @@ export function abrirPdfServicoNoNavegador(data: any): void {
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
   if (blocoAtivo(blocos, 'consideracoes_gerais')) {
-    const txt = textoBloco(blocos, 'consideracoes_gerais', textos ?? {}, 'consideracoes_gerais') || DEFAULT_CONSIDERACOES
+    // Itens fixos da empresa (configuração) + itens específicos desta proposta
+    const fixedTxt = (textos ?? {})?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES
+    const customBloco = (blocos ?? []).find((b: any) => b.tipoBloco === 'consideracoes_gerais')
+    const customTxt = customBloco?.textoOverride?.trim() || ''
+    const combinedTxt = [fixedTxt, customTxt].filter(Boolean).join('\n')
     html += `
     <div class="page">
       ${H(numero)}
       <div class="page-content">
         <div class="section-title">LEIA COM ATENÇÃO — Informações Importantes</div>
-        ${renderListaNumerada(txt, cor1)}
+        ${renderListaNumerada(combinedTxt, cor1)}
       </div>
       ${F(numero)}
     </div>`
