@@ -39,6 +39,26 @@ app.use('/trpc', createExpressMiddleware({
 
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
+// TEMP: run migration — remove after first deploy
+app.get('/run-migration-prazo', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const stmts = [
+      'ALTER TABLE proposta ADD COLUMN IF NOT EXISTS prazo_execucao VARCHAR(300) NULL AFTER titulo_servico',
+    ]
+    const results = []
+    for (const s of stmts) {
+      await conn.execute(s)
+      results.push(s.slice(0, 60) + ': OK')
+    }
+    await conn.end()
+    res.json({ ok: true, results })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 
 async function main() {
   await testConnection()

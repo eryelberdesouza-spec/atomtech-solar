@@ -172,6 +172,7 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   const dataValidade = proposta?.dataValidade ? fmtDate(proposta.dataValidade) : null
 
   const totalGeral = (itensServico ?? []).reduce((s: number, i: any) => s + Number(i.valorTotal), 0)
+  const prazoExecucao = proposta?.prazoExecucao ?? null
 
   const condsAtivas = (condicoesComerciais ?? []).filter((c: any) => c.ativa !== false)
 
@@ -311,6 +312,7 @@ export function abrirPdfServicoNoNavegador(data: any): void {
               </tr>
             </tfoot>
           </table>
+          ${prazoExecucao ? `<div style="margin-top:16px;padding:12px 16px;background:#F5A62310;border-left:3px solid ${cor1};border-radius:6px"><span style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.05em">Prazo de Execução</span><p style="margin:4px 0 0;font-weight:600;color:#0E2040">${prazoExecucao}</p></div>` : ''}
           <p style="font-size:10px;color:#8A9BB5;margin-top:8px">* Valores em Reais (BRL). Proposta válida até ${dataValidade ?? '—'}.</p>
         </div>
         <div class="page-footer">
