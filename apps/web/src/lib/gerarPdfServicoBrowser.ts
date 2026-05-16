@@ -40,9 +40,10 @@ function agruparItens(txt: string): { titulo: string; corpo: string[] }[] {
   const items: { titulo: string; corpo: string[] }[] = []
   for (const line of txt.split('\n').map(l => l.trim())) {
     if (!line) continue
-    // Início de item: bullet (- •), numeração (1. 2.) ou linha toda em maiúsculas
+    // Início de item: bullet (- •), numeração (1. 2.), letra (a. b. c.) ou linha toda em maiúsculas
     const isTitle = /^[-•]\s/.test(line)
       || /^\d+\.\s/.test(line)
+      || /^[a-zA-Z]\.\s/.test(line)
       || (line === line.toUpperCase() && line.length > 3 && /[A-ZÁÉÍÓÚÃÕÇ]/.test(line))
     if (isTitle || items.length === 0) {
       items.push({ titulo: line, corpo: [] })
@@ -53,10 +54,12 @@ function agruparItens(txt: string): { titulo: string; corpo: string[] }[] {
   return items
 }
 
+const stripPrefix = (s: string) => s.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*|^[a-zA-Z]\.\s*/, '')
+
 function renderListaNumerada(txt: string, cor1: string): string {
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   return agruparItens(txt).map(({ titulo, corpo }, idx) => {
-    const tituloHtml = bold(titulo.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*/, ''))
+    const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
     return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7">
       <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx + 1}</span>
@@ -72,7 +75,7 @@ function renderListaLetras(txt: string): string {
   const letras = 'abcdefghijklmnopqrstuvwxyz'
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   return agruparItens(txt).map(({ titulo, corpo }, idx) => {
-    const tituloHtml = bold(titulo.replace(/^[-•]\s*|^\*(?!\*)\s+/, ''))
+    const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
     return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start">
       <span style="min-width:24px;height:24px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${letras[idx] ?? String(idx + 1)}</span>
@@ -143,7 +146,7 @@ const CSS_SERVICO = `
   }
   .doc-table thead { display: table-header-group; }
   .doc-table tbody { display: table-row-group; }
-  .doc-thead-cell { padding: 0; border: none; }
+  .doc-thead-cell { padding: 0 0 20px 0; border: none; } /* padding-bottom cria espaço abaixo do header em todas as páginas */
   .doc-tbody-cell  { padding: 0; border: none; vertical-align: top; }
 
   /* ─── HEADER INTERNO (dentro do <thead>) ───────────────────────── */
@@ -177,7 +180,7 @@ const CSS_SERVICO = `
   .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
-  .doc-content { padding: 20px 36px 8px; }
+  .doc-content { padding: 0 36px 8px; } /* sem padding-top — o thead-cell já faz esse papel */
   .section { margin-bottom: 24px; page-break-inside: avoid; break-inside: avoid; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
