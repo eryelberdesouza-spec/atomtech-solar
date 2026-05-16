@@ -271,6 +271,39 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     </div>`
   }
 
+  // ── O QUE PROPOMOS ENTREGAR ───────────────────────────────────────
+  if (blocoAtivo(blocos, 'escopo_entregas')) {
+    const txt = textoBloco(blocos, 'escopo_entregas', textos ?? {}, 'escopo_entregas')
+    if (txt) {
+      const letras = 'abcdefghijklmnopqrstuvwxyz'
+      const linhas = txt.split('\n').map(l => l.trim()).filter(Boolean)
+      const itensHtml = linhas.map((linha, idx) => {
+        const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        return `<div style="display:flex;gap:12px;margin-bottom:10px;align-items:flex-start">
+          <span style="min-width:22px;height:22px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:Calibri,sans-serif;flex-shrink:0;margin-top:1px">${letras[idx] ?? String(idx + 1)}</span>
+          <span style="font-size:11.5px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
+        </div>`
+      }).join('')
+      html += `
+      <div class="page">
+        <div class="page-inner">
+          <div class="page-header">
+            <div class="page-header-title">O que Propomos Entregar</div>
+            <div class="page-header-num">${numero}</div>
+          </div>
+          <div class="page-content">
+            <div class="section-title">O que Propomos Entregar</div>
+            ${itensHtml || '<p>Conteúdo a preencher.</p>'}
+          </div>
+          <div class="page-footer">
+            <div class="page-footer-text">${nomeEmpresa}</div>
+            <div class="page-footer-num">${numero}</div>
+          </div>
+        </div>
+      </div>`
+    }
+  }
+
   // ── ESCOPO DO SERVIÇO (TABELA DE ITENS) ──────────────────────────
   if (blocoAtivo(blocos, 'escopo_servico')) {
     const itens = itensServico ?? []
@@ -357,6 +390,45 @@ export function abrirPdfServicoNoNavegador(data: any): void {
               </table>` : ''}
             </div>`
           }).join('')}
+        </div>
+        <div class="page-footer">
+          <div class="page-footer-text">${nomeEmpresa}</div>
+          <div class="page-footer-text">${numero}</div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  // ── CONSIDERAÇÕES GERAIS ─────────────────────────────────────────
+  const DEFAULT_CONSIDERACOES = `- **Atendimento:** Prestado em horário comercial, de segunda a sexta-feira das 8h às 18h.
+- **Autoria do Orçamento:** Este documento é de uso exclusivo desta negociação e não deve ser repassado a terceiros.
+- **Encargos e Taxas:** Eventuais taxas, licenças ou liberações necessárias são de responsabilidade do contratante.
+- **Etapa Única:** Os serviços serão executados de forma contínua e em etapa única, salvo acordo formal em contrário.
+- **Garantia:** Os serviços possuem garantia de 90 dias contra defeitos de execução.
+- **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
+
+  if (blocoAtivo(blocos, 'consideracoes_gerais')) {
+    const txt = textoBloco(blocos, 'consideracoes_gerais', textos ?? {}, 'consideracoes_gerais') || DEFAULT_CONSIDERACOES
+    const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
+    const itensHtml = linhas.map((linha: string, idx: number) => {
+      const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      return `<div style="display:flex;gap:12px;margin-bottom:10px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid #EEF2F7">
+        <span style="min-width:22px;height:22px;background:#F5A62315;color:#0E2040;border:1px solid #F5A62340;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:Calibri,sans-serif;flex-shrink:0;margin-top:1px">${idx + 1}</span>
+        <span style="font-size:11px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
+      </div>`
+    }).join('')
+    html += `
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-title">Considerações Gerais</div>
+          <div class="page-header-num">${numero}</div>
+        </div>
+        <div class="page-content">
+          <div class="section-title">LEIA COM ATENÇÃO — INFORMAÇÕES IMPORTANTES</div>
+          <div style="margin-bottom:16px">
+            ${itensHtml}
+          </div>
         </div>
         <div class="page-footer">
           <div class="page-footer-text">${nomeEmpresa}</div>
