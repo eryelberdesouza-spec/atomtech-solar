@@ -35,12 +35,16 @@ function renderTexto(txt: string | undefined | null): string {
   }).join('')
 }
 
-// Grupo linhas em itens: linha com bullet "- " inicia item; demais são corpo do item anterior
+// Grupo linhas em itens: linha com bullet ou numeração própria inicia item; demais são corpo
 function agruparItens(txt: string): { titulo: string; corpo: string[] }[] {
   const items: { titulo: string; corpo: string[] }[] = []
   for (const line of txt.split('\n').map(l => l.trim())) {
     if (!line) continue
-    if (/^[-•]\s/.test(line) || items.length === 0) {
+    // Início de item: bullet (- •), numeração (1. 2.) ou linha toda em maiúsculas
+    const isTitle = /^[-•]\s/.test(line)
+      || /^\d+\.\s/.test(line)
+      || (line === line.toUpperCase() && line.length > 3 && /[A-ZÁÉÍÓÚÃÕÇ]/.test(line))
+    if (isTitle || items.length === 0) {
       items.push({ titulo: line, corpo: [] })
     } else {
       items[items.length - 1].corpo.push(line)
@@ -52,7 +56,7 @@ function agruparItens(txt: string): { titulo: string; corpo: string[] }[] {
 function renderListaNumerada(txt: string, cor1: string): string {
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   return agruparItens(txt).map(({ titulo, corpo }, idx) => {
-    const tituloHtml = bold(titulo.replace(/^[-•]\s*|^\*(?!\*)\s+/, ''))
+    const tituloHtml = bold(titulo.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*/, ''))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
     return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7">
       <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx + 1}</span>
@@ -571,17 +575,17 @@ export function abrirPdfServicoNoNavegador(data: any): void {
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
   if (blocoAtivo(blocos, 'consideracoes_gerais')) {
-    // Itens fixos da empresa (configuração) + itens específicos desta proposta
+    // Se há override (modelo selecionado), usa só ele. Caso contrário, usa o texto fixo da empresa.
     const fixedTxt = (textos ?? {})?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES
     const customBloco = (blocos ?? []).find((b: any) => b.tipoBloco === 'consideracoes_gerais')
     const customTxt = customBloco?.textoOverride?.trim() || ''
-    const combinedTxt = [fixedTxt, customTxt].filter(Boolean).join('\n')
+    const consideracoesTxt = customTxt || fixedTxt
     html += `
     <div class="page">
       ${H(numero)}
       <div class="page-content">
         <div class="section-title">LEIA COM ATENÇÃO — Informações Importantes</div>
-        ${renderListaNumerada(combinedTxt, cor1)}
+        ${renderListaNumerada(consideracoesTxt, cor1)}
       </div>
       ${F(numero)}
     </div>`
