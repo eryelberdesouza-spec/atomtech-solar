@@ -669,7 +669,9 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
   )
 }
 
-const BLOCOS_TEXTO_EDITAVEL = new Set(['escopo_entregas', 'consideracoes_gerais'])
+const BLOCOS_TEXTO_EDITAVEL   = new Set(['escopo_entregas', 'consideracoes_gerais'])
+const BLOCOS_COM_CATALOGO     = new Set(['garantias', 'consideracoes_gerais', 'escopo_entregas', 'fornecedores', 'regulamentacao', 'como_funciona'])
+const BLOCOS_OBRIGATORIOS_PDF = new Set(['garantias', 'escopo_entregas'])
 const BLOCOS_LABELS: Record<string, string> = {
   capa: 'Capa', apresentacao_empresa: 'Apresentação da Empresa',
   o_que_inclui: 'O que inclui', como_funciona: 'Como funciona',
@@ -696,9 +698,12 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
   const updateBlocos = trpc.proposta.updateBlocos.useMutation({
     onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }),
   })
-  const [estado, setEstado] = useState<any[]>(blocos ?? [])
-  const [editandoTexto, setEditandoTexto] = useState<number | null>(null)
+  const { data: todosModelos } = (trpc as any).modeloBloco.list.useQuery()
+
+  const [estado, setEstado]         = useState<any[]>(blocos ?? [])
+  const [editandoId, setEditandoId] = useState<number | null>(null)
   const [textoEditando, setTextoEditando] = useState('')
+  const [modoCustom, setModoCustom] = useState(false)
 
   const toggle = (id: number) => {
     const novos = estado.map(b => b.id === id ? { ...b, ativo: !b.ativo } : b)
@@ -706,19 +711,24 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
     updateBlocos.mutate({ propostaId, blocos: novos.map(b => ({ id: b.id, ativo: b.ativo, ordem: b.ordem })) })
   }
 
-  const abrirTexto = (b: any) => {
+  const abrirPainel = (b: any) => {
+    if (editandoId === b.id) { setEditandoId(null); return }
     setTextoEditando(b.textoOverride ?? '')
-    setEditandoTexto(b.id)
+    setModoCustom(false)
+    setEditandoId(b.id)
+  }
+
+  const aplicarModelo = (b: any, conteudo: string) => {
+    updateBlocos.mutate({ propostaId, blocos: [{ id: b.id, ativo: b.ativo, ordem: b.ordem, textoOverride: conteudo }] })
+    setEstado(est => est.map(x => x.id === b.id ? { ...x, textoOverride: conteudo } : x))
+    setEditandoId(null)
   }
 
   const salvarTexto = (b: any) => {
     const novoTexto = textoEditando.trim() || null
-    updateBlocos.mutate({
-      propostaId,
-      blocos: [{ id: b.id, ativo: b.ativo, ordem: b.ordem, textoOverride: novoTexto }],
-    })
+    updateBlocos.mutate({ propostaId, blocos: [{ id: b.id, ativo: b.ativo, ordem: b.ordem, textoOverride: novoTexto }] })
     setEstado(est => est.map(x => x.id === b.id ? { ...x, textoOverride: novoTexto } : x))
-    setEditandoTexto(null)
+    setEditandoId(null)
   }
 
   const ativos   = estado.filter(b => b.ativo).length
@@ -727,7 +737,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>Ative ou desative os blocos que aparecerão no PDF.</p>
+        <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>Ative ou desative os blocos. Blocos marcados <span style={{ color: '#F59E0B', fontWeight: 700 }}>OBR</span> exigem modelo selecionado para gerar o PDF.</p>
         <div style={{ display: 'flex', gap: 8 }}>
           <span style={{ background: `${C.green}15`, color: C.green, border: `1px solid ${C.green}30`, borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>{ativos} ativos</span>
           <span style={{ background: `${C.darkBorder}40`, color: C.textMuted, borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>{inativos} inativos</span>
@@ -737,42 +747,64 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
         {estado.map((b, i) => {
           const isConsideracoes = b.tipoBloco === 'consideracoes_gerais'
           const fixedText: string = textos?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES_PREVIEW
-          const temItensEspecificos = !!b.textoOverride?.trim()
-          const alertar = isConsideracoes && b.ativo && !temItensEspecificos
+          const temConteudo = b.textoOverride !== null && b.textoOverride !== undefined
+          const isObrigatorio = BLOCOS_OBRIGATORIOS_PDF.has(b.tipoBloco)
+          const isBloqueado = isObrigatorio && b.ativo && !temConteudo
+          const temCatalogo = BLOCOS_COM_CATALOGO.has(b.tipoBloco)
+          const modelosBloco = ((todosModelos as any[]) ?? []).filter((m: any) => m.tipoBloco === b.tipoBloco)
+          const textoAtual = b.textoOverride
 
           return (
             <div key={b.id ?? i}>
-              <Card style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s', borderLeft: b.ativo ? `3px solid ${C.green}` : `3px solid ${C.darkBorder}` }}>
+              <Card style={{
+                padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12,
+                opacity: b.ativo ? 1 : 0.45, transition: 'opacity 0.2s',
+                borderLeft: isBloqueado ? `3px solid #EF4444` : b.ativo ? `3px solid ${C.green}` : `3px solid ${C.darkBorder}`,
+              }}>
                 <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace', minWidth: 20, fontWeight: 700 }}>{String(i + 1).padStart(2, '0')}</span>
-                <span style={{ flex: 1, color: b.ativo ? C.text : C.textMuted, fontSize: 13, fontWeight: b.ativo ? 500 : 400 }}>{BLOCOS_LABELS[b.tipoBloco] ?? b.tipoBloco}</span>
-                {alertar && (
-                  <span style={{ fontSize: 10, background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40', borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
-                    ⚠️ Sem itens específicos
+                <span style={{ flex: 1, color: b.ativo ? C.text : C.textMuted, fontSize: 13, fontWeight: b.ativo ? 500 : 400 }}>
+                  {BLOCOS_LABELS[b.tipoBloco] ?? b.tipoBloco}
+                </span>
+
+                {/* Badges de status */}
+                {isObrigatorio && b.ativo && (
+                  <span style={{ fontSize: 9, background: '#F59E0B15', color: '#F59E0B', border: '1px solid #F59E0B40', borderRadius: 4, padding: '1px 5px', fontWeight: 700, letterSpacing: '0.05em' }}>OBR</span>
+                )}
+                {isBloqueado && (
+                  <span style={{ fontSize: 10, background: '#EF444420', color: '#EF4444', border: '1px solid #EF444440', borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
+                    ⛔ Sem modelo
                   </span>
                 )}
-                {temItensEspecificos && isConsideracoes && (
+                {temConteudo && !isBloqueado && isConsideracoes && (
                   <span style={{ fontSize: 10, background: `${C.green}15`, color: C.green, border: `1px solid ${C.green}30`, borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
                     + itens desta proposta
                   </span>
                 )}
-                {BLOCOS_TEXTO_EDITAVEL.has(b.tipoBloco) && (
+                {temConteudo && !isConsideracoes && BLOCOS_COM_CATALOGO.has(b.tipoBloco) && !isBloqueado && (
+                  <span style={{ fontSize: 10, background: `${C.green}15`, color: C.green, border: `1px solid ${C.green}30`, borderRadius: 5, padding: '2px 7px', fontWeight: 600 }}>
+                    ✔ Modelo aplicado
+                  </span>
+                )}
+
+                {/* Botão expandir painel */}
+                {(temCatalogo || BLOCOS_TEXTO_EDITAVEL.has(b.tipoBloco)) && (
                   <button
-                    onClick={() => editandoTexto === b.id ? setEditandoTexto(null) : abrirTexto(b)}
-                    title="Editar itens desta proposta"
-                    style={{ background: 'none', border: `1px solid ${C.darkBorder}`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: C.textDim, cursor: 'pointer' }}
+                    onClick={() => abrirPainel(b)}
+                    style={{ background: 'none', border: `1px solid ${editandoId === b.id ? C.solar : C.darkBorder}`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: editandoId === b.id ? C.solar : C.textDim, cursor: 'pointer' }}
                   >
-                    ✏️ {isConsideracoes ? 'Itens específicos' : (b.textoOverride ? 'Personalizado' : 'Texto padrão')}
+                    {editandoId === b.id ? '▲ Fechar' : (isConsideracoes ? '✍️ Itens específicos' : temCatalogo ? '📋 Modelos' : '✏️ Texto')}
                   </button>
                 )}
                 <Toggle checked={b.ativo} onChange={() => toggle(b.id)} />
               </Card>
 
-              {editandoTexto === b.id && (
-                <div style={{ background: C.dark, border: `1px solid ${C.darkBorder}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Painel expandido */}
+              {editandoId === b.id && (
+                <div style={{ background: C.dark, border: `1px solid ${C.darkBorder}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                   {isConsideracoes ? (
+                    /* ── CONSIDERAÇÕES GERAIS: fixed + specific items ── */
                     <>
-                      {/* Seção: itens fixos (somente leitura) */}
                       <div>
                         <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           📌 Itens fixos (configuração da empresa)
@@ -783,36 +815,154 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                           ))}
                         </div>
                         <p style={{ color: C.textDim, fontSize: 10, margin: '5px 0 0' }}>
-                          Para editar os itens fixos: <strong style={{ color: C.accent }}>Configurações → Textos Institucionais → Considerações Gerais</strong>
+                          Editar itens fixos: <strong style={{ color: C.accent }}>Configurações → Textos Institucionais → Considerações Gerais</strong>
                         </p>
                       </div>
 
-                      {/* Seção: itens específicos desta proposta */}
+                      {/* Modelo picker para itens específicos */}
+                      {modelosBloco.length > 0 && !modoCustom && (
+                        <div>
+                          <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            📋 Modelos para itens específicos
+                          </p>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {modelosBloco.map((m: any) => (
+                              <button key={m.id} onClick={() => { setTextoEditando(m.conteudo); setModoCustom(true) }} style={{
+                                background: textoAtual === m.conteudo ? `${C.solar}20` : '#0A0F1A',
+                                border: `1px solid ${textoAtual === m.conteudo ? C.solar : C.darkBorder}`,
+                                borderRadius: 8, padding: '8px 12px', cursor: 'pointer', textAlign: 'left', maxWidth: 200,
+                              }}>
+                                <div style={{ color: textoAtual === m.conteudo ? C.solar : C.text, fontSize: 12, fontWeight: 600 }}>{m.titulo}</div>
+                                <div style={{ color: C.textDim, fontSize: 10, marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 170 }}>
+                                  {m.conteudo.split('\n')[0]?.replace(/^[-•*]\s*/, '').substring(0, 50)}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div>
                         <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           ✍️ Itens específicos desta proposta
                         </p>
-                        {!temItensEspecificos && (
-                          <div style={{ background: '#F59E0B10', border: '1px solid #F59E0B30', borderRadius: 8, padding: '10px 14px', marginBottom: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                            <span style={{ fontSize: 14 }}>⚠️</span>
-                            <p style={{ color: '#F59E0B', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
-                              Nenhum item específico cadastrado. Adicione abaixo as cláusulas particulares desta proposta (ex: condições de acesso ao local, materiais excluídos, responsabilidades específicas).
-                            </p>
-                          </div>
-                        )}
                         <textarea
                           value={textoEditando}
                           onChange={e => setTextoEditando(e.target.value)}
                           rows={6}
                           style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
-                          placeholder={'- **Acesso ao local:** O contratante garantirá acesso livre durante o período de execução.\n- **Materiais excluídos:** Tubulações existentes não estão incluídas neste escopo.'}
+                          placeholder={'- **Acesso ao local:** O contratante garantirá acesso livre.\n- **Materiais excluídos:** Tubulações existentes não incluídas.'}
                         />
                         <p style={{ color: C.textDim, fontSize: 10, margin: '5px 0 0' }}>
-                          Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para cada item. Estes itens aparecem após os itens fixos no PDF.
+                          Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para cada item.
                         </p>
                       </div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
+                        <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>{updateBlocos.isPending ? 'Salvando...' : 'Salvar'}</Btn>
+                      </div>
+                    </>
+                  ) : temCatalogo ? (
+                    /* ── BLOCO COM CATÁLOGO (garantias, escopo_entregas, fornecedores, regulamentacao, como_funciona) ── */
+                    <>
+                      {isBloqueado && (
+                        <div style={{ background: '#EF444415', border: '1px solid #EF444430', borderRadius: 8, padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: 14 }}>⛔</span>
+                          <p style={{ color: '#EF4444', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+                            Este bloco é <strong>obrigatório</strong>. Selecione um modelo abaixo ou escreva um texto personalizado. Sem conteúdo, o PDF não poderá ser gerado.
+                          </p>
+                        </div>
+                      )}
+
+                      {!modoCustom ? (
+                        <>
+                          {modelosBloco.length > 0 ? (
+                            <div>
+                              <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                📋 Selecione um modelo
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {modelosBloco.map((m: any) => {
+                                  const selecionado = textoAtual === m.conteudo
+                                  return (
+                                    <button key={m.id} onClick={() => aplicarModelo(b, m.conteudo)} style={{
+                                      background: selecionado ? `${C.solar}15` : '#0A0F1A',
+                                      border: `2px solid ${selecionado ? C.solar : C.darkBorder}`,
+                                      borderRadius: 10, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+                                      display: 'flex', alignItems: 'flex-start', gap: 12,
+                                    }}>
+                                      <span style={{
+                                        minWidth: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        background: selecionado ? C.solar : C.darkBorder, color: selecionado ? '#000' : C.textDim, fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 2,
+                                      }}>{selecionado ? '✔' : ''}</span>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ color: selecionado ? C.solar : C.text, fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}>{m.titulo}</div>
+                                        <div style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.6 }}>
+                                          {m.conteudo.split('\n').slice(0, 3).map((l: string, idx: number) => (
+                                            <div key={idx} style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{l}</div>
+                                          ))}
+                                          {m.conteudo.split('\n').length > 3 && <div style={{ color: C.textDim, fontSize: 10 }}>+{m.conteudo.split('\n').length - 3} linhas...</div>}
+                                        </div>
+                                      </div>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ background: '#0A0F1A', borderRadius: 8, padding: '14px 16px', textAlign: 'center' }}>
+                              <p style={{ color: C.textMuted, fontSize: 12, margin: '0 0 6px' }}>Nenhum modelo cadastrado para este bloco.</p>
+                              <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                                Crie modelos em <strong style={{ color: C.accent }}>Configurações → Modelos de Bloco</strong>
+                              </p>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {temConteudo && (
+                                <Btn size="sm" variant="ghost" onClick={() => aplicarModelo(b, '')} style={{ color: C.textDim, borderColor: C.darkBorder }}>
+                                  ✕ Remover conteúdo
+                                </Btn>
+                              )}
+                            </div>
+                            <Btn size="sm" variant="ghost" onClick={() => { setTextoEditando(textoAtual ?? ''); setModoCustom(true) }}>
+                              ✏️ Escrever personalizado
+                            </Btn>
+                          </div>
+                        </>
+                      ) : (
+                        /* Modo texto customizado */
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>✏️ Texto personalizado</p>
+                            {modelosBloco.length > 0 && (
+                              <button onClick={() => setModoCustom(false)} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11, cursor: 'pointer' }}>
+                                ← Voltar aos modelos
+                              </button>
+                            )}
+                          </div>
+                          <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                            Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas e <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para destaque.
+                          </p>
+                          <textarea
+                            value={textoEditando}
+                            onChange={e => setTextoEditando(e.target.value)}
+                            rows={8}
+                            style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
+                            placeholder={'- **Garantia do fabricante:** 12 anos para módulos\n- **Garantia de instalação:** 5 anos contra defeitos'}
+                          />
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
+                            <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
+                              {updateBlocos.isPending ? 'Salvando...' : 'Salvar'}
+                            </Btn>
+                          </div>
+                        </>
+                      )}
                     </>
                   ) : (
+                    /* ── BLOCO SEM CATÁLOGO (texto livre simples) ── */
                     <>
                       <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
                         Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas e <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para destaque. Deixe vazio para usar o padrão.
@@ -822,17 +972,16 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                         onChange={e => setTextoEditando(e.target.value)}
                         rows={8}
                         style={{ width: '100%', background: '#0A0F1A', border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12, fontFamily: 'monospace', lineHeight: 1.6, resize: 'vertical' }}
-                        placeholder={'- Fornecimento e instalação do painel X\n- Configuração do sistema Y\n- Emissão de relatório técnico'}
+                        placeholder={'- Fornecimento e instalação do painel X\n- Configuração do sistema Y'}
                       />
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
+                        <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
+                          {updateBlocos.isPending ? 'Salvando...' : 'Salvar'}
+                        </Btn>
+                      </div>
                     </>
                   )}
-
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <Btn size="sm" variant="ghost" onClick={() => setEditandoTexto(null)}>Cancelar</Btn>
-                    <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
-                      {updateBlocos.isPending ? 'Salvando...' : 'Salvar'}
-                    </Btn>
-                  </div>
                 </div>
               )}
             </div>
@@ -1021,6 +1170,20 @@ export function PropostaDetailPage() {
 
   const handleGerarPdf = () => {
     if (!data) { alert('Dados da proposta ainda não carregados.'); return }
+
+    // Validar blocos obrigatórios
+    const bls = (data as any).blocos ?? []
+    const bloqueados = bls.filter((b: any) =>
+      b.ativo &&
+      BLOCOS_OBRIGATORIOS_PDF.has(b.tipoBloco) &&
+      (b.textoOverride === null || b.textoOverride === undefined)
+    )
+    if (bloqueados.length > 0) {
+      const nomes = bloqueados.map((b: any) => BLOCOS_LABELS[b.tipoBloco] ?? b.tipoBloco).join(', ')
+      alert(`⛔ Os blocos abaixo estão ativos mas sem conteúdo:\n\n${nomes}\n\nSelecione um modelo em "Blocos da Proposta" antes de gerar o PDF.`)
+      return
+    }
+
     setGerandoPdf(true)
     setTimeout(() => {
       try {
@@ -1126,7 +1289,7 @@ export function PropostaDetailPage() {
             {tab === 'financeiro'      && <TabFinanceiro af={analiseFinanceira} />}
             {tab === 'precificacao'    && <TabPrecificacao prec={precificacao} propostaId={propostaId} />}
             {tab === 'pagamento'       && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} isServico={false} valorReferencia={Number(precificacao?.precoFinal ?? 0)} />}
-            {tab === 'blocos'          && <TabBlocos blocos={blocos} propostaId={propostaId} />}
+            {tab === 'blocos'          && <TabBlocos blocos={blocos} propostaId={propostaId} textos={(() => { const t: Record<string, any> = {}; if (textosData) { (textosData as any[]).forEach((x: any) => { t[x.chave] = x }); } return t })()} />}
           </>
         )}
       </div>
