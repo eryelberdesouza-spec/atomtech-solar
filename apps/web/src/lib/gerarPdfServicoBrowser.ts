@@ -389,6 +389,45 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     </div>`
   }
 
+  // ── COMO FUNCIONA + REGULAMENTAÇÃO ──────────────────────────────
+  const temComoFunciona  = blocoAtivo(blocos, 'como_funciona')
+  const temReg           = blocoAtivo(blocos, 'regulamentacao')
+
+  if (temComoFunciona || temReg) {
+    const txtCF  = textoBloco(blocos, 'como_funciona',  textos ?? {}, 'como_funciona')
+    const txtReg = textoBloco(blocos, 'regulamentacao', textos ?? {}, 'regulamentacao')
+    html += `
+    <div class="page">
+      ${H(numero)}
+      <div class="page-content">
+        ${temComoFunciona ? `
+          <div class="section-title">Como Funciona</div>
+          ${renderTexto(txtCF) || '<p>Informações sobre o funcionamento do serviço proposto.</p>'}
+          ${temReg ? '<hr class="section-divider">' : ''}
+        ` : ''}
+        ${temReg ? `
+          <div class="section-title">Regulamentação</div>
+          ${renderTexto(txtReg) || '<p>O serviço é prestado em conformidade com as normas técnicas e legislação vigente aplicáveis.</p>'}
+        ` : ''}
+      </div>
+      ${F(numero)}
+    </div>`
+  }
+
+  // ── FORNECEDORES ─────────────────────────────────────────────────
+  if (blocoAtivo(blocos, 'fornecedores')) {
+    const txt = textoBloco(blocos, 'fornecedores', textos ?? {}, 'fornecedores')
+    html += `
+    <div class="page">
+      ${H(numero)}
+      <div class="page-content">
+        <div class="section-title">Fornecedores e Parceiros</div>
+        ${renderTexto(txt) || '<p>Trabalhamos com fornecedores homologados que atendem aos mais altos padrões de qualidade e procedência.</p>'}
+      </div>
+      ${F(numero)}
+    </div>`
+  }
+
   // ── GARANTIAS ────────────────────────────────────────────────────
   if (blocoAtivo(blocos, 'garantias')) {
     const txt = textoBloco(blocos, 'garantias', textos ?? {}, 'garantias')

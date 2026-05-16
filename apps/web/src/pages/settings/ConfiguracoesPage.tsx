@@ -536,12 +536,13 @@ function AbaPremissas() {
 
 // ─── ABA TEXTOS INSTITUCIONAIS ────────────────────────────────────────────────
 const CONFIG_ABAS = [
-  { path: '',         label: 'Empresa' },
+  { path: '',          label: 'Empresa' },
   { path: 'premissas', label: 'Premissas' },
-  { path: 'textos',   label: 'Textos Institucionais' },
-  { path: 'blocos',   label: 'Blocos da Proposta' },   // ← inserir aqui
+  { path: 'textos',    label: 'Textos Institucionais' },
+  { path: 'modelos',   label: 'Modelos de Bloco' },
+  { path: 'blocos',    label: 'Blocos da Proposta' },
   { path: 'catalogo',  label: 'Catálogo de Equip.' },
-  { path: 'usuarios', label: 'Usuários' },
+  { path: 'usuarios',  label: 'Usuários' },
 ]
 function AbaTextos() {
   const { data, isLoading, refetch } = trpc.textoInstitucional.list.useQuery()
@@ -611,6 +612,157 @@ function AbaTextos() {
           <Btn onClick={handleSave} disabled={updateMutation.isPending || conteudo[chaveAtiva] === undefined}>
             {updateMutation.isPending ? 'Salvando...' : 'Salvar Texto'}
           </Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── ABA MODELOS DE BLOCO ────────────────────────────────────────────────────
+
+const TIPOS_MODELOS = [
+  { tipo: 'garantias',            label: 'Garantias',               obrigatorio: true  },
+  { tipo: 'consideracoes_gerais', label: 'Considerações Gerais',    obrigatorio: true  },
+  { tipo: 'escopo_entregas',      label: 'O que Propomos Entregar', obrigatorio: true  },
+  { tipo: 'fornecedores',         label: 'Fornecedores',            obrigatorio: false },
+  { tipo: 'regulamentacao',       label: 'Regulamentação',          obrigatorio: false },
+  { tipo: 'como_funciona',        label: 'Como Funciona',           obrigatorio: false },
+]
+
+const VAZIO_MODELO = { titulo: '', conteudo: '' }
+
+function AbaModelos() {
+  const { data: modelos, isLoading, refetch } = (trpc as any).modeloBloco.list.useQuery()
+  const createMut = (trpc as any).modeloBloco.create.useMutation({ onSuccess: () => { refetch(); setForm(VAZIO_MODELO); setShowForm(false) } })
+  const updateMut = (trpc as any).modeloBloco.update.useMutation({ onSuccess: () => { refetch(); setEditId(null); setForm(VAZIO_MODELO) } })
+  const deleteMut = (trpc as any).modeloBloco.delete.useMutation({ onSuccess: () => refetch() })
+
+  const [tipoAtivo, setTipoAtivo] = useState('garantias')
+  const [showForm, setShowForm]   = useState(false)
+  const [editId, setEditId]       = useState<number | null>(null)
+  const [form, setForm]           = useState(VAZIO_MODELO)
+
+  const listaAtiva = ((modelos as any[]) ?? []).filter((m: any) => m.tipoBloco === tipoAtivo)
+  const tipoInfo   = TIPOS_MODELOS.find(t => t.tipo === tipoAtivo)!
+
+  const iniciarEdicao = (m: any) => {
+    setEditId(m.id)
+    setForm({ titulo: m.titulo, conteudo: m.conteudo })
+    setShowForm(false)
+  }
+
+  const salvar = () => {
+    if (!form.titulo.trim() || !form.conteudo.trim()) return
+    if (editId) {
+      updateMut.mutate({ id: editId, titulo: form.titulo, conteudo: form.conteudo })
+    } else {
+      createMut.mutate({ tipoBloco: tipoAtivo, titulo: form.titulo, conteudo: form.conteudo, ordem: listaAtiva.length })
+    }
+  }
+
+  if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div>
+
+  return (
+    <div style={{ display: 'flex', gap: 16, height: '70vh' }}>
+      {/* Sidebar */}
+      <div style={{ width: 210, flexShrink: 0 }}>
+        <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px 4px', fontWeight: 700 }}>
+          Tipos de Bloco
+        </p>
+        {TIPOS_MODELOS.map(t => {
+          const qtd = ((modelos as any[]) ?? []).filter((m: any) => m.tipoBloco === t.tipo).length
+          return (
+            <button key={t.tipo} onClick={() => { setTipoAtivo(t.tipo); setShowForm(false); setEditId(null); setForm(VAZIO_MODELO) }} style={{
+              width: '100%', padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', marginBottom: 3,
+              background: tipoAtivo === t.tipo ? `${C.solar}15` : 'transparent',
+              color: tipoAtivo === t.tipo ? C.solar : C.textMuted,
+              textAlign: 'left', fontSize: 12.5, fontWeight: tipoAtivo === t.tipo ? 600 : 400,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+            }}>
+              <span>{t.label}</span>
+              <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {t.obrigatorio && <span style={{ fontSize: 9, color: '#F59E0B', fontWeight: 700 }}>OBR</span>}
+                {qtd > 0 && <span style={{ background: `${C.solar}25`, color: C.solar, borderRadius: 10, padding: '0 6px', fontSize: 10, fontWeight: 700 }}>{qtd}</span>}
+              </span>
+            </button>
+          )
+        })}
+        <div style={{ marginTop: 16, padding: '10px 12px', background: `${C.darkBorder}30`, borderRadius: 8 }}>
+          <p style={{ color: C.textDim, fontSize: 10, margin: 0, lineHeight: 1.6 }}>
+            {tipoInfo?.obrigatorio
+              ? '⚠️ Bloco obrigatório — o PDF só é gerado se um modelo for escolhido na proposta.'
+              : 'Bloco opcional — disponível para seleção na proposta.'
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: 0 }}>{tipoInfo?.label}</p>
+          <Btn size="sm" onClick={() => { setShowForm(s => !s); setEditId(null); setForm(VAZIO_MODELO) }}>
+            {showForm ? '✕ Cancelar' : '+ Novo Modelo'}
+          </Btn>
+        </div>
+
+        {/* Formulário */}
+        {(showForm || editId !== null) && (
+          <Card style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
+            <p style={{ color: C.solar, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
+              {editId ? 'Editar modelo' : 'Novo modelo'}
+            </p>
+            <Input label="Título do modelo" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ex: Garantia Padrão 12 Meses" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Conteúdo</label>
+              <textarea
+                value={form.conteudo}
+                onChange={e => setForm(f => ({ ...f, conteudo: e.target.value }))}
+                rows={7}
+                style={{ background: C.dark, border: `1px solid ${C.darkBorder}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontSize: 12.5, fontFamily: 'monospace', lineHeight: 1.7, resize: 'vertical', outline: 'none' }}
+                placeholder={'- **Item:** Descrição do item\n- **Outro item:** Mais detalhes'}
+              />
+              <p style={{ color: C.textDim, fontSize: 10, margin: 0 }}>
+                Use <code style={{ background: `${C.darkBorder}60`, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para itens com destaque.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Btn variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditId(null); setForm(VAZIO_MODELO) }}>Cancelar</Btn>
+              <Btn size="sm" onClick={salvar} disabled={!form.titulo.trim() || !form.conteudo.trim() || createMut.isPending || updateMut.isPending}>
+                {createMut.isPending || updateMut.isPending ? 'Salvando...' : 'Salvar Modelo'}
+              </Btn>
+            </div>
+          </Card>
+        )}
+
+        {/* Lista de modelos */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {listaAtiva.length === 0 && !showForm && !editId && (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: C.textMuted }}>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>📄</div>
+              <p style={{ margin: 0, fontSize: 13 }}>Nenhum modelo cadastrado para este bloco.</p>
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: C.textDim }}>Clique em <strong>+ Novo Modelo</strong> para criar o primeiro.</p>
+            </div>
+          )}
+          {listaAtiva.map((m: any) => (
+            <Card key={m.id} style={{ padding: '12px 16px', display: editId === m.id ? 'none' : 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ color: C.text, fontWeight: 600, fontSize: 13 }}>{m.titulo}</span>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => iniciarEdicao(m)} style={{ background: 'none', border: `1px solid ${C.darkBorder}`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: C.textDim, cursor: 'pointer' }}>✏️ Editar</button>
+                  <button onClick={() => { if (confirm('Excluir este modelo?')) deleteMut.mutate({ id: m.id }) }} style={{ background: 'none', border: `1px solid ${C.danger}40`, borderRadius: 6, padding: '3px 9px', fontSize: 11, color: C.danger, cursor: 'pointer' }}>🗑</button>
+                </div>
+              </div>
+              <div style={{ background: '#0A0F1A', borderRadius: 7, padding: '8px 12px', maxHeight: 100, overflowY: 'auto' }}>
+                {m.conteudo.split('\n').slice(0, 5).map((l: string, i: number) => (
+                  <div key={i} style={{ color: C.textMuted, fontSize: 11, fontFamily: 'monospace', lineHeight: 1.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</div>
+                ))}
+                {m.conteudo.split('\n').length > 5 && (
+                  <div style={{ color: C.textDim, fontSize: 10 }}>+{m.conteudo.split('\n').length - 5} linhas...</div>
+                )}
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
     </div>
@@ -1247,6 +1399,7 @@ export function ConfiguracoesPage() {
           <Route path=""          element={<AbaEmpresa />} />
           <Route path="premissas" element={<AbaPremissas />} />
           <Route path="textos"    element={<AbaTextos />} />
+          <Route path="modelos"   element={<AbaModelos />} />
           <Route path="blocos"    element={<AbaBlocos />} />
           <Route path="usuarios"  element={<AbaUsuarios />} />
           <Route path="catalogo"  element={<AbaCatalogo />} />

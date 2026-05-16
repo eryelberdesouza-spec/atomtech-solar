@@ -8,8 +8,9 @@ import { premissasRouter } from './premissas.router'
 import { pdfRouter }       from './pdf.router'
 import { calculoRouter }   from './calculo.router'
 import { usuarioRouter }   from './usuario.router'
-import { textoRouter }     from './texto.router'
-import { equipamentoRouter } from './equipamento.router'
+import { textoRouter }       from './texto.router'
+import { equipamentoRouter }  from './equipamento.router'
+import { modeloBlocoRouter }  from './modeloBloco.router'
 
 export const appRouter = router({
   auth:               authRouter,
@@ -23,6 +24,7 @@ export const appRouter = router({
   usuario:            usuarioRouter,
   textoInstitucional: textoRouter,
   equipamento:        equipamentoRouter,
+  modeloBloco:        modeloBlocoRouter,
 })
 
 export type AppRouter = typeof appRouter

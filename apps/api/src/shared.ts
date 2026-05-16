@@ -489,17 +489,33 @@ export const BLOCOS_PADRAO: { tipo: TipoBloco; label: string; ordem: number }[] 
 ]
 
 export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number }[] = [
-  { tipo: 'capa',                 label: 'Capa',                       ordem: 1 },
-  { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa',    ordem: 2 },
-  { tipo: 'diferenciais',         label: 'Diferenciais',               ordem: 3 },
-  { tipo: 'garantias',            label: 'Garantias',                  ordem: 4 },
-  { tipo: 'escopo_entregas',      label: 'O que Propomos Entregar',    ordem: 5 },
-  { tipo: 'escopo_servico',       label: 'Escopo do Serviço',          ordem: 6 },
-  { tipo: 'condicoes_comerciais', label: 'Condições Comerciais',       ordem: 7 },
-  { tipo: 'consideracoes_gerais', label: 'Considerações Gerais',       ordem: 8 },
-  { tipo: 'aceite',               label: 'Aceite da Proposta',         ordem: 9 },
-  { tipo: 'contato',              label: 'Contato e Endereço',         ordem: 10 },
+  { tipo: 'capa',                 label: 'Capa',                       ordem: 1  },
+  { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa',    ordem: 2  },
+  { tipo: 'diferenciais',         label: 'Diferenciais',               ordem: 3  },
+  { tipo: 'garantias',            label: 'Garantias',                  ordem: 4  },
+  { tipo: 'como_funciona',        label: 'Como Funciona',              ordem: 5  },
+  { tipo: 'regulamentacao',       label: 'Regulamentação',             ordem: 6  },
+  { tipo: 'fornecedores',         label: 'Fornecedores',               ordem: 7  },
+  { tipo: 'escopo_entregas',      label: 'O que Propomos Entregar',    ordem: 8  },
+  { tipo: 'escopo_servico',       label: 'Escopo do Serviço',          ordem: 9  },
+  { tipo: 'condicoes_comerciais', label: 'Condições Comerciais',       ordem: 10 },
+  { tipo: 'consideracoes_gerais', label: 'Considerações Gerais',       ordem: 11 },
+  { tipo: 'aceite',               label: 'Aceite da Proposta',         ordem: 12 },
+  { tipo: 'contato',              label: 'Contato e Endereço',         ordem: 13 },
 ]
+
+// ─── MODELO DE BLOCO ─────────────────────────────────────────────────────────
+
+export interface ModeloBloco {
+  id: number
+  empresaId: number
+  tipoBloco: string
+  titulo: string
+  conteudo: string
+  ativo: boolean
+  ordem: number
+  createdAt?: string
+}
 
 // ─── TEXTO INSTITUCIONAL ──────────────────────────────────────────────────────
 

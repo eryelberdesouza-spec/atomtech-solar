@@ -57,6 +57,34 @@ app.get('/run-migration-prazo', async (_, res) => {
 })
 
 
+app.get('/run-migration-modelo-bloco', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS modelo_bloco (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id  INT NOT NULL,
+        tipo_bloco  VARCHAR(60) NOT NULL,
+        titulo      VARCHAR(200) NOT NULL,
+        conteudo    TEXT NOT NULL,
+        ativo       TINYINT(1) NOT NULL DEFAULT 1,
+        ordem       INT NOT NULL DEFAULT 0,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mb_empresa_tipo (empresa_id, tipo_bloco)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'tabela modelo_bloco pronta' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {

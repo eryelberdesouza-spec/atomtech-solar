@@ -445,6 +445,17 @@ export const catalogoInversor = mysqlTable('catalogo_inversor', {
   ativo:         boolean('ativo').default(true).notNull(),
   createdAt:     timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 })
+
+export const modeloBloco = mysqlTable('modelo_bloco', {
+  id:         int('id').primaryKey().autoincrement(),
+  empresaId:  int('empresa_id').notNull().references(() => empresa.id),
+  tipoBloco:  varchar('tipo_bloco', { length: 60 }).notNull(),
+  titulo:     varchar('titulo', { length: 200 }).notNull(),
+  conteudo:   text('conteudo').notNull(),
+  ativo:      boolean('ativo').default(true).notNull(),
+  ordem:      int('ordem').default(0).notNull(),
+  createdAt:  timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
 export const empresaRelations = relations(empresa, ({ many }) => ({
   usuarios: many(usuario),
   clientes: many(cliente),
