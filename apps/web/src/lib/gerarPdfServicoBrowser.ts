@@ -83,27 +83,27 @@ function renderListaLetras(txt: string): string {
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CSS_SERVICO = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Inter', 'Calibri Light', Calibri, Candara, 'Segoe UI', sans-serif;
+    font-family: 'Jost', 'Segoe UI', Candara, sans-serif;
     font-weight: 300; font-size: 13.5px; line-height: 1.75;
     color: #1C1C2E; background: white;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     -webkit-font-smoothing: antialiased;
   }
   p { font-size: 13.5px; font-weight: 300; color: #333; line-height: 1.85; margin-bottom: 10px; }
-  strong, b { font-family: 'Inter', Calibri, sans-serif; font-weight: 600; color: #0E2040; }
+  strong, b { font-family: 'Jost', sans-serif; font-weight: 600; color: #0E2040; }
   ul { padding-left: 20px; margin: 8px 0 12px; }
   li { font-size: 13.5px; font-weight: 300; color: #444; line-height: 1.9; margin-bottom: 4px; }
 
-  /* ─── PÁGINA: flex layout — header no topo, conteúdo cresce, footer no fundo ── */
+  /* ─── PÁGINA: altura fixa A4, header e footer absolutos ── */
   .page {
     width: 210mm;
-    min-height: 297mm;
-    display: flex;
-    flex-direction: column;
+    height: 297mm;
+    overflow: hidden;
+    position: relative;
     page-break-after: always;
     break-after: page;
   }
@@ -120,7 +120,8 @@ const CSS_SERVICO = `
   }
   .capa-body {
     flex: 1;
-    padding: 40px 40px 0;
+    padding: 0 40px;
+    display: flex; flex-direction: column; justify-content: center;
   }
   .capa-pretitle {
     font-size: 10px; font-weight: 500; color: #F5A623;
@@ -156,8 +157,8 @@ const CSS_SERVICO = `
 
   /* ─── HEADER INTERNO ───────────────────────────────────────────── */
   .header-interno {
+    position: absolute; top: 0; left: 0; right: 0;
     height: 54px;
-    flex-shrink: 0;
     background: #0E2040;
     padding: 0 36px;
     display: flex; align-items: center; justify-content: space-between;
@@ -181,9 +182,8 @@ const CSS_SERVICO = `
 
   /* ─── FOOTER ───────────────────────────────────────────────────── */
   .footer {
+    position: absolute; bottom: 0; left: 0; right: 0;
     height: 48px;
-    flex-shrink: 0;
-    margin-top: auto;
     background: #0E2040;
     padding: 0 36px;
     display: flex; align-items: center; justify-content: space-between;
@@ -192,7 +192,12 @@ const CSS_SERVICO = `
   .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
 
   /* ─── CONTEÚDO ─────────────────────────────────────────────────── */
-  .page-content { padding: 24px 36px; flex: 1; }
+  .page-content {
+    position: absolute;
+    top: 54px; bottom: 48px; left: 0; right: 0;
+    padding: 24px 36px;
+    overflow: hidden;
+  }
 
   .section-title {
     font-size: 18px; font-weight: 600; color: #0E2040;
@@ -448,20 +453,6 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     </div>`
   }
 
-  // ── GARANTIAS ────────────────────────────────────────────────────
-  if (blocoAtivo(blocos, 'garantias')) {
-    const txt = textoBloco(blocos, 'garantias', textos ?? {}, 'garantias')
-    html += `
-    <div class="page">
-      ${H(numero)}
-      <div class="page-content">
-        <div class="section-title">Garantias Inclusas</div>
-        ${renderTexto(txt) || `<p>Todos os serviços executados possuem garantia conforme a legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados. Nosso compromisso vai além da entrega — estamos presentes no pós-serviço.</p>`}
-      </div>
-      ${F(numero)}
-    </div>`
-  }
-
   // ── O QUE PROPOMOS ENTREGAR (página própria) ─────────────────────
   const temEntregas = blocoAtivo(blocos, 'escopo_entregas')
   const txtEntregas = textoBloco(blocos, 'escopo_entregas', textos ?? {}, 'escopo_entregas')
@@ -552,6 +543,20 @@ export function abrirPdfServicoNoNavegador(data: any): void {
             </div>`
           }).join('')}
         ` : ''}
+      </div>
+      ${F(numero)}
+    </div>`
+  }
+
+  // ── GARANTIAS ────────────────────────────────────────────────────
+  if (blocoAtivo(blocos, 'garantias')) {
+    const txt = textoBloco(blocos, 'garantias', textos ?? {}, 'garantias')
+    html += `
+    <div class="page">
+      ${H(numero)}
+      <div class="page-content">
+        <div class="section-title">Garantias Inclusas</div>
+        ${renderTexto(txt) || `<p>Todos os serviços executados possuem garantia conforme a legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados. Nosso compromisso vai além da entrega — estamos presentes no pós-serviço.</p>`}
       </div>
       ${F(numero)}
     </div>`
