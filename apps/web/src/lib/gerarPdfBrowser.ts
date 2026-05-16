@@ -489,11 +489,13 @@ function gerarHTML(data: any): string {
   })() : ''
 
   // ── CONDIÇÕES COMERCIAIS ─────────────────────────────────────────────────
+  const prazoExecucaoSolar = prop?.prazoExecucao ?? null
   const condicoesBloco = tem('condicoes_comerciais') ? `<div class="page">
     ${headerInterno(numero, logoUrl)}
     <div class="section">
       <div class="section-title">Condi\u00e7\u00f5es Comerciais</div>
       <div class="highlight-box"><p>Investimento Total: <strong>${formatCurrency(precoFinal)}</strong> &middot; Economia Estimada: <strong>${formatCurrency(af?.economiaMensalAno1)}/m\u00eas</strong></p></div>
+      ${prazoExecucaoSolar ? `<div style="margin-top:10px;padding:10px 14px;background:#F5A62310;border-left:3px solid #F5A623;border-radius:4px"><span style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.05em">Prazo de Execu\u00e7\u00e3o</span><p style="margin:3px 0 0;font-weight:600;color:#0E2040;font-size:12px">${prazoExecucaoSolar}</p></div>` : ''}
       ${tem('formas_pagamento') ? `
       <div style="margin-top:12px">
         <div class="section-sub">Formas de Pagamento</div>

@@ -1099,6 +1099,107 @@ export const propostaRouter = router({
       return { ok: true, valorTotal: novoTotal }
     }),
 
+// ─── PRAZO DE EXECUÇÃO ───────────────────────────────────────────────────────
+  updatePrazoExecucao: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      prazoExecucao: z.string().max(300),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      await ctx.db.update(proposta)
+        .set({ prazoExecucao: input.prazoExecucao || null } as any)
+        .where(eq(proposta.id, input.propostaId))
+        .execute()
+      return { ok: true }
+    }),
+
+  // ─── ADICIONAR CONDIÇÃO COMERCIAL ─────────────────────────────────────────
+  addCondicao: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      tipo: z.enum(['avista', 'parcelado_marcos', 'financiamento', 'cartao']),
+      descricao: z.string().optional(),
+      valorTotal: z.number().positive(),
+      parcelas: z.array(z.object({
+        numeroParcela: z.number().int(),
+        descricaoEvento: z.string(),
+        percentualDoTotal: z.number(),
+        prazoDias: z.number().default(0),
+        tipoPrazo: z.enum(['uteis', 'corridos']).default('corridos'),
+      })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const ordemAtual = await ctx.db.select({ ordem: ccTable.ordem }).from(ccTable)
+        .where(eq(ccTable.propostaId, input.propostaId))
+      const novaOrdem = ordemAtual.length > 0 ? Math.max(...ordemAtual.map(c => c.ordem ?? 0)) + 1 : 0
+
+      const descricaoDefault: Record<string, string> = {
+        avista: 'Pagamento à Vista',
+        parcelado_marcos: 'Pagamento Parcelado',
+        financiamento: 'Financiamento Bancário',
+        cartao: 'Cartão de Crédito',
+      }
+
+      const [condResult] = await ctx.db.insert(ccTable).values({
+        propostaId: input.propostaId,
+        tipo: input.tipo,
+        descricao: input.descricao ?? descricaoDefault[input.tipo],
+        valorTotal: String(input.valorTotal),
+        ativa: true,
+        ordem: novaOrdem,
+      }).execute()
+
+      const condId = (condResult as { insertId: number }).insertId
+
+      const parcelas = input.parcelas && input.parcelas.length > 0
+        ? input.parcelas
+        : [{ numeroParcela: 1, descricaoEvento: descricaoDefault[input.tipo], percentualDoTotal: 100, prazoDias: 0, tipoPrazo: 'corridos' as const }]
+
+      for (const p of parcelas) {
+        await ctx.db.insert(ppTable).values({
+          condicaoId: condId,
+          numeroParcela: p.numeroParcela,
+          descricaoEvento: p.descricaoEvento,
+          valor: String((input.valorTotal * p.percentualDoTotal) / 100),
+          percentualDoTotal: String(p.percentualDoTotal),
+          prazoDias: p.prazoDias,
+          tipoPrazo: p.tipoPrazo,
+          referenciaEvento: `marco_${p.numeroParcela}`,
+          meiosPagamento: JSON.stringify(['pix', 'transferencia']),
+          dadosBancariosJson: null,
+        }).execute()
+      }
+
+      return { ok: true, condId }
+    }),
+
+  // ─── EXCLUIR CONDIÇÃO COMERCIAL ───────────────────────────────────────────
+  deleteCondicao: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      condicaoId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      await ctx.db.delete(ppTable).where(eq(ppTable.condicaoId, input.condicaoId)).execute()
+      await ctx.db.delete(ccTable).where(eq(ccTable.id, input.condicaoId)).execute()
+      return { ok: true }
+    }),
+
 // Exclui proposta e todos os registros relacionados
   delete: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))

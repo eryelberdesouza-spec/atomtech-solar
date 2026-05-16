@@ -251,6 +251,7 @@ export const proposta = mysqlTable('proposta', {
   dataEmissao: date('data_emissao').notNull(),
   dataValidade: date('data_validade'),
   tituloServico: varchar('titulo_servico', { length: 200 }),
+  prazoExecucao: varchar('prazo_execucao', { length: 300 }),
   observacoesInternas: text('observacoes_internas'),
   createdBy: int('created_by').references(() => usuario.id),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),

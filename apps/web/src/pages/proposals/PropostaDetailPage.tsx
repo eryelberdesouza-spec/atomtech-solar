@@ -445,21 +445,35 @@ function TabPrecificacao({ prec, propostaId }: any) {
   )
 }
 
-function TabPagamento({ condicoes, propostaId }: any) {
+function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any) {
   const utils = trpc.useUtils()
   const updateCond = trpc.proposta.updateCondicoes.useMutation({
     onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setEditandoId(null) },
     onError: (e) => alert('Erro ao salvar: ' + e.message),
   })
+  const addCond = trpc.proposta.addCondicao.useMutation({
+    onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setShowAddForm(false) },
+    onError: (e) => alert('Erro: ' + e.message),
+  })
+  const deleteCond = trpc.proposta.deleteCondicao.useMutation({
+    onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }),
+    onError: (e) => alert('Erro: ' + e.message),
+  })
 
   const [editandoId, setEditandoId]     = useState<number | null>(null)
   const [formParcelas, setFormParcelas] = useState<any[]>([])
   const [formAvista, setFormAvista]     = useState({ desconto: 0, prazoDias: 0, tipoPrazo: 'corridos' })
+  const [showAddForm, setShowAddForm]   = useState(false)
+  const [addForm, setAddForm]           = useState({ tipo: 'avista' as string, descricao: '', valorTotal: valorReferencia ?? 0, numParcelas: 1 })
 
   const tipos: Record<string, string> = {
     avista: '💰 À Vista', parcelado_marcos: '📋 Parcelado por Marcos',
     financiamento: '🏪 Financiamento Bancário', cartao: '💳 Cartão de Crédito',
   }
+
+  const tiposDisponiveis = isServico
+    ? [{ value: 'avista', label: '💰 À Vista' }, { value: 'parcelado_marcos', label: '📋 Parcelado por Marcos' }, { value: 'cartao', label: '💳 Cartão de Crédito' }]
+    : [{ value: 'avista', label: '💰 À Vista' }, { value: 'parcelado_marcos', label: '📋 Parcelado por Marcos' }, { value: 'financiamento', label: '🏪 Financiamento Bancário' }, { value: 'cartao', label: '💳 Cartão de Crédito' }]
 
   const iniciarEdicao = (c: any) => {
     if (c.tipo === 'avista') {
@@ -470,32 +484,98 @@ function TabPagamento({ condicoes, propostaId }: any) {
     setEditandoId(c.id)
   }
 
-  if (!condicoes?.length) return <EmptyState icon="💳" title="Condições comerciais não configuradas" />
+  const handleAddCondicao = () => {
+    if (!addForm.valorTotal) { alert('Informe o valor total'); return }
+    const parcelas = addForm.tipo === 'parcelado_marcos'
+      ? Array.from({ length: addForm.numParcelas }, (_, i) => ({
+          numeroParcela: i + 1,
+          descricaoEvento: `Parcela ${i + 1}`,
+          percentualDoTotal: Number((100 / addForm.numParcelas).toFixed(2)),
+          prazoDias: (i + 1) * 30,
+          tipoPrazo: 'corridos' as const,
+        }))
+      : undefined
+    addCond.mutate({ propostaId, tipo: addForm.tipo as any, descricao: addForm.descricao || undefined, valorTotal: addForm.valorTotal, parcelas })
+  }
+
+  const barColors = [C.solar, C.green, C.accent, '#9B8DEE', '#F97316']
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {condicoes.map((c: any, i: number) => {
+      {/* Botão + nova condição */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Btn size="sm" variant="ghost" onClick={() => { setShowAddForm(!showAddForm); setAddForm({ tipo: 'avista', descricao: '', valorTotal: valorReferencia ?? 0, numParcelas: 1 }) }}>
+          {showAddForm ? '✖ Cancelar' : '+ Nova Condição'}
+        </Btn>
+      </div>
+
+      {/* Formulário de nova condição */}
+      {showAddForm && (
+        <Card style={{ padding: '16px 20px', border: `1px solid ${C.accent}40` }}>
+          <p style={{ color: C.accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 12px', letterSpacing: '0.07em' }}>Nova Condição de Pagamento</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Tipo</label>
+              <select value={addForm.tipo} onChange={e => setAddForm(f => ({ ...f, tipo: e.target.value }))}
+                style={{ width: '100%', padding: '9px 10px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none' }}>
+                {tiposDisponiveis.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Descrição (opcional)</label>
+              <input value={addForm.descricao} onChange={e => setAddForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: 50% entrada + 50% entrega"
+                style={{ width: '100%', padding: '9px 10px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Valor Total (R$)</label>
+              <input type="number" min={0} value={addForm.valorTotal} onChange={e => setAddForm(f => ({ ...f, valorTotal: Number(e.target.value) }))}
+                style={{ width: '100%', padding: '9px 10px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          {addForm.tipo === 'parcelado_marcos' && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Número de Parcelas</label>
+              <input type="number" min={1} max={12} value={addForm.numParcelas} onChange={e => setAddForm(f => ({ ...f, numParcelas: Number(e.target.value) }))}
+                style={{ width: 100, padding: '9px 10px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none' }} />
+              <span style={{ color: C.textDim, fontSize: 11, marginLeft: 8 }}>parcelas iguais de {formatCurrency(addForm.valorTotal / (addForm.numParcelas || 1))}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => setShowAddForm(false)}>Cancelar</Btn>
+            <Btn onClick={handleAddCondicao} disabled={addCond.isPending}>
+              {addCond.isPending ? '⏳ Criando...' : '✔ Criar Condição'}
+            </Btn>
+          </div>
+        </Card>
+      )}
+
+      {(!condicoes?.length && !showAddForm) && <EmptyState icon="💳" title="Nenhuma condição comercial. Clique em + Nova Condição." />}
+
+      {condicoes?.map((c: any, i: number) => {
         const isEditando = editandoId === c.id
         const podeEditar = c.tipo === 'avista' || c.tipo === 'parcelado_marcos'
         const totalPct   = formParcelas.reduce((s, p) => s + Number(p.percentualDoTotal), 0)
-        const barColor   = i === 0 ? C.solar : i === 1 ? C.green : C.accent
+        const barColor   = barColors[i % barColors.length]
 
         return (
           <Card key={c.id ?? i} style={{ padding: '16px 20px', borderLeft: `3px solid ${barColor}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: C.text, fontSize: 14, fontWeight: 700 }}>{tipos[c.tipo] ?? c.tipo}</span>
-                {c.tipo === 'parcelado_marcos' && (
-                  <span style={{ fontSize: 10, color: C.solar, background: `${C.solar}18`, padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>Padrão Atom Tech</span>
+                {c.descricao && c.descricao !== tipos[c.tipo]?.replace(/^[^ ]+ /, '') && (
+                  <span style={{ fontSize: 11, color: C.textDim }}>{c.descricao}</span>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: C.solar, fontSize: 15, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(c.valorTotal)}</span>
-                {podeEditar && (
-                  <Btn size="sm" variant="ghost" onClick={() => isEditando ? setEditandoId(null) : iniciarEdicao(c)}>
-                    {isEditando ? '✖ Cancelar' : '✏️ Editar'}
-                  </Btn>
+                {podeEditar && !isEditando && (
+                  <Btn size="sm" variant="ghost" onClick={() => iniciarEdicao(c)}>✏️ Editar</Btn>
                 )}
+                {isEditando && (
+                  <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>✖ Cancelar</Btn>
+                )}
+                <button onClick={() => { if (confirm('Excluir esta condição de pagamento?')) deleteCond.mutate({ propostaId, condicaoId: c.id }) }}
+                  style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid #F8514940`, background: '#F8514910', color: '#F85149', cursor: 'pointer', fontSize: 12 }}>✕</button>
               </div>
             </div>
 
@@ -546,8 +626,14 @@ function TabPagamento({ condicoes, propostaId }: any) {
 
             {isEditando && c.tipo === 'parcelado_marcos' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '10px 1fr 65px 65px 90px', gap: 8, marginBottom: 4, padding: '0 2px' }}>
+                  {['', 'Descrição', '%', 'Dias', 'Tipo'].map(h => (
+                    <span key={h} style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>{h}</span>
+                  ))}
+                </div>
                 {formParcelas.map((p, j) => (
-                  <div key={j} style={{ display: 'grid', gridTemplateColumns: '1fr 65px 65px 90px', gap: 8, alignItems: 'center' }}>
+                  <div key={j} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 65px 65px 90px', gap: 8, alignItems: 'center' }}>
+                    <span style={{ color: C.textDim, fontSize: 11, fontWeight: 700 }}>{j + 1}</span>
                     <input value={p.descricaoEvento} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], descricaoEvento: e.target.value }; setFormParcelas(n) }}
                       style={{ padding: '7px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
                     <input type="number" min={0} max={100} value={p.percentualDoTotal} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], percentualDoTotal: Number(e.target.value) }; setFormParcelas(n) }}
@@ -561,6 +647,10 @@ function TabPagamento({ condicoes, propostaId }: any) {
                     </select>
                   </div>
                 ))}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => [...f, { numeroParcela: f.length + 1, descricaoEvento: `Parcela ${f.length + 1}`, percentualDoTotal: 0, prazoDias: 0, tipoPrazo: 'corridos' }])}>+ Parcela</Btn>
+                  {formParcelas.length > 1 && <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => f.slice(0, -1))}>- Remover</Btn>}
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: `1px solid ${C.darkBorder}` }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: Math.abs(totalPct - 100) < 0.01 ? C.green : C.danger }}>Total: {totalPct.toFixed(0)}% {Math.abs(totalPct - 100) < 0.01 ? '✔' : '⚠ deve ser 100%'}</span>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -746,6 +836,45 @@ function TabItensServico({ itens, propostaId, tituloServico }: { itens: any[]; p
   )
 }
 
+// ─── PRAZO DE EXECUÇÃO ───────────────────────────────────────────────
+function PrazoExecucaoBar({ proposta, propostaId }: { proposta: any; propostaId: number }) {
+  const utils = trpc.useUtils()
+  const updatePrazo = trpc.proposta.updatePrazoExecucao.useMutation({
+    onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setEditando(false) },
+    onError: (e) => alert('Erro: ' + e.message),
+  })
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState(proposta.prazoExecucao ?? '')
+
+  if (!editando) {
+    return (
+      <div style={{ padding: '8px 24px', background: `${C.darkBorder}30`, borderBottom: `1px solid ${C.darkBorder}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>⏱ Prazo de Execução:</span>
+        <span style={{ color: proposta.prazoExecucao ? C.text : C.textMuted, fontSize: 13, flex: 1 }}>
+          {proposta.prazoExecucao || <em style={{ color: C.textMuted }}>Não informado</em>}
+        </span>
+        <button onClick={() => { setValor(proposta.prazoExecucao ?? ''); setEditando(true) }}
+          style={{ background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 12, padding: '2px 8px', borderRadius: 5 }}>✏️ Editar</button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '8px 24px', background: `${C.solar}08`, borderBottom: `1px solid ${C.solar}30`, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ color: C.solar, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>⏱ Prazo de Execução:</span>
+      <input value={valor} onChange={e => setValor(e.target.value)} placeholder="Ex: 30 dias úteis após aprovação"
+        style={{ flex: 1, padding: '6px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.solar}60`, color: C.text, fontSize: 13, outline: 'none' }}
+        onKeyDown={e => { if (e.key === 'Enter') updatePrazo.mutate({ propostaId, prazoExecucao: valor }) }}
+        autoFocus
+      />
+      <Btn size="sm" variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
+      <Btn size="sm" onClick={() => updatePrazo.mutate({ propostaId, prazoExecucao: valor })} disabled={updatePrazo.isPending}>
+        {updatePrazo.isPending ? '...' : '✔ Salvar'}
+      </Btn>
+    </div>
+  )
+}
+
 export function PropostaDetailPage() {
   const { id }    = useParams()
   const navigate  = useNavigate()
@@ -849,6 +978,9 @@ export function PropostaDetailPage() {
         </div>
       </div>
 
+      {/* ── PRAZO DE EXECUÇÃO ──────────────────────────────────────── */}
+      <PrazoExecucaoBar proposta={proposta} propostaId={propostaId} />
+
       {/* ── ABAS ────────────────────────────────────────────────────── */}
       <div style={{ background: C.darkMid, padding: '0 24px', borderBottom: `1px solid ${C.darkBorder}` }}>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -859,7 +991,7 @@ export function PropostaDetailPage() {
         {isServico ? (
           <>
             {tab === 'itens'    && <TabItensServico itens={itensServico ?? []} propostaId={propostaId} tituloServico={proposta.tituloServico} />}
-            {tab === 'pagamento' && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} />}
+            {tab === 'pagamento' && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} isServico={true} valorReferencia={itensServico?.reduce((s: number, i: any) => s + Number(i.valorTotal), 0)} />}
             {tab === 'blocos'    && <TabBlocos blocos={blocos} propostaId={propostaId} />}
           </>
         ) : (
@@ -867,7 +999,7 @@ export function PropostaDetailPage() {
             {tab === 'dimensionamento' && <TabDimensionamento dim={dimensionamento} equips={equipamentos} propostaId={propostaId} />}
             {tab === 'financeiro'      && <TabFinanceiro af={analiseFinanceira} />}
             {tab === 'precificacao'    && <TabPrecificacao prec={precificacao} propostaId={propostaId} />}
-            {tab === 'pagamento'       && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} />}
+            {tab === 'pagamento'       && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} isServico={false} valorReferencia={Number(precificacao?.precoFinal ?? 0)} />}
             {tab === 'blocos'          && <TabBlocos blocos={blocos} propostaId={propostaId} />}
           </>
         )}
