@@ -35,27 +35,47 @@ function renderTexto(txt: string | undefined | null): string {
   }).join('')
 }
 
-// Render numbered/lettered list — only strips bullet prefix, NOT ** bold marker
+// Grupo linhas em itens: linha com bullet "- " inicia item; demais são corpo do item anterior
+function agruparItens(txt: string): { titulo: string; corpo: string[] }[] {
+  const items: { titulo: string; corpo: string[] }[] = []
+  for (const line of txt.split('\n').map(l => l.trim())) {
+    if (!line) continue
+    if (/^[-•]\s/.test(line) || items.length === 0) {
+      items.push({ titulo: line, corpo: [] })
+    } else {
+      items[items.length - 1].corpo.push(line)
+    }
+  }
+  return items
+}
+
 function renderListaNumerada(txt: string, cor1: string): string {
-  const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
-  return linhas.map((linha: string, idx: number) => {
-    // strip leading "- " or "• " but NOT "**"
-    const texto = linha.replace(/^[-•]\s*|^\*(?!\*)\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    return `<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid #EEF2F7">
-      <span style="min-width:26px;height:26px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${idx + 1}</span>
-      <span style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${texto}</span>
+  const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  return agruparItens(txt).map(({ titulo, corpo }, idx) => {
+    const tituloHtml = bold(titulo.replace(/^[-•]\s*|^\*(?!\*)\s+/, ''))
+    const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
+    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7">
+      <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx + 1}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
+        ${corpoHtml ? `<div style="font-size:12.5px;color:#555;margin-top:2px;line-height:1.75">${corpoHtml}</div>` : ''}
+      </div>
     </div>`
   }).join('')
 }
 
 function renderListaLetras(txt: string): string {
   const letras = 'abcdefghijklmnopqrstuvwxyz'
-  const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
-  return linhas.map((linha: string, idx: number) => {
-    const texto = linha.replace(/^[-•]\s*|^\*(?!\*)\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    return `<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start">
-      <span style="min-width:26px;height:26px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${letras[idx] ?? String(idx + 1)}</span>
-      <span style="font-size:13.5px;font-weight:300;color:#333;line-height:1.85">${texto}</span>
+  const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  return agruparItens(txt).map(({ titulo, corpo }, idx) => {
+    const tituloHtml = bold(titulo.replace(/^[-•]\s*|^\*(?!\*)\s+/, ''))
+    const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
+    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start">
+      <span style="min-width:24px;height:24px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${letras[idx] ?? String(idx + 1)}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
+        ${corpoHtml ? `<div style="font-size:12.5px;color:#555;margin-top:2px;line-height:1.75">${corpoHtml}</div>` : ''}
+      </div>
     </div>`
   }).join('')
 }
@@ -78,13 +98,12 @@ const CSS_SERVICO = `
   ul { padding-left: 20px; margin: 8px 0 12px; }
   li { font-size: 13.5px; font-weight: 300; color: #444; line-height: 1.9; margin-bottom: 4px; }
 
-  /* ─── PÁGINA: posicionamento absoluto de header/footer ────────── */
+  /* ─── PÁGINA: flex layout — header no topo, conteúdo cresce, footer no fundo ── */
   .page {
     width: 210mm;
     min-height: 297mm;
-    position: relative;
-    padding-top: 54px;   /* altura do header */
-    padding-bottom: 48px; /* altura do footer */
+    display: flex;
+    flex-direction: column;
     page-break-after: always;
     break-after: page;
   }
@@ -93,15 +112,15 @@ const CSS_SERVICO = `
   /* ─── CAPA ─────────────────────────────────────────────────────── */
   .capa {
     background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%);
-    padding: 0;
+    display: flex; flex-direction: column;
   }
   .capa-top {
     padding: 30px 40px 0;
     display: flex; justify-content: space-between; align-items: flex-start;
   }
   .capa-body {
-    padding: 0 40px;
-    padding-top: 40px;
+    flex: 1;
+    padding: 40px 40px 0;
   }
   .capa-pretitle {
     font-size: 10px; font-weight: 500; color: #F5A623;
@@ -127,7 +146,7 @@ const CSS_SERVICO = `
     font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.95); margin-top: 4px;
   }
   .capa-footer {
-    margin-top: 48px;
+    margin-top: auto;
     padding: 20px 40px;
     border-top: 1px solid rgba(255,255,255,0.1);
     display: flex; justify-content: space-between; align-items: flex-end;
@@ -137,11 +156,11 @@ const CSS_SERVICO = `
 
   /* ─── HEADER INTERNO ───────────────────────────────────────────── */
   .header-interno {
-    position: absolute; top: 0; left: 0; right: 0; height: 54px;
+    height: 54px;
+    flex-shrink: 0;
     background: #0E2040;
     padding: 0 36px;
     display: flex; align-items: center; justify-content: space-between;
-    z-index: 10;
   }
   .header-logo {
     display: flex; align-items: center; gap: 10px;
@@ -162,17 +181,18 @@ const CSS_SERVICO = `
 
   /* ─── FOOTER ───────────────────────────────────────────────────── */
   .footer {
-    position: absolute; bottom: 0; left: 0; right: 0; height: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    margin-top: auto;
     background: #0E2040;
     padding: 0 36px;
     display: flex; align-items: center; justify-content: space-between;
-    z-index: 10;
   }
   .footer-text { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.7); }
   .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
 
   /* ─── CONTEÚDO ─────────────────────────────────────────────────── */
-  .page-content { padding: 24px 36px; }
+  .page-content { padding: 24px 36px; flex: 1; }
 
   .section-title {
     font-size: 18px; font-weight: 600; color: #0E2040;
@@ -442,22 +462,35 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     </div>`
   }
 
-  // ── O QUE PROPOMOS ENTREGAR + ESCOPO DO SERVIÇO (mesma página) ───
+  // ── O QUE PROPOMOS ENTREGAR (página própria) ─────────────────────
   const temEntregas = blocoAtivo(blocos, 'escopo_entregas')
-  const temEscopo   = blocoAtivo(blocos, 'escopo_servico')
   const txtEntregas = textoBloco(blocos, 'escopo_entregas', textos ?? {}, 'escopo_entregas')
 
-  if (temEntregas || temEscopo) {
+  if (temEntregas && txtEntregas) {
+    html += `
+    <div class="page">
+      ${H(numero)}
+      <div class="page-content">
+        <div class="section-title">O que Propomos Entregar</div>
+        ${renderListaLetras(txtEntregas)}
+      </div>
+      ${F(numero)}
+    </div>`
+  }
+
+  // ── ESCOPO DO SERVIÇO + CONDIÇÕES COMERCIAIS (mesma página) ──────
+  const temEscopo   = blocoAtivo(blocos, 'escopo_servico')
+  const temConds    = blocoAtivo(blocos, 'condicoes_comerciais') && condsAtivas.length > 0
+  const tipoLabel: Record<string, string> = {
+    avista: 'À Vista', parcelado_marcos: 'Parcelado por Marcos', financiamento: 'Financiamento', cartao: 'Cartão de Crédito',
+  }
+
+  if (temEscopo || temConds) {
     const itens = itensServico ?? []
     html += `
     <div class="page">
       ${H(numero)}
       <div class="page-content">
-        ${temEntregas && txtEntregas ? `
-          <div class="section-title">O que Propomos Entregar</div>
-          ${renderListaLetras(txtEntregas)}
-          ${temEscopo ? `<hr class="section-divider">` : ''}
-        ` : ''}
         ${temEscopo ? `
           <div class="section-title">${tituloServico}</div>
           <table class="tabela-itens">
@@ -494,42 +527,31 @@ export function abrirPdfServicoNoNavegador(data: any): void {
             <p><strong>⏱ Prazo de Execução:</strong> ${prazoExecucao}</p>
           </div>` : ''}
           <p style="font-size:11px;color:#8A9BB5;margin-top:4px">* Valores em Reais (BRL). Proposta válida até ${dataValidade ?? '—'}.</p>
+          ${temConds ? `<hr class="section-divider">` : ''}
         ` : ''}
-      </div>
-      ${F(numero)}
-    </div>`
-  }
-
-  // ── CONDIÇÕES COMERCIAIS ─────────────────────────────────────────
-  if (blocoAtivo(blocos, 'condicoes_comerciais') && condsAtivas.length > 0) {
-    const tipoLabel: Record<string, string> = {
-      avista: 'À Vista', parcelado_marcos: 'Parcelado por Marcos', financiamento: 'Financiamento', cartao: 'Cartão de Crédito',
-    }
-    html += `
-    <div class="page">
-      ${H(numero)}
-      <div class="page-content">
-        <div class="section-title">Condições de Pagamento</div>
-        ${condsAtivas.map((cond: any) => {
-          const parcelas = cond.parcelas ?? []
-          return `
-          <div class="cond-card">
-            <div class="cond-header">
-              <div class="cond-header-title">${tipoLabel[cond.tipo] ?? cond.tipo}${cond.descricao ? ` — ${cond.descricao}` : ''}</div>
-              <div class="cond-total">${fmt(cond.valorTotal)}</div>
-            </div>
-            ${parcelas.length > 0 ? `
-            <table class="parcelas-table">
-              ${parcelas.map((p: any) => `
-              <tr>
-                <td style="color:#0E2040;font-weight:600;width:28px">${p.numeroParcela}.</td>
-                <td>${p.descricaoEvento}</td>
-                <td style="color:#8A9BB5;font-size:11px">${p.prazoDias > 0 ? `${p.prazoDias} dias ${p.tipoPrazo ?? 'corridos'}` : 'Na assinatura'}</td>
-                <td class="valor">${fmt(p.valor)}</td>
-              </tr>`).join('')}
-            </table>` : ''}
-          </div>`
-        }).join('')}
+        ${temConds ? `
+          <div class="section-title">Condições de Pagamento</div>
+          ${condsAtivas.map((cond: any) => {
+            const parcelas = cond.parcelas ?? []
+            return `
+            <div class="cond-card">
+              <div class="cond-header">
+                <div class="cond-header-title">${tipoLabel[cond.tipo] ?? cond.tipo}${cond.descricao ? ` — ${cond.descricao}` : ''}</div>
+                <div class="cond-total">${fmt(cond.valorTotal)}</div>
+              </div>
+              ${parcelas.length > 0 ? `
+              <table class="parcelas-table">
+                ${parcelas.map((p: any) => `
+                <tr>
+                  <td style="color:#0E2040;font-weight:600;width:28px">${p.numeroParcela}.</td>
+                  <td>${p.descricaoEvento}</td>
+                  <td style="color:#8A9BB5;font-size:11px">${p.prazoDias > 0 ? `${p.prazoDias} dias ${p.tipoPrazo ?? 'corridos'}` : 'Na assinatura'}</td>
+                  <td class="valor">${fmt(p.valor)}</td>
+                </tr>`).join('')}
+              </table>` : ''}
+            </div>`
+          }).join('')}
+        ` : ''}
       </div>
       ${F(numero)}
     </div>`
