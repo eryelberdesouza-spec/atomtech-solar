@@ -22,6 +22,7 @@ import {
   premissasConfig,
   premissasSnapshot,
   equipamentoProposta,
+  itemServicoProposta,
   fatura,
   cliente,
   empresa,
@@ -31,7 +32,7 @@ import { calcularDimensionamento } from '../engines/sizing.engine'
 import { calcularFinanceiro } from '../engines/financial.engine'
 import { calcularPrecificacao, gerarItensCustomizadosPadrao } from '../engines/pricing.engine'
 import { gerarCondicoesCompletasAtomTech } from '../engines/payment.engine'
-import { BLOCOS_PADRAO } from '../shared'
+import { BLOCOS_PADRAO, BLOCOS_SERVICO_PADRAO } from '../shared'
 
 // ─── GERADOR DE NÚMERO DA PROPOSTA ───────────────────────────────────────────
 
@@ -98,6 +99,8 @@ export const propostaRouter = router({
         .select({
           id: proposta.id,
           numero: proposta.numero,
+          tipoProposta: proposta.tipoProposta,
+          tituloServico: proposta.tituloServico,
           status: proposta.status,
           versao: proposta.versao,
           dataEmissao: proposta.dataEmissao,
@@ -141,7 +144,7 @@ export const propostaRouter = router({
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
 
       const [
-        dim, prec, itens, af, condComerciais, blocos, equips, snapshot,
+        dim, prec, itens, af, condComerciais, blocos, equips, snapshot, itensServico,
       ] = await Promise.all([
         ctx.db.select().from(dimTable).where(eq(dimTable.propostaId, input.id)).limit(1),
         ctx.db.select().from(precTable).where(eq(precTable.propostaId, input.id)).limit(1),
@@ -151,6 +154,7 @@ export const propostaRouter = router({
         ctx.db.select().from(blocoTable).where(eq(blocoTable.propostaId, input.id)).orderBy(blocoTable.ordem),
         ctx.db.select().from(equipamentoProposta).where(eq(equipamentoProposta.propostaId, input.id)).orderBy(equipamentoProposta.ordem),
         ctx.db.select().from(premissasSnapshot).where(eq(premissasSnapshot.propostaId, input.id)).limit(1),
+        ctx.db.select().from(itemServicoProposta).where(eq(itemServicoProposta.propostaId, input.id)).orderBy(itemServicoProposta.ordem),
       ])
 
       const parcelasMap: Record<number, any[]> = {}
@@ -175,6 +179,7 @@ export const propostaRouter = router({
         })),
         blocos,
         equipamentos: equips,
+        itensServico,
         premissasSnapshot: snapshot[0]?.dadosJson ?? null,
       }
     }),
@@ -936,6 +941,164 @@ export const propostaRouter = router({
 
       return { ok: true, sizing: novoSizing }
     }),
+// ─── CRIAR PROPOSTA DE SERVIÇO GERAL ─────────────────────────────────────────
+  createServico: protectedProcedure
+    .input(
+      z.object({
+        clienteId: z.number().int().positive(),
+        tituloServico: z.string().min(1, 'Informe o título do serviço'),
+        dataEmissao: z.string(),
+        dataValidade: z.string().optional(),
+        observacoesInternas: z.string().optional(),
+        itens: z.array(z.object({
+          descricao: z.string().min(1),
+          unidade: z.string().default('un'),
+          quantidade: z.number().positive(),
+          valorUnitario: z.number().min(0),
+        })).min(1, 'Adicione ao menos um item'),
+        descontoAvista: z.number().optional(),
+        marcoParcelas: z.array(z.object({
+          descricao: z.string(),
+          percentual: z.number(),
+          prazoDias: z.number(),
+          tipoPrazo: z.enum(['uteis', 'corridos']),
+        })).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId, id: usuarioId } = ctx.usuario
+
+      const [cli] = await ctx.db.select().from(cliente)
+        .where(and(eq(cliente.id, input.clienteId), eq(cliente.empresaId, empresaId)))
+        .limit(1)
+      if (!cli) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+
+      const valorTotal = input.itens.reduce((sum, i) => sum + i.quantidade * i.valorUnitario, 0)
+      const numero = await gerarNumeroProposta(ctx.db, empresaId)
+
+      const [propostaResult] = await ctx.db.insert(proposta).values({
+        empresaId, numero,
+        tipoProposta: 'servico_geral',
+        clienteId: input.clienteId,
+        usuarioId, status: 'rascunho', versao: 1,
+        tituloServico: input.tituloServico,
+        dataEmissao: input.dataEmissao,
+        dataValidade: input.dataValidade,
+        observacoesInternas: input.observacoesInternas,
+        createdBy: usuarioId,
+      }).execute()
+
+      const propostaId = (propostaResult as { insertId: number }).insertId
+
+      for (let i = 0; i < input.itens.length; i++) {
+        const item = input.itens[i]
+        const total = item.quantidade * item.valorUnitario
+        await ctx.db.insert(itemServicoProposta).values({
+          propostaId,
+          descricao: item.descricao,
+          unidade: item.unidade,
+          quantidade: String(item.quantidade),
+          valorUnitario: String(item.valorUnitario),
+          valorTotal: String(total),
+          ordem: i + 1,
+        }).execute()
+      }
+
+      const [emp] = await ctx.db
+        .select({ bancoPixChave: empresa.bancoPixChave, bancoNome: empresa.bancoNome })
+        .from(empresa).where(eq(empresa.id, empresaId)).limit(1)
+
+      const dadosBancarios = { banco: emp?.bancoNome ?? undefined, pixChave: emp?.bancoPixChave ?? undefined }
+
+      const condicoes = gerarCondicoesCompletasAtomTech(
+        propostaId, valorTotal, dadosBancarios, input.descontoAvista, input.marcoParcelas,
+      )
+
+      for (const cond of condicoes) {
+        const [condResult] = await ctx.db.insert(ccTable).values({
+          propostaId, tipo: cond.tipo, descricao: cond.descricao,
+          valorTotal: String(cond.valorTotal), ativa: cond.ativa, ordem: cond.ordem,
+        }).execute()
+
+        const condId = (condResult as { insertId: number }).insertId
+
+        for (const parcela of cond.parcelas) {
+          await ctx.db.insert(ppTable).values({
+            condicaoId: condId,
+            numeroParcela: parcela.numeroParcela,
+            descricaoEvento: parcela.descricaoEvento,
+            valor: String(parcela.valor),
+            percentualDoTotal: parcela.percentualDoTotal ? String(parcela.percentualDoTotal) : undefined,
+            prazoDias: parcela.prazoDias,
+            tipoPrazo: parcela.tipoPrazo,
+            referenciaEvento: parcela.referenciaEvento,
+            meiosPagamento: parcela.meiosPagamento,
+            dadosBancariosJson: parcela.dadosBancarios as any,
+          }).execute()
+        }
+      }
+
+      for (const bloco of BLOCOS_SERVICO_PADRAO) {
+        await ctx.db.insert(blocoTable).values({
+          propostaId, tipoBloco: bloco.tipo, ativo: true, ordem: bloco.ordem,
+        }).execute()
+      }
+
+      return { propostaId, numero, ok: true }
+    }),
+
+  // ─── EDITAR ITENS DO SERVIÇO ──────────────────────────────────────────────
+  updateItensServico: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      itens: z.array(z.object({
+        id: z.number().int().positive().optional(),
+        descricao: z.string().min(1),
+        unidade: z.string().default('un'),
+        quantidade: z.number().positive(),
+        valorUnitario: z.number().min(0),
+        ordem: z.number().int().optional(),
+      })).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select().from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      await ctx.db.delete(itemServicoProposta)
+        .where(eq(itemServicoProposta.propostaId, input.propostaId)).execute()
+
+      for (let i = 0; i < input.itens.length; i++) {
+        const item = input.itens[i]
+        const total = item.quantidade * item.valorUnitario
+        await ctx.db.insert(itemServicoProposta).values({
+          propostaId: input.propostaId,
+          descricao: item.descricao,
+          unidade: item.unidade,
+          quantidade: String(item.quantidade),
+          valorUnitario: String(item.valorUnitario),
+          valorTotal: String(total),
+          ordem: item.ordem ?? i + 1,
+        }).execute()
+      }
+
+      const novoTotal = input.itens.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0)
+      const conds = await ctx.db.select().from(ccTable).where(eq(ccTable.propostaId, input.propostaId))
+      for (const cond of conds) {
+        const ratio = novoTotal / Number(cond.valorTotal || 1)
+        await ctx.db.update(ccTable).set({ valorTotal: String(novoTotal) })
+          .where(eq(ccTable.id, cond.id!)).execute()
+        const parcelas = await ctx.db.select().from(ppTable).where(eq(ppTable.condicaoId, cond.id!))
+        for (const p of parcelas) {
+          await ctx.db.update(ppTable).set({ valor: String(Number(p.valor) * ratio) })
+            .where(eq(ppTable.id, p.id!)).execute()
+        }
+      }
+
+      return { ok: true, valorTotal: novoTotal }
+    }),
+
 // Exclui proposta e todos os registros relacionados
   delete: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -961,6 +1124,7 @@ export const propostaRouter = router({
       await ctx.db.delete(afTable)              .where(eq(afTable.propostaId,             input.id)).execute()
       await ctx.db.delete(blocoTable)           .where(eq(blocoTable.propostaId,          input.id)).execute()
       await ctx.db.delete(equipamentoProposta)  .where(eq(equipamentoProposta.propostaId, input.id)).execute()
+      await ctx.db.delete(itemServicoProposta)  .where(eq(itemServicoProposta.propostaId, input.id)).execute()
       await ctx.db.delete(dimTable)             .where(eq(dimTable.propostaId,            input.id)).execute()
       await ctx.db.delete(premissasSnapshot)    .where(eq(premissasSnapshot.propostaId,   input.id)).execute()
       await ctx.db.delete(proposta)             .where(eq(proposta.id,                    input.id)).execute()

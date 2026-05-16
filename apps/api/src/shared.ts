@@ -484,6 +484,17 @@ export const BLOCOS_PADRAO: { tipo: TipoBloco; label: string; ordem: number }[] 
   { tipo: 'contato', label: 'Contato e Endereço', ordem: 19 },
 ]
 
+export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number }[] = [
+  { tipo: 'capa',                 label: 'Capa',                     ordem: 1 },
+  { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa',  ordem: 2 },
+  { tipo: 'diferenciais',         label: 'Diferenciais',             ordem: 3 },
+  { tipo: 'garantias',            label: 'Garantias',                ordem: 4 },
+  { tipo: 'escopo_servico',       label: 'Escopo do Serviço',        ordem: 5 },
+  { tipo: 'condicoes_comerciais', label: 'Condições Comerciais',     ordem: 6 },
+  { tipo: 'aceite',               label: 'Aceite da Proposta',       ordem: 7 },
+  { tipo: 'contato',              label: 'Contato e Endereço',       ordem: 8 },
+]
+
 // ─── TEXTO INSTITUCIONAL ──────────────────────────────────────────────────────
 
 export interface TextoInstitucional {

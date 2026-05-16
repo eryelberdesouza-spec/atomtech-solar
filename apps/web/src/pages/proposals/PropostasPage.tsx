@@ -25,8 +25,9 @@ const STATUS_COLOR: Record<string, string> = {
 
 export function PropostasPage() {
   const navigate = useNavigate()
-  const [filtro, setFiltro]   = useState<StatusFiltro>('todos')
-  const [busca, setBusca]     = useState('')
+  const [filtro, setFiltro]     = useState<StatusFiltro>('todos')
+  const [busca, setBusca]       = useState('')
+  const [menuNova, setMenuNova] = useState(false)
 
   const { data, isLoading } = trpc.proposta.list.useQuery({ isTemplate: false, porPagina: 100 })
   const lista = data?.data ?? []
@@ -51,7 +52,34 @@ export function PropostasPage() {
           <h2 style={{ color: '#E2EAF5', fontSize: 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
           <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
         </div>
-        <Btn onClick={() => navigate('/propostas/nova')}>+ Nova Proposta</Btn>
+        <div style={{ position: 'relative' }}>
+          <Btn onClick={() => setMenuNova(v => !v)}>+ Nova Proposta ▾</Btn>
+          {menuNova && (
+            <div
+              onMouseLeave={() => setMenuNova(false)}
+              style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#111D2E', border: '1px solid #1E3050', borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 100, minWidth: 240 }}
+            >
+              <button
+                onClick={() => { setMenuNova(false); navigate('/propostas/nova') }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #1E3050' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#F5A62310')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              >
+                <span style={{ color: '#E2EAF5', fontSize: 13, fontWeight: 700 }}>☀️ Sistema Fotovoltaico</span>
+                <span style={{ color: '#4A6080', fontSize: 11, marginTop: 2 }}>Proposta com dimensionamento e análise financeira</span>
+              </button>
+              <button
+                onClick={() => { setMenuNova(false); navigate('/propostas/nova-servico') }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#F5A62310')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              >
+                <span style={{ color: '#E2EAF5', fontSize: 13, fontWeight: 700 }}>🔧 Serviço / Instalação</span>
+                <span style={{ color: '#4A6080', fontSize: 11, marginTop: 2 }}>CFTV, Carregadores, Elétrica, Manutenção...</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -155,10 +183,18 @@ export function PropostasPage() {
                   (e.currentTarget as HTMLDivElement).style.borderLeftColor = cor;
                 }}
               >
-                <span style={{ color: '#F5A623', fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{p.numero}</span>
+                <div>
+                  <span style={{ color: '#F5A623', fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{p.numero}</span>
+                  <div style={{ marginTop: 3 }}>
+                    {p.tipoProposta === 'servico_geral'
+                      ? <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#2D9C4E20', color: '#2D9C4E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Serviço</span>
+                      : <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#F5A62320', color: '#F5A623', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Solar</span>
+                    }
+                  </div>
+                </div>
                 <div>
                   <div style={{ color: '#C8D8EC', fontSize: 13, fontWeight: 600 }}>{p.clienteNome}</div>
-                  {p.clienteEstado && <div style={{ color: '#3A5070', fontSize: 11, marginTop: 1 }}>{p.clienteEstado}</div>}
+                  {(p.tituloServico || p.clienteEstado) && <div style={{ color: '#3A5070', fontSize: 11, marginTop: 1 }}>{p.tituloServico || p.clienteEstado}</div>}
                 </div>
                 <Badge status={p.status} />
                 <span style={{ color: '#4A6080', fontSize: 12 }}>{formatDate(p.dataEmissao)}</span>

@@ -10,13 +10,20 @@ import {
   EmptyState, PageWrapper, C, Input,
 } from '../../components/ui'
 import { abrirPdfNoNavegador } from '../../lib/gerarPdfBrowser'
+import { abrirPdfServicoNoNavegador } from '../../lib/gerarPdfServicoBrowser'
 
-const TABS = [
+const TABS_SOLAR = [
   { id: 'dimensionamento', label: 'Dimensionamento' },
   { id: 'financeiro',      label: 'Análise Financeira' },
   { id: 'precificacao',    label: 'Precificação' },
   { id: 'pagamento',       label: 'Condições Comerciais' },
   { id: 'blocos',          label: 'Blocos da Proposta' },
+]
+
+const TABS_SERVICO = [
+  { id: 'itens',    label: 'Itens do Serviço' },
+  { id: 'pagamento', label: 'Condições Comerciais' },
+  { id: 'blocos',    label: 'Blocos da Proposta' },
 ]
 
 // ─── PILL BADGE ──────────────────────────────────────────────────────
@@ -620,10 +627,130 @@ function TabBlocos({ blocos, propostaId }: any) {
   )
 }
 
+// ─── ABA: ITENS DO SERVIÇO ───────────────────────────────────────────
+function TabItensServico({ itens, propostaId, tituloServico }: { itens: any[]; propostaId: number; tituloServico?: string | null }) {
+  const utils = trpc.useUtils()
+  const updateItens = trpc.proposta.updateItensServico.useMutation({
+    onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setEditando(false) },
+    onError: (e) => alert('Erro: ' + e.message),
+  })
+
+  const [editando, setEditando] = useState(false)
+  const [form, setForm] = useState<{ id: number; descricao: string; unidade: string; quantidade: string; valorUnitario: string }[]>(
+    (itens ?? []).map((item, i) => ({
+      id: i,
+      descricao: item.descricao,
+      unidade: item.unidade ?? 'un',
+      quantidade: String(item.quantidade),
+      valorUnitario: String(item.valorUnitario),
+    }))
+  )
+
+  const UNIDADES = ['un', 'm', 'm²', 'm³', 'h', 'km', 'kg', 'l', 'pc', 'vb']
+  const totalItem = (i: typeof form[0]) => (parseFloat(i.quantidade) || 0) * (parseFloat(i.valorUnitario) || 0)
+  const totalGeral = (editando ? form : itens ?? []).reduce((s, i) => s + (editando ? totalItem(i as any) : Number(i.valorTotal)), 0)
+
+  const salvar = () => {
+    const validos = form.filter(i => i.descricao.trim() && parseFloat(i.quantidade) > 0)
+    if (validos.length === 0) { alert('Adicione ao menos um item válido'); return }
+    updateItens.mutate({
+      propostaId,
+      itens: validos.map((i, idx) => ({
+        descricao: i.descricao.trim(),
+        unidade: i.unidade,
+        quantidade: parseFloat(i.quantidade),
+        valorUnitario: parseFloat(i.valorUnitario) || 0,
+        ordem: idx + 1,
+      })),
+    })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {tituloServico && (
+        <div style={{ padding: '12px 16px', background: `${C.solar}10`, borderRadius: 10, border: `1px solid ${C.solar}30` }}>
+          <span style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Serviço</span>
+          <p style={{ color: C.text, fontSize: 15, fontWeight: 700, margin: '4px 0 0' }}>{tituloServico}</p>
+        </div>
+      )}
+
+      <Card style={{ padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <p style={{ color: C.text, fontSize: 13, fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Itens e Serviços</p>
+          <Btn size="sm" variant="ghost" onClick={() => { setEditando(!editando); if (!editando) setForm((itens ?? []).map((item, i) => ({ id: i, descricao: item.descricao, unidade: item.unidade ?? 'un', quantidade: String(item.quantidade), valorUnitario: String(item.valorUnitario) }))) }}>
+            {editando ? '✖ Cancelar' : '✏️ Editar Itens'}
+          </Btn>
+        </div>
+
+        {editando ? (
+          <div>
+            {/* Cabeçalho */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 120px 100px 32px', gap: 8, marginBottom: 8, padding: '0 4px' }}>
+              {['Descrição', 'Un.', 'Qtd.', 'Valor Unit.', 'Total', ''].map(h => (
+                <span key={h} style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {form.map((item, idx) => (
+                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 120px 100px 32px', gap: 8, alignItems: 'center' }}>
+                  <input value={item.descricao} onChange={e => setForm(f => f.map((r, i) => i === idx ? { ...r, descricao: e.target.value } : r))}
+                    style={{ padding: '8px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none', boxSizing: 'border-box', width: '100%' }} />
+                  <select value={item.unidade} onChange={e => setForm(f => f.map((r, i) => i === idx ? { ...r, unidade: e.target.value } : r))}
+                    style={{ padding: '8px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none', width: '100%' }}>
+                    {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <input type="number" min="0" step="0.001" value={item.quantidade} onChange={e => setForm(f => f.map((r, i) => i === idx ? { ...r, quantidade: e.target.value } : r))}
+                    style={{ padding: '8px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none', textAlign: 'right', boxSizing: 'border-box', width: '100%' }} />
+                  <input type="number" min="0" step="0.01" value={item.valorUnitario} onChange={e => setForm(f => f.map((r, i) => i === idx ? { ...r, valorUnitario: e.target.value } : r))}
+                    style={{ padding: '8px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none', textAlign: 'right', boxSizing: 'border-box', width: '100%' }} />
+                  <span style={{ color: C.text, fontSize: 12, fontWeight: 600, textAlign: 'right' }}>{formatCurrency(totalItem(item))}</span>
+                  <button onClick={() => form.length > 1 && setForm(f => f.filter((_, i) => i !== idx))} disabled={form.length === 1}
+                    style={{ background: 'none', border: 'none', color: form.length === 1 ? C.textMuted : '#F85149', cursor: form.length === 1 ? 'default' : 'pointer', fontSize: 16, fontWeight: 700 }}>×</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, alignItems: 'center' }}>
+              <Btn size="sm" variant="ghost" onClick={() => setForm(f => [...f, { id: Date.now(), descricao: '', unidade: 'un', quantidade: '1', valorUnitario: '' }])}>+ Adicionar Item</Btn>
+              <Btn size="sm" onClick={salvar} disabled={updateItens.isPending}>{updateItens.isPending ? 'Salvando...' : 'Salvar Itens'}</Btn>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 120px 120px', gap: 8, marginBottom: 8, padding: '0 4px' }}>
+              {['Descrição', 'Un.', 'Qtd.', 'Valor Unit.', 'Total'].map(h => (
+                <span key={h} style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {(itens ?? []).map((item: any, idx: number) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 120px 120px', gap: 8, alignItems: 'center', padding: '10px 4px', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                  <span style={{ color: C.text, fontSize: 13 }}>{item.descricao}</span>
+                  <span style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>{item.unidade}</span>
+                  <span style={{ color: C.textDim, fontSize: 12, textAlign: 'right' }}>{Number(item.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</span>
+                  <span style={{ color: C.textDim, fontSize: 12, textAlign: 'right' }}>{formatCurrency(item.valorUnitario)}</span>
+                  <span style={{ color: C.text, fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{formatCurrency(item.valorTotal)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, paddingTop: 16, borderTop: `1px solid ${C.darkBorder}` }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Total da Proposta</div>
+            <div style={{ color: C.solar, fontSize: 22, fontWeight: 800 }}>{formatCurrency(totalGeral)}</div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 export function PropostaDetailPage() {
   const { id }    = useParams()
   const navigate  = useNavigate()
-  const [tab, setTab]               = useState('dimensionamento')
+  const [tabSolar, setTabSolar]         = useState('dimensionamento')
+  const [tabServico, setTabServico]     = useState('itens')
   const [gerandoPdf, setGerandoPdf] = useState(false)
 
   const propostaId = Number(id)
@@ -644,7 +771,12 @@ export function PropostaDetailPage() {
       try {
         const textos: Record<string, any> = {}
         if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
-        abrirPdfNoNavegador({ ...data, empresa: { ...data.empresa, ...empresa }, textos, cliente: clienteData })
+        const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData }
+        if ((data as any).proposta?.tipoProposta === 'servico_geral') {
+          abrirPdfServicoNoNavegador(dadosPdf)
+        } else {
+          abrirPdfNoNavegador(dadosPdf)
+        }
       } catch (e) {
         alert('Erro ao gerar PDF. Verifique se popups estão permitidos neste site.')
         console.error(e)
@@ -655,7 +787,11 @@ export function PropostaDetailPage() {
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spinner size={36} /></div>
   if (!data) return <EmptyState icon="☹" title="Proposta não encontrada" />
 
-  const { proposta, dimensionamento, equipamentos, precificacao, analiseFinanceira, condicoesComerciais, blocos } = data
+  const { proposta, dimensionamento, equipamentos, precificacao, analiseFinanceira, condicoesComerciais, blocos, itensServico } = data as any
+  const isServico = proposta.tipoProposta === 'servico_geral'
+  const tab    = isServico ? tabServico : tabSolar
+  const setTab = isServico ? setTabServico : setTabSolar
+  const TABS   = isServico ? TABS_SERVICO : TABS_SOLAR
 
   const handleStatus = (status: any) => {
     updateStatus.mutate({ id: propostaId, status }, { onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }) })
@@ -690,6 +826,9 @@ export function PropostaDetailPage() {
             {clienteData && (
               <span style={{ color: C.text, fontSize: 14, fontWeight: 700 }}>{clienteData.nome}</span>
             )}
+            {isServico && proposta.tituloServico && (
+              <span style={{ color: C.textDim, fontSize: 12, background: `${C.green}15`, borderRadius: 5, padding: '1px 8px', border: `1px solid ${C.green}30` }}>🔧 {proposta.tituloServico}</span>
+            )}
             <span style={{ color: C.textDim, fontSize: 12 }}>
               Emissão: {formatDate(proposta.dataEmissao)}
               {proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}
@@ -717,11 +856,21 @@ export function PropostaDetailPage() {
 
       {/* ── CONTEÚDO ────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px' }}>
-        {tab === 'dimensionamento' && <TabDimensionamento dim={dimensionamento} equips={equipamentos} propostaId={propostaId} />}
-        {tab === 'financeiro'      && <TabFinanceiro af={analiseFinanceira} />}
-        {tab === 'precificacao'    && <TabPrecificacao prec={precificacao} propostaId={propostaId} />}
-        {tab === 'pagamento'       && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} />}
-        {tab === 'blocos'          && <TabBlocos blocos={blocos} propostaId={propostaId} />}
+        {isServico ? (
+          <>
+            {tab === 'itens'    && <TabItensServico itens={itensServico ?? []} propostaId={propostaId} tituloServico={proposta.tituloServico} />}
+            {tab === 'pagamento' && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} />}
+            {tab === 'blocos'    && <TabBlocos blocos={blocos} propostaId={propostaId} />}
+          </>
+        ) : (
+          <>
+            {tab === 'dimensionamento' && <TabDimensionamento dim={dimensionamento} equips={equipamentos} propostaId={propostaId} />}
+            {tab === 'financeiro'      && <TabFinanceiro af={analiseFinanceira} />}
+            {tab === 'precificacao'    && <TabPrecificacao prec={precificacao} propostaId={propostaId} />}
+            {tab === 'pagamento'       && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} />}
+            {tab === 'blocos'          && <TabBlocos blocos={blocos} propostaId={propostaId} />}
+          </>
+        )}
       </div>
     </div>
   )
