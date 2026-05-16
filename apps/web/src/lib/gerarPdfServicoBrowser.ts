@@ -246,7 +246,8 @@ const CSS_SERVICO = `
 
   @media print {
     body { margin: 0; }
-    @page { size: A4; margin: 0; }
+    /* margin-bottom reserva espaço para o footer fixo em todas as páginas impressas */
+    @page { size: A4; margin: 0 0 48px 0; }
   }
 `
 
