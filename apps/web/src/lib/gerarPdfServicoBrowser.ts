@@ -22,16 +22,45 @@ const fmtDate = (s: any): string => {
 
 function renderTexto(txt: string | undefined | null): string {
   if (!txt) return ''
+  // Only strip genuine list bullets (- or •), NOT ** which is bold marker
+  const stripBullet = (s: string) => s.replace(/^[-•]\s*|^\*(?!\*)\s+/, '')
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
   return txt.split('\n\n').map(para => {
     const lines = para.split('\n').filter(l => l.trim())
     if (!lines.length) return ''
-    if (lines.every(l => l.trimStart().startsWith('- '))) {
-      return '<ul>' + lines.map(l => `<li>${bold(l.replace(/^\s*-\s*/, ''))}</li>`).join('') + '</ul>'
+    if (lines.every(l => /^[-•*]\s/.test(l.trimStart()) && !l.trimStart().startsWith('**'))) {
+      return '<ul>' + lines.map(l => `<li>${bold(stripBullet(l.trim()))}</li>`).join('') + '</ul>'
     }
     return `<p>${bold(para.replace(/\n/g, '<br>'))}</p>`
   }).join('')
 }
+
+// Render numbered/lettered list — only strips bullet prefix, NOT ** bold marker
+function renderListaNumerada(txt: string, cor1: string): string {
+  const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
+  return linhas.map((linha: string, idx: number) => {
+    // strip leading "- " or "• " but NOT "**"
+    const texto = linha.replace(/^[-•]\s*|^\*(?!\*)\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    return `<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid #EEF2F7">
+      <span style="min-width:26px;height:26px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${idx + 1}</span>
+      <span style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${texto}</span>
+    </div>`
+  }).join('')
+}
+
+function renderListaLetras(txt: string): string {
+  const letras = 'abcdefghijklmnopqrstuvwxyz'
+  const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
+  return linhas.map((linha: string, idx: number) => {
+    const texto = linha.replace(/^[-•]\s*|^\*(?!\*)\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    return `<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start">
+      <span style="min-width:26px;height:26px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${letras[idx] ?? String(idx + 1)}</span>
+      <span style="font-size:13.5px;font-weight:300;color:#333;line-height:1.85">${texto}</span>
+    </div>`
+  }).join('')
+}
+
+// ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CSS_SERVICO = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -49,113 +78,131 @@ const CSS_SERVICO = `
   ul { padding-left: 20px; margin: 8px 0 12px; }
   li { font-size: 13.5px; font-weight: 300; color: #444; line-height: 1.9; margin-bottom: 4px; }
 
-  /* ─── PÁGINAS A4 ───────────────────────────────────────────────── */
+  /* ─── PÁGINA: posicionamento absoluto de header/footer ────────── */
   .page {
-    width: 210mm; min-height: 297mm; position: relative;
-    display: flex; flex-direction: column;
-    page-break-after: always; break-after: page;
+    width: 210mm;
+    min-height: 297mm;
+    position: relative;
+    padding-top: 54px;   /* altura do header */
+    padding-bottom: 48px; /* altura do footer */
+    page-break-after: always;
+    break-after: page;
   }
   .page:last-child { page-break-after: avoid; break-after: avoid; }
 
   /* ─── CAPA ─────────────────────────────────────────────────────── */
-  .capa { background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%); }
-  .capa-top { padding: 28px 36px 0; display: flex; justify-content: space-between; align-items: flex-start; }
-  .capa-body { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 40px; }
+  .capa {
+    background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%);
+    padding: 0;
+  }
+  .capa-top {
+    padding: 30px 40px 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .capa-body {
+    padding: 0 40px;
+    padding-top: 40px;
+  }
   .capa-pretitle {
-    font-family: 'Inter', Calibri, sans-serif; font-size: 10px; font-weight: 500;
-    color: #F5A623; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 18px;
+    font-size: 10px; font-weight: 500; color: #F5A623;
+    letter-spacing: 5px; text-transform: uppercase; margin-bottom: 18px;
   }
   .capa-title {
-    font-family: 'Inter', Calibri, sans-serif; font-size: 40px; font-weight: 700;
-    color: #FFFFFF; line-height: 1.1; margin-bottom: 8px;
+    font-size: 40px; font-weight: 700; color: #FFFFFF; line-height: 1.1; margin-bottom: 8px;
   }
-  .capa-divider { width: 60px; height: 3px; background: #F5A623; margin: 20px 0; border-radius: 2px; }
+  .capa-divider { width: 60px; height: 3px; background: #F5A623; margin: 22px 0; border-radius: 2px; }
   .capa-cliente-label {
-    font-size: 9px; font-weight: 300;
-    color: rgba(255,255,255,0.5); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px;
+    font-size: 10px; font-weight: 300;
+    color: rgba(255,255,255,0.7); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
   }
   .capa-cliente-nome {
-    font-family: 'Inter', Calibri, sans-serif; font-size: 28px; font-weight: 600;
-    color: #fff; line-height: 1.2;
+    font-size: 30px; font-weight: 600; color: #fff; line-height: 1.2;
   }
-  .capa-meta { display: flex; gap: 32px; margin-top: 24px; }
+  .capa-meta { display: flex; gap: 36px; margin-top: 28px; }
   .capa-meta-label {
-    font-size: 9px; font-weight: 300;
-    color: rgba(255,255,255,0.4); letter-spacing: 2px; text-transform: uppercase;
+    font-size: 10px; font-weight: 300;
+    color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase;
   }
   .capa-meta-value {
-    font-family: 'Inter', Calibri, sans-serif; font-size: 14px; font-weight: 400;
-    color: rgba(255,255,255,0.85); margin-top: 3px;
+    font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.95); margin-top: 4px;
   }
-  .capa-footer { padding: 22px 40px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .capa-footer-left { font-size: 10px; font-weight: 300; color: rgba(255,255,255,0.35); line-height: 1.6; }
-  .capa-footer-right { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.25); text-align: right; }
+  .capa-footer {
+    margin-top: 48px;
+    padding: 20px 40px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .capa-footer-left { font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.55); line-height: 1.7; }
+  .capa-footer-right { font-size: 10px; font-weight: 300; color: rgba(255,255,255,0.4); text-align: right; line-height: 1.6; }
 
   /* ─── HEADER INTERNO ───────────────────────────────────────────── */
   .header-interno {
+    position: absolute; top: 0; left: 0; right: 0; height: 54px;
     background: #0E2040;
-    padding: 12px 36px;
-    display: flex; justify-content: space-between; align-items: center;
-    flex-shrink: 0;
+    padding: 0 36px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 10;
   }
   .header-logo {
-    font-family: 'Inter', Calibri, sans-serif;
-    font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 10px;
   }
-  .header-logo span { color: #F5A623; }
-  .header-logo small { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.4); margin-left: 8px; }
+  .header-logo-nome {
+    font-size: 16px; font-weight: 700; color: #fff; letter-spacing: 1px;
+  }
+  .header-logo-nome span { color: #F5A623; }
+  .header-logo-tag {
+    font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.5);
+    letter-spacing: 2px; text-transform: uppercase;
+    padding-left: 10px; border-left: 1px solid rgba(255,255,255,0.2);
+  }
   .header-tag {
-    font-size: 9px; font-weight: 300;
-    color: rgba(255,255,255,0.4); letter-spacing: 3px; text-transform: uppercase;
+    font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.6);
+    letter-spacing: 2px; text-transform: uppercase;
   }
 
   /* ─── FOOTER ───────────────────────────────────────────────────── */
   .footer {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 48px;
     background: #0E2040;
-    padding: 12px 36px;
-    display: flex; justify-content: space-between; align-items: center;
-    flex-shrink: 0; margin-top: auto;
+    padding: 0 36px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 10;
   }
-  .footer-text { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.45); line-height: 1.5; }
-  .footer-numero { font-size: 9px; color: rgba(255,255,255,0.3); font-family: 'Inter', Calibri, monospace; }
+  .footer-text { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.7); }
+  .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
 
   /* ─── CONTEÚDO ─────────────────────────────────────────────────── */
-  .page-content { padding: 26px 36px; flex: 1; }
+  .page-content { padding: 24px 36px; }
+
   .section-title {
-    font-family: 'Inter', Calibri, sans-serif; font-size: 18px; font-weight: 600;
-    color: #0E2040; border-left: 4px solid #F5A623; padding-left: 12px;
+    font-size: 18px; font-weight: 600; color: #0E2040;
+    border-left: 4px solid #F5A623; padding-left: 12px;
     margin-bottom: 16px; line-height: 1.2;
   }
-  .section-sub {
-    font-family: 'Inter', Calibri, sans-serif; font-size: 14px; font-weight: 600;
-    color: #0E2040; margin: 20px 0 10px;
-  }
-  .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 24px 0; }
+  .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 22px 0; }
 
   /* ─── TABELA DE ITENS ──────────────────────────────────────────── */
-  .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
   .tabela-itens thead tr { background: #0E2040; }
   .tabela-itens thead th {
-    padding: 10px 12px; text-align: left; color: #FFFFFF;
-    font-family: 'Inter', Calibri, sans-serif; font-size: 10px;
-    font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 10px 12px; text-align: left; color: #fff;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
   }
-  .tabela-itens thead th:last-child { text-align: right; }
   .tabela-itens thead th.num { text-align: right; }
   .tabela-itens tbody tr:nth-child(odd) { background: #F8FAFD; }
-  .tabela-itens tbody tr:nth-child(even) { background: #FFFFFF; }
+  .tabela-itens tbody tr:nth-child(even) { background: #fff; }
   .tabela-itens tbody td {
     padding: 10px 12px; color: #2C3E50; font-size: 12.5px;
     border-bottom: 1px solid #EEF2F7;
   }
-  .tabela-itens tbody td.num { text-align: right; font-family: 'Inter', Calibri, monospace; }
+  .tabela-itens tbody td.num { text-align: right; }
   .tabela-itens tbody td.descricao { font-weight: 400; }
   .tabela-itens tfoot tr { background: #0E2040; }
   .tabela-itens tfoot td {
-    padding: 11px 12px; color: white;
-    font-family: 'Inter', Calibri, sans-serif; font-size: 13px; font-weight: 600;
+    padding: 11px 12px; color: #fff;
+    font-size: 13px; font-weight: 500;
   }
-  .tabela-itens tfoot td.num { text-align: right; color: #F5A623; font-size: 15px; }
+  .tabela-itens tfoot td.num { text-align: right; color: #fff; font-size: 15px; font-weight: 700; }
 
   /* ─── CONDIÇÕES COMERCIAIS ─────────────────────────────────────── */
   .cond-card {
@@ -168,26 +215,25 @@ const CSS_SERVICO = `
     border-bottom: 1px solid #E8EDF4;
   }
   .cond-header-title { font-size: 13px; font-weight: 600; color: #0E2040; }
-  .cond-total { font-size: 15px; font-weight: 700; color: #F5A623; }
+  .cond-total { font-size: 15px; font-weight: 700; color: #0E2040; }
   .parcelas-table { width: 100%; border-collapse: collapse; }
   .parcelas-table td { padding: 9px 18px; font-size: 12.5px; color: #444; border-bottom: 1px solid #EEF2F7; }
   .parcelas-table td.valor { text-align: right; font-weight: 600; color: #0E2040; }
   .parcelas-table tr:last-child td { border-bottom: none; }
 
   /* ─── ACEITE ───────────────────────────────────────────────────── */
-  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin: 8px 0; }
-  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 56px; }
+  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 8px; }
+  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 120px; }
   .assinatura-linha {
-    border-top: 1px solid #333; padding-top: 8px; text-align: center;
-    font-size: 11px; font-weight: 300; color: #555;
+    border-top: 1px solid #333; padding-top: 10px; text-align: center;
+    font-size: 12px; font-weight: 300; color: #555;
   }
 
-  /* ─── CAIXAS INFO ──────────────────────────────────────────────── */
+  /* ─── INFO BOX ─────────────────────────────────────────────────── */
   .info-box {
     background: linear-gradient(135deg, #fff8e8, #fff3d0);
     border-left: 4px solid #F5A623;
-    padding: 13px 18px; border-radius: 0 8px 8px 0;
-    margin: 8px 0 16px;
+    padding: 13px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;
   }
   .info-box p { margin: 0; font-weight: 400; color: #0E2040; font-size: 13px; }
 
@@ -198,6 +244,8 @@ const CSS_SERVICO = `
     @page { size: A4; margin: 0; }
   }
 `
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function blocoAtivo(blocos: any[], tipo: string): boolean {
   if (!blocos || blocos.length === 0) return true
@@ -212,27 +260,29 @@ function textoBloco(blocos: any[], tipo: string, textos: Record<string, any>, ch
 }
 
 function headerInterno(numero: string, nomeEmpresa: string, logoUrl?: string | null) {
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="height:32px;max-width:160px;object-fit:contain;display:block;" alt="Logo"/>`
+    : `<div class="header-logo-nome">${nomeEmpresa}</div><div class="header-logo-tag">Proposta de Serviços</div>`
   return `<div class="header-interno">
-    <div class="header-logo">
-      ${logoUrl
-        ? `<img src="${logoUrl}" style="height:24px;max-width:140px;object-fit:contain;vertical-align:middle;" alt="Logo"/>`
-        : `${nomeEmpresa}<small>Proposta de Serviços</small>`
-      }
-    </div>
+    <div class="header-logo">${logoHtml}</div>
     <div class="header-tag">Proposta de Serviços &middot; ${numero}</div>
   </div>`
 }
 
 function footerServico(numero: string, empresa: any) {
-  const tel    = empresa?.telefone ?? ''
-  const email  = empresa?.email ?? ''
-  const cidade = empresa?.cidade ? `${empresa.cidade}/${empresa.estado ?? ''}` : ''
-  const partes = [empresa?.nome, cidade, email, tel].filter(Boolean).join(' · ')
+  const partes = [
+    empresa?.nome,
+    empresa?.cidade ? `${empresa.cidade}/${empresa.estado ?? ''}` : null,
+    empresa?.email,
+    empresa?.telefone,
+  ].filter(Boolean).join(' · ')
   return `<div class="footer">
     <div class="footer-text">${partes}</div>
     <div class="footer-numero">${numero}</div>
   </div>`
 }
+
+// ─── GERADOR PRINCIPAL ───────────────────────────────────────────────────────
 
 export function abrirPdfServicoNoNavegador(data: any): void {
   const { proposta, itensServico, condicoesComerciais, blocos, empresa, textos, cliente } = data
@@ -246,10 +296,8 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   const numero = proposta?.numero ?? ''
   const dataEmissao = fmtDate(proposta?.dataEmissao)
   const dataValidade = proposta?.dataValidade ? fmtDate(proposta.dataValidade) : null
-
   const totalGeral = (itensServico ?? []).reduce((s: number, i: any) => s + Number(i.valorTotal), 0)
   const prazoExecucao = proposta?.prazoExecucao ?? null
-
   const condsAtivas = (condicoesComerciais ?? []).filter((c: any) => c.ativa !== false)
 
   const H = (n: string) => headerInterno(n, nomeEmpresa, logoUrl)
@@ -260,18 +308,18 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   // ── CAPA ─────────────────────────────────────────────────────────
   if (blocoAtivo(blocos, 'capa')) {
     html += `
-    <div class="page capa">
+    <div class="page capa" style="padding:0">
       <div class="capa-top">
         <div>
           ${logoUrl
-            ? `<img src="${logoUrl}" style="height:56px;max-width:180px;object-fit:contain;" alt="Logo"/>`
-            : `<div style="font-size:20px;font-weight:800;color:#fff;letter-spacing:2px">${nomeEmpresa}</div>
-               <div style="font-size:9px;font-weight:400;color:#F5A623;letter-spacing:5px;text-transform:uppercase;margin-top:3px">Proposta de Serviços</div>`
+            ? `<img src="${logoUrl}" style="height:72px;max-width:200px;object-fit:contain;" alt="Logo"/>`
+            : `<div style="font-size:24px;font-weight:800;color:#fff;letter-spacing:2px">${nomeEmpresa}</div>
+               <div style="font-size:9px;font-weight:400;color:#F5A623;letter-spacing:5px;text-transform:uppercase;margin-top:4px">Proposta de Serviços</div>`
           }
         </div>
-        <div style="font-size:9px;color:rgba(255,255,255,0.3);text-align:right;line-height:1.7">
-          ${empresa?.cidade ? `${empresa.cidade}/${empresa.estado ?? ''}<br>` : ''}
-          ${numero}
+        <div style="text-align:right;line-height:1.7">
+          ${empresa?.cidade ? `<div style="font-size:10px;color:rgba(255,255,255,0.5)">${empresa.cidade}/${empresa.estado ?? ''}</div>` : ''}
+          <div style="font-size:9px;color:rgba(255,255,255,0.3)">${numero}</div>
         </div>
       </div>
       <div class="capa-body">
@@ -297,7 +345,10 @@ export function abrirPdfServicoNoNavegador(data: any): void {
       </div>
       <div class="capa-footer">
         <div class="capa-footer-left">${nomeEmpresa}${empresa?.cidade ? ` · ${empresa.cidade}/${empresa.estado ?? ''}` : ''}</div>
-        <div class="capa-footer-right">${empresa?.email ?? ''}${empresa?.telefone ? `<br>${empresa.telefone}` : ''}</div>
+        <div class="capa-footer-right">
+          ${empresa?.email ? empresa.email : ''}
+          ${empresa?.telefone ? `<br>${empresa.telefone}` : ''}
+        </div>
       </div>
     </div>`
   }
@@ -310,23 +361,28 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     const txtApres = textoBloco(blocos, 'apresentacao_empresa', textos ?? {}, 'apresentacao_empresa')
     const txtDif   = textoBloco(blocos, 'diferenciais', textos ?? {}, 'diferenciais')
 
+    // Defaults genéricos — não mencionam energia solar
+    const defaultApres = `<p>${nomeEmpresa} é uma empresa especializada em soluções técnicas e de engenharia, com foco em qualidade, segurança e satisfação do cliente. Nossa equipe atua com comprometimento em cada etapa do projeto, do planejamento à entrega final.</p>`
+    const defaultDif   = `<ul>
+      <li>Equipe técnica qualificada e certificada</li>
+      <li>Materiais de alta qualidade com garantia do fabricante</li>
+      <li>Pontualidade e comprometimento com prazos combinados</li>
+      <li>Atendimento personalizado e suporte pós-serviço</li>
+      <li>Orçamento transparente sem custos ocultos</li>
+    </ul>`
+
     html += `
     <div class="page">
       ${H(numero)}
       <div class="page-content">
         ${temApres ? `
           <div class="section-title">Quem Somos</div>
-          ${renderTexto(txtApres) || `<p>${nomeEmpresa} é uma empresa especializada em soluções elétricas e de automação, com foco em qualidade, segurança e satisfação do cliente.</p>`}
+          ${renderTexto(txtApres) || defaultApres}
         ` : ''}
         ${temApres && temDif ? `<hr class="section-divider">` : ''}
         ${temDif ? `
-          <div class="section-title" style="margin-top:${temApres ? '0' : '0'}">Por que nos escolher?</div>
-          ${renderTexto(txtDif) || `<ul>
-            <li>Equipe técnica qualificada e certificada</li>
-            <li>Materiais de alta qualidade com garantia do fabricante</li>
-            <li>Pontualidade e comprometimento com prazos</li>
-            <li>Atendimento personalizado e suporte pós-serviço</li>
-          </ul>`}
+          <div class="section-title">Por que nos escolher?</div>
+          ${renderTexto(txtDif) || defaultDif}
         ` : ''}
       </div>
       ${F(numero)}
@@ -341,79 +397,65 @@ export function abrirPdfServicoNoNavegador(data: any): void {
       ${H(numero)}
       <div class="page-content">
         <div class="section-title">Garantias Inclusas</div>
-        ${renderTexto(txt) || '<p>Todos os serviços executados possuem garantia conforme legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados. Nosso compromisso vai além da entrega — estamos presentes no pós-serviço.</p>'}
+        ${renderTexto(txt) || `<p>Todos os serviços executados possuem garantia conforme a legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados. Nosso compromisso vai além da entrega — estamos presentes no pós-serviço.</p>`}
       </div>
       ${F(numero)}
     </div>`
   }
 
-  // ── O QUE PROPOMOS ENTREGAR ───────────────────────────────────────
-  if (blocoAtivo(blocos, 'escopo_entregas')) {
-    const txt = textoBloco(blocos, 'escopo_entregas', textos ?? {}, 'escopo_entregas')
-    if (txt) {
-      const letras = 'abcdefghijklmnopqrstuvwxyz'
-      const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
-      const itensHtml = linhas.map((linha: string, idx: number) => {
-        const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        return `<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start">
-          <span style="min-width:26px;height:26px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'Inter',Calibri,sans-serif;flex-shrink:0;margin-top:2px">${letras[idx] ?? String(idx + 1)}</span>
-          <span style="font-size:13.5px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
-        </div>`
-      }).join('')
-      html += `
-      <div class="page">
-        ${H(numero)}
-        <div class="page-content">
-          <div class="section-title">O que Propomos Entregar</div>
-          ${itensHtml}
-        </div>
-        ${F(numero)}
-      </div>`
-    }
-  }
+  // ── O QUE PROPOMOS ENTREGAR + ESCOPO DO SERVIÇO (mesma página) ───
+  const temEntregas = blocoAtivo(blocos, 'escopo_entregas')
+  const temEscopo   = blocoAtivo(blocos, 'escopo_servico')
+  const txtEntregas = textoBloco(blocos, 'escopo_entregas', textos ?? {}, 'escopo_entregas')
 
-  // ── ESCOPO DO SERVIÇO (TABELA DE ITENS) ──────────────────────────
-  if (blocoAtivo(blocos, 'escopo_servico')) {
+  if (temEntregas || temEscopo) {
     const itens = itensServico ?? []
     html += `
     <div class="page">
       ${H(numero)}
       <div class="page-content">
-        <div class="section-title">${tituloServico}</div>
-        <table class="tabela-itens">
-          <thead>
-            <tr>
-              <th style="width:36px">#</th>
-              <th>Descrição</th>
-              <th class="num" style="width:52px">Un.</th>
-              <th class="num" style="width:72px">Qtd.</th>
-              <th class="num" style="width:100px">Valor Unit.</th>
-              <th class="num" style="width:110px">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itens.map((item: any, idx: number) => `
-            <tr>
-              <td style="color:#8A9BB5;font-size:11px;text-align:center">${idx + 1}</td>
-              <td class="descricao">${item.descricao}</td>
-              <td class="num">${item.unidade ?? 'un'}</td>
-              <td class="num">${fmtN(item.quantidade)}</td>
-              <td class="num">${fmt(item.valorUnitario)}</td>
-              <td class="num" style="font-weight:600;color:#0E2040">${fmt(item.valorTotal)}</td>
-            </tr>`).join('')}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="5">Valor Total da Proposta</td>
-              <td class="num">${fmt(totalGeral)}</td>
-            </tr>
-          </tfoot>
-        </table>
-        ${prazoExecucao ? `
-        <div class="info-box">
-          <p><strong>⏱ Prazo de Execução:</strong> ${prazoExecucao}</p>
-        </div>` : ''}
-        <p style="font-size:11px;color:#8A9BB5;margin-top:6px">* Valores em Reais (BRL). Proposta válida até ${dataValidade ?? '—'}.</p>
+        ${temEntregas && txtEntregas ? `
+          <div class="section-title">O que Propomos Entregar</div>
+          ${renderListaLetras(txtEntregas)}
+          ${temEscopo ? `<hr class="section-divider">` : ''}
+        ` : ''}
+        ${temEscopo ? `
+          <div class="section-title">${tituloServico}</div>
+          <table class="tabela-itens">
+            <thead>
+              <tr>
+                <th style="width:36px">#</th>
+                <th>Descrição</th>
+                <th class="num" style="width:52px">Un.</th>
+                <th class="num" style="width:70px">Qtd.</th>
+                <th class="num" style="width:100px">Valor Unit.</th>
+                <th class="num" style="width:110px">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itens.map((item: any, idx: number) => `
+              <tr>
+                <td style="color:#8A9BB5;font-size:11px;text-align:center">${idx + 1}</td>
+                <td class="descricao">${item.descricao}</td>
+                <td class="num">${item.unidade ?? 'un'}</td>
+                <td class="num">${fmtN(item.quantidade)}</td>
+                <td class="num">${fmt(item.valorUnitario)}</td>
+                <td class="num" style="font-weight:600">${fmt(item.valorTotal)}</td>
+              </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5">Valor Total da Proposta</td>
+                <td class="num">${fmt(totalGeral)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          ${prazoExecucao ? `
+          <div class="info-box">
+            <p><strong>⏱ Prazo de Execução:</strong> ${prazoExecucao}</p>
+          </div>` : ''}
+          <p style="font-size:11px;color:#8A9BB5;margin-top:4px">* Valores em Reais (BRL). Proposta válida até ${dataValidade ?? '—'}.</p>
+        ` : ''}
       </div>
       ${F(numero)}
     </div>`
@@ -464,20 +506,12 @@ export function abrirPdfServicoNoNavegador(data: any): void {
 
   if (blocoAtivo(blocos, 'consideracoes_gerais')) {
     const txt = textoBloco(blocos, 'consideracoes_gerais', textos ?? {}, 'consideracoes_gerais') || DEFAULT_CONSIDERACOES
-    const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
-    const itensHtml = linhas.map((linha: string, idx: number) => {
-      const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      return `<div style="display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;padding-bottom:14px;border-bottom:1px solid #EEF2F7">
-        <span style="min-width:26px;height:26px;background:#F5A62318;color:#0E2040;border:1px solid #F5A62345;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'Inter',Calibri,sans-serif;flex-shrink:0;margin-top:2px">${idx + 1}</span>
-        <span style="font-size:13px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
-      </div>`
-    }).join('')
     html += `
     <div class="page">
       ${H(numero)}
       <div class="page-content">
         <div class="section-title">LEIA COM ATENÇÃO — Informações Importantes</div>
-        ${itensHtml}
+        ${renderListaNumerada(txt, cor1)}
       </div>
       ${F(numero)}
     </div>`
@@ -496,39 +530,39 @@ export function abrirPdfServicoNoNavegador(data: any): void {
           <div class="section-title">Aceite e Assinatura</div>
           <div class="aceite-box">
             <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
-            <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor:</strong> ${fmt(totalGeral)}</p>
+            <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
             <p><strong>Cliente:</strong> ${nomeCliente}</p>
             <div class="assinatura-grid">
               <div>
                 <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
-                <p style="text-align:center;font-size:11px;color:#999;margin-top:6px">Data: ___/___/______</p>
+                <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
               </div>
               <div>
                 <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
-                <p style="text-align:center;font-size:11px;color:#999;margin-top:6px">Data: ___/___/______</p>
+                <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
               </div>
             </div>
           </div>
         ` : ''}
         ${temAceite && temContato ? `<hr class="section-divider">` : ''}
         ${temContato ? `
-          <div class="section-title" style="margin-top:${temAceite ? '0' : '0'}">Entre em Contato</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px">
+          <div class="section-title">Entre em Contato</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px">
             ${empresa?.telefone ? `<div>
-              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Telefone</p>
-              <p style="font-size:15px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
+              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Telefone</p>
+              <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
             </div>` : ''}
             ${empresa?.email ? `<div>
-              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">E-mail</p>
-              <p style="font-size:15px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
+              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">E-mail</p>
+              <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
             </div>` : ''}
             ${empresa?.site ? `<div>
-              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Site</p>
-              <p style="font-size:15px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
+              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Site</p>
+              <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
             </div>` : ''}
             ${empresa?.endereco ? `<div style="grid-column:1/-1">
-              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Endereço</p>
-              <p style="font-size:15px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
+              <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Endereço</p>
+              <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
             </div>` : ''}
           </div>
         ` : ''}
