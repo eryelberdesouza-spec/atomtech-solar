@@ -92,7 +92,7 @@ function renderListaLetras(txt: string): string {
 const CSS_SERVICO = `
   @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap');
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body {
     font-family: 'Jost', 'Segoe UI', Candara, sans-serif;
     font-weight: 300; font-size: 13.5px; line-height: 1.75;
@@ -170,7 +170,9 @@ const CSS_SERVICO = `
     position: fixed;
     bottom: 0; left: 0; right: 0;
     height: 48px;
-    background: #0E2040;
+    background: #0E2040 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     padding: 0 36px;
     display: flex; align-items: center; justify-content: space-between;
     z-index: 100;
@@ -179,7 +181,7 @@ const CSS_SERVICO = `
   .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
-  .doc-content { padding: 0 36px 8px; } /* sem padding-top — o thead-cell já faz esse papel */
+  .doc-content { padding: 0 36px 64px; } /* padding-bottom deixa espaço acima do footer fixo */
   .section { margin-bottom: 24px; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
@@ -245,10 +247,7 @@ const CSS_SERVICO = `
 
   @media print {
     body { margin: 0; }
-    /* margem inferior em todas as páginas reserva espaço para o footer fixo */
-    @page          { size: A4; margin: 0 0 48px 0; }
-    /* primeira página (capa) não tem margem — capa é exatamente 297mm */
-    @page :first   { margin: 0; }
+    @page { size: A4; margin: 0; }
   }
 `
 
@@ -283,9 +282,9 @@ function footerServico(numero: string, empresa: any) {
     empresa?.email,
     empresa?.telefone,
   ].filter(Boolean).join(' · ')
-  return `<div class="footer">
-    <div class="footer-text">${partes}</div>
-    <div class="footer-numero">${numero}</div>
+  return `<div style="position:fixed;bottom:0;left:0;right:0;height:48px;background-color:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;z-index:100;">
+    <div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.7);font-family:inherit;">${partes}</div>
+    <div style="font-size:9px;color:rgba(255,255,255,0.5);font-family:inherit;">${numero}</div>
   </div>`
 }
 
