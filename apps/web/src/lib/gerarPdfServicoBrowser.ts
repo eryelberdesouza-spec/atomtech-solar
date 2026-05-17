@@ -58,7 +58,17 @@ const stripPrefix = (s: string) => s.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*|
 
 function renderListaNumerada(txt: string, cor1: string): string {
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  return agruparItens(txt).map(({ titulo, corpo }, idx) => {
+  // Verifica se o texto usa prefixos (-, •, 1., a.) para decidir como agrupar
+  const lines = txt.split('\n').map(l => l.trim()).filter(Boolean)
+  const temPrefixo = lines.some(l =>
+    /^[-•]\s/.test(l) || /^\d+\.\s/.test(l) || /^[a-zA-Z]\.\s/.test(l)
+  )
+  // Com prefixos → usa agruparItens (suporta título + corpo)
+  // Sem prefixos → cada linha vira seu próprio item numerado
+  const grupos = temPrefixo
+    ? agruparItens(txt)
+    : lines.map(l => ({ titulo: l, corpo: [] as string[] }))
+  return grupos.map(({ titulo, corpo }, idx) => {
     const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
     return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
@@ -71,18 +81,18 @@ function renderListaNumerada(txt: string, cor1: string): string {
   }).join('')
 }
 
+// Cada linha não-vazia = um item independente com badge de letra (a, b, c…)
+// NÃO usa agruparItens — garante que linhas sem prefixo virem itens distintos
 function renderListaLetras(txt: string): string {
   const letras = 'abcdefghijklmnopqrstuvwxyz'
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  return agruparItens(txt).map(({ titulo, corpo }, idx) => {
-    const tituloHtml = bold(stripPrefix(titulo))
-    const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
-    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;page-break-inside:avoid;break-inside:avoid">
-      <span style="min-width:24px;height:24px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${letras[idx] ?? String(idx + 1)}</span>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
-        ${corpoHtml ? `<div style="font-size:12.5px;color:#555;margin-top:2px;line-height:1.75">${corpoHtml}</div>` : ''}
-      </div>
+  const items = txt.split('\n').map(l => l.trim()).filter(Boolean)
+  if (!items.length) return ''
+  return items.map((item, idx) => {
+    const clean = bold(stripPrefix(item))
+    return `<div style="display:flex;gap:12px;margin-bottom:10px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
+      <span style="min-width:26px;height:26px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${letras[idx] ?? idx + 1}</span>
+      <div style="flex:1;font-size:13px;font-weight:300;color:#333;line-height:1.85;padding-top:3px">${clean}</div>
     </div>`
   }).join('')
 }
@@ -452,8 +462,10 @@ export function abrirPdfServicoNoNavegador(data: any): void {
 
   // Garantias
   if (blocoAtivo(blocos, 'garantias')) {
-    const txt = textoBloco(blocos, 'garantias', textos ?? {}, 'garantias')
-    sections += sec('Garantias Inclusas', renderTexto(txt) || `<p>Todos os serviços executados possuem garantia conforme a legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados. Nosso compromisso vai além da entrega — estamos presentes no pós-serviço.</p>`)
+    const txtGar = textoBloco(blocos, 'garantias', textos ?? {}, 'garantias')
+    const defaultGar = `- Todos os serviços executados possuem garantia conforme a legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados.
+- Nosso compromisso vai além da entrega — estamos presentes no pós-serviço para qualquer suporte necessário.`
+    sections += sec('Garantias Inclusas', renderListaNumerada(txtGar || defaultGar, cor1))
   }
 
   // Considerações Gerais
