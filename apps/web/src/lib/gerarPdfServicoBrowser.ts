@@ -505,22 +505,22 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   }
   if (temContato) {
     sections += sec('Entre em Contato', `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:4px">
         ${empresa?.telefone ? `<div>
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Telefone</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
         </div>` : ''}
         ${empresa?.email ? `<div>
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">E-mail</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">E-mail</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
         </div>` : ''}
         ${empresa?.site ? `<div>
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Site</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Site</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
         </div>` : ''}
-        ${empresa?.endereco ? `<div style="grid-column:1/-1">
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Endereço</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
+        ${empresa?.endereco ? `<div style="grid-column:1/-1;margin-top:2px">
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>`)
   }
@@ -547,7 +547,32 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     </td></tr></tbody>
   </table>` : ''}
   <script>
-    window.onload = function() { setTimeout(function() { window.print(); }, 800); };
+    window.onload = function() {
+      setTimeout(function() {
+        // Empurra o tfoot ao pé da última página calculando o espaço restante
+        try {
+          var content  = document.querySelector('.doc-content');
+          var thead    = document.querySelector('.doc-table thead');
+          var tfoot    = document.querySelector('.doc-table tfoot');
+          if (content && thead && tfoot) {
+            var pageH   = Math.round(297 * 96 / 25.4); // 297mm em px a 96dpi ≈ 1122px
+            var theadH  = thead.offsetHeight;
+            var tfootH  = tfoot.offsetHeight;
+            var availH  = pageH - theadH - tfootH;
+            var contentH = content.scrollHeight; // já inclui o padding-bottom de 28px
+            if (availH > 0) {
+              var pages   = Math.ceil(contentH / availH) || 1;
+              var extra   = (pages * availH) - contentH;
+              // Só aplica se o ganho for significativo (> 20px) para evitar ruído
+              if (extra > 20) {
+                content.style.paddingBottom = (28 + extra) + 'px';
+              }
+            }
+          }
+        } catch(e) {}
+        window.print();
+      }, 800);
+    };
   </script>
 </body>
 </html>`
