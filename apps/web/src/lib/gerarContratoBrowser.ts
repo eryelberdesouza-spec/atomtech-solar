@@ -174,6 +174,8 @@ const CSS = `
     background: #1a2744;
     border-radius: 4px;
     padding: 6px 12px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .header img { height: 36px; }
   .header-line { flex: 1; }
