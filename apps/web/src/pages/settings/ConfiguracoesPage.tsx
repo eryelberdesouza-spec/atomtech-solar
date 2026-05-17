@@ -97,6 +97,39 @@ function AbaEmpresa() {
 
       <Card style={{ padding: '20px 24px' }}>
         <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 16px' }}>
+          Representantes Legais (Contratos)
+        </p>
+        <p style={{ color: C.textMuted, fontSize: 12, margin: '0 0 14px' }}>
+          Preenchidos automaticamente na assinatura dos contratos gerados pela plataforma.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <Input label="Representante 1 — Nome" value={val('rep1Nome')} onChange={e => set('rep1Nome', e.target.value)} placeholder="Paulo Henrique Ramos da Silva" />
+          <Input label="Representante 1 — CPF" value={val('rep1Cpf')} onChange={e => set('rep1Cpf', e.target.value)} placeholder="031.363.751-22" />
+          <div style={{ gridColumn: 'span 2' }}>
+            <textarea
+              value={val('rep1Descricao')}
+              onChange={e => set('rep1Descricao', e.target.value)}
+              rows={2}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none' }}
+              placeholder="brasileiro, empresário, portador da CNH nº 04313134400 DETRAN/DF"
+            />
+          </div>
+          <Input label="Representante 2 — Nome" value={val('rep2Nome')} onChange={e => set('rep2Nome', e.target.value)} placeholder="Eryelber Correia de Souza" />
+          <Input label="Representante 2 — CPF" value={val('rep2Cpf')} onChange={e => set('rep2Cpf', e.target.value)} placeholder="597.148.321-87" />
+          <div style={{ gridColumn: 'span 2' }}>
+            <textarea
+              value={val('rep2Descricao')}
+              onChange={e => set('rep2Descricao', e.target.value)}
+              rows={2}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none' }}
+              placeholder="brasileiro, engenheiro eletricista, portador da R.G. nº 2.165.250 SSPGO e CPF/MF nº 597.148.321-87"
+            />
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{ padding: '20px 24px' }}>
+        <p style={{ color: C.solar, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 16px' }}>
           Rodapé das Propostas
         </p>
         <textarea

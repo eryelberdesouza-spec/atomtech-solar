@@ -32,6 +32,13 @@ const empresaUpdateSchema = z.object({
   bancoPixTipo: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatorio']).optional(),
   bancoPixChave: z.string().max(150).optional(),
   rodapeTexto: z.string().optional(),
+  // Representantes legais para contratos
+  rep1Nome: z.string().max(200).optional(),
+  rep1Cpf: z.string().max(30).optional(),
+  rep1Descricao: z.string().optional(),
+  rep2Nome: z.string().max(200).optional(),
+  rep2Cpf: z.string().max(30).optional(),
+  rep2Descricao: z.string().optional(),
   // Regras de cadastro
   bloquearDupNome: z.boolean().optional(),
   bloquearDupEmpresa: z.boolean().optional(),

@@ -11,6 +11,7 @@ import {
 } from '../../components/ui'
 import { abrirPdfNoNavegador } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador } from '../../lib/gerarPdfServicoBrowser'
+import { abrirContratoNoNavegador } from '../../lib/gerarContratoBrowser'
 
 const TABS_SOLAR = [
   { id: 'dimensionamento', label: 'Dimensionamento' },
@@ -1261,6 +1262,7 @@ export function PropostaDetailPage() {
   const [tabSolar, setTabSolar]         = useState('dimensionamento')
   const [tabServico, setTabServico]     = useState('itens')
   const [gerandoPdf, setGerandoPdf] = useState(false)
+  const [gerandoContrato, setGerandoContrato] = useState(false)
 
   const propostaId = Number(id)
   const { data, isLoading } = trpc.proposta.byId.useQuery({ id: propostaId }, { enabled: !!propostaId })
@@ -1304,6 +1306,20 @@ export function PropostaDetailPage() {
         alert('Erro ao gerar PDF. Verifique se popups estão permitidos neste site.')
         console.error(e)
       } finally { setGerandoPdf(false) }
+    }, 100)
+  }
+
+  const handleGerarContrato = () => {
+    if (!data) { alert('Dados da proposta ainda não carregados.'); return }
+    setGerandoContrato(true)
+    setTimeout(() => {
+      try {
+        const dadosContrato = { ...data, empresa: { ...(data as any).empresa, ...empresa }, cliente: clienteData }
+        abrirContratoNoNavegador(dadosContrato)
+      } catch (e) {
+        alert('Erro ao gerar contrato. Verifique se popups estão permitidos neste site.')
+        console.error(e)
+      } finally { setGerandoContrato(false) }
     }, 100)
   }
 
@@ -1366,6 +1382,12 @@ export function PropostaDetailPage() {
           )}
           <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')}
             style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
+          {!isServico && (
+            <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
+              style={{ borderColor: C.green + '60', color: C.green }}>
+              {gerandoContrato ? '⏳ Gerando...' : '📄 Gerar Contrato'}
+            </Btn>
+          )}
           <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
             {gerandoPdf ? '⏳ Gerando...' : '↯ Exportar PDF'}
           </Btn>
