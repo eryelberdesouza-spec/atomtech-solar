@@ -1,6 +1,15 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { trpc } from '../../lib/trpc'
+
+const IconLogout = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+    <polyline points="16 17 21 12 16 7"/>
+    <line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+)
 
 const NAV = [
   { path: '/dashboard',    label: 'Dashboard',     icon: '◈', color: '#F5A623', desc: 'Visão geral'       },
@@ -66,6 +75,8 @@ function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean 
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const navigate = useNavigate()
   const { data: empresa } = (trpc as any).empresa.get.useQuery()
@@ -83,6 +94,17 @@ export function Layout() {
   const usuario: any = (() => {
     try { return JSON.parse(localStorage.getItem('atomtech_usuario') || '{}') } catch { return {} }
   })()
+
+  // Fecha o dropdown ao clicar fora
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   return (
     <div style={{
@@ -152,38 +174,100 @@ export function Layout() {
           ))}
         </nav>
 
-        {/* Usuário + Recolher */}
+        {/* Usuário + Logout + Recolher */}
         <div style={{ borderTop: '1px solid #1E3050', padding: '12px 8px' }}>
-          {!collapsed && (
+
+          {/* Card do usuário — sempre visível, adapta ao estado */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            gap: collapsed ? 0 : 10,
+            padding: collapsed ? '8px 0' : '10px 12px',
+            marginBottom: 8, borderRadius: 10,
+            background: '#0C1828', border: '1px solid #1E3050',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+          }}>
+            {/* Avatar */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', marginBottom: 8,
-              borderRadius: 10, background: '#0C1828', border: '1px solid #1E3050',
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #F5A623, #3EBB7A)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0,
             }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #F5A623, #3EBB7A)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0,
-              }}>
-                {(usuario?.nome || 'U')[0].toUpperCase()}
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{
-                  fontSize: 12, fontWeight: 600, color: '#C8D8EC',
-                  lineHeight: 1.2, whiteSpace: 'nowrap',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {usuario?.nome?.split(' ')[0] || 'Usuário'}
-                </div>
-                <div style={{ fontSize: 10, color: '#3A5070' }}>Admin</div>
-              </div>
-              <button onClick={logout} title="Sair" style={{
-                background: 'none', border: 'none', color: '#3A5070',
-                cursor: 'pointer', fontSize: 14, padding: 4, borderRadius: 6,
-              }}>↗</button>
+              {(usuario?.nome || 'U')[0].toUpperCase()}
             </div>
+
+            {/* Nome + cargo (só expandido) */}
+            {!collapsed && (
+              <>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{
+                    fontSize: 12, fontWeight: 600, color: '#C8D8EC',
+                    lineHeight: 1.2, whiteSpace: 'nowrap',
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {usuario?.nome?.split(' ')[0] || 'Usuário'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#3A5070' }}>Admin</div>
+                </div>
+
+                {/* Botão Sair — expandido: ícone + texto */}
+                <button
+                  onClick={logout}
+                  title="Sair da plataforma"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'none', border: '1px solid #2A3F55',
+                    color: '#7A92AA', cursor: 'pointer',
+                    fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                    padding: '5px 8px', borderRadius: 6, flexShrink: 0,
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = '#FF444416'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = '#FF6B6B'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#FF444440'
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'none'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = '#7A92AA'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#2A3F55'
+                  }}
+                >
+                  <IconLogout />
+                  Sair
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Botão Sair separado (só recolhido) */}
+          {collapsed && (
+            <button
+              onClick={logout}
+              title="Sair da plataforma"
+              style={{
+                width: '100%', padding: '7px 0', borderRadius: 8,
+                border: '1px solid #1E3050', background: 'transparent',
+                color: '#3A5070', cursor: 'pointer', marginBottom: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#FF444416'
+                ;(e.currentTarget as HTMLButtonElement).style.color = '#FF6B6B'
+                ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#FF444440'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+                ;(e.currentTarget as HTMLButtonElement).style.color = '#3A5070'
+                ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#1E3050'
+              }}
+            >
+              <IconLogout />
+            </button>
           )}
+
+          {/* Botão recolher/expandir */}
           <button
             onClick={() => setCollapsed(!collapsed)}
             style={{
@@ -237,14 +321,64 @@ export function Layout() {
             >
               + Nova Proposta
             </button>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #F5A623, #3EBB7A)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 800, color: '#fff',
-              boxShadow: '0 2px 8px rgba(245,166,35,0.3)',
-            }}>
-              {(usuario?.nome || 'E')[0].toUpperCase()}
+
+            {/* Avatar com dropdown de usuário */}
+            <div ref={userMenuRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowUserMenu(v => !v)}
+                title="Menu do usuário"
+                style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #F5A623, #3EBB7A)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 800, color: '#fff',
+                  boxShadow: '0 2px 8px rgba(245,166,35,0.3)',
+                  border: showUserMenu ? '2px solid #F5A623' : '2px solid transparent',
+                  cursor: 'pointer', transition: 'border 0.15s',
+                }}
+              >
+                {(usuario?.nome || 'E')[0].toUpperCase()}
+              </button>
+
+              {/* Dropdown */}
+              {showUserMenu && (
+                <div style={{
+                  position: 'absolute', top: 44, right: 0, zIndex: 100,
+                  background: '#131F30', border: '1px solid #1E3050',
+                  borderRadius: 10, padding: 6, minWidth: 180,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                }}>
+                  {/* Info do usuário */}
+                  <div style={{
+                    padding: '8px 10px 10px', borderBottom: '1px solid #1E3050', marginBottom: 4,
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#C8D8EC' }}>
+                      {usuario?.nome || 'Usuário'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#3A5070', marginTop: 2 }}>
+                      {usuario?.email || 'Admin'}
+                    </div>
+                  </div>
+
+                  {/* Botão Sair */}
+                  <button
+                    onClick={logout}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 10px', borderRadius: 7, border: 'none',
+                      background: 'transparent', color: '#FF6B6B',
+                      cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      fontFamily: 'inherit', transition: 'background 0.15s',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#FF444420')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <IconLogout />
+                    Sair da plataforma
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
