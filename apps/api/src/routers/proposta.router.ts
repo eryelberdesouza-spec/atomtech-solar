@@ -1040,7 +1040,7 @@ export const propostaRouter = router({
 
       for (const bloco of BLOCOS_SERVICO_PADRAO) {
         await ctx.db.insert(blocoTable).values({
-          propostaId, tipoBloco: bloco.tipo, ativo: true, ordem: bloco.ordem,
+          propostaId, tipoBloco: bloco.tipo, ativo: bloco.ativo ?? true, ordem: bloco.ordem,
         }).execute()
       }
 

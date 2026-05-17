@@ -451,6 +451,7 @@ export type TipoBloco =
   | 'formas_pagamento'
   | 'escopo_servico'
   | 'escopo_entregas'
+  | 'observacoes_complementares'
   | 'consideracoes_gerais'
   | 'aceite'
   | 'contato'
@@ -488,20 +489,25 @@ export const BLOCOS_PADRAO: { tipo: TipoBloco; label: string; ordem: number }[] 
   { tipo: 'contato', label: 'Contato e Endereço', ordem: 20 },
 ]
 
-export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number }[] = [
-  { tipo: 'capa',                 label: 'Capa',                       ordem: 1  },
-  { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa',    ordem: 2  },
-  { tipo: 'diferenciais',         label: 'Diferenciais',               ordem: 3  },
-  { tipo: 'garantias',            label: 'Garantias',                  ordem: 4  },
-  { tipo: 'como_funciona',        label: 'Como Funciona',              ordem: 5  },
-  { tipo: 'regulamentacao',       label: 'Regulamentação',             ordem: 6  },
-  { tipo: 'fornecedores',         label: 'Fornecedores',               ordem: 7  },
-  { tipo: 'escopo_entregas',      label: 'O que Propomos Entregar',    ordem: 8  },
-  { tipo: 'escopo_servico',       label: 'Escopo do Serviço',          ordem: 9  },
-  { tipo: 'condicoes_comerciais', label: 'Condições Comerciais',       ordem: 10 },
-  { tipo: 'consideracoes_gerais', label: 'Considerações Gerais',       ordem: 11 },
-  { tipo: 'aceite',               label: 'Aceite da Proposta',         ordem: 12 },
-  { tipo: 'contato',              label: 'Contato e Endereço',         ordem: 13 },
+export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number; ativo?: boolean }[] = [
+  { tipo: 'capa',                       label: 'Capa',                            ordem: 1  },
+  { tipo: 'apresentacao_empresa',       label: 'Apresentação da Empresa',         ordem: 2  },
+  { tipo: 'diferenciais',               label: 'Diferenciais',                    ordem: 3  },
+  { tipo: 'garantias',                  label: 'Garantias',                       ordem: 4  },
+  // como_funciona e regulamentacao inativos por padrão — contêm conteúdo fotovoltaico
+  // específico que não se aplica a propostas de serviço geral. Ative manualmente se necessário.
+  { tipo: 'como_funciona',              label: 'Como Funciona',                   ordem: 5,  ativo: false },
+  { tipo: 'regulamentacao',             label: 'Regulamentação',                  ordem: 6,  ativo: false },
+  { tipo: 'fornecedores',               label: 'Fornecedores',                    ordem: 7  },
+  { tipo: 'escopo_entregas',            label: 'O que Propomos Entregar',         ordem: 8  },
+  { tipo: 'escopo_servico',             label: 'Escopo do Serviço',               ordem: 9  },
+  { tipo: 'condicoes_comerciais',       label: 'Condições Comerciais',            ordem: 10 },
+  // Observações Complementares: campo livre para informações adicionais específicas
+  // desta proposta (exclusões de escopo, condições especiais, obras civis, etc.)
+  { tipo: 'observacoes_complementares', label: 'Observações Complementares',      ordem: 11, ativo: false },
+  { tipo: 'consideracoes_gerais',       label: 'Considerações Gerais',            ordem: 12 },
+  { tipo: 'aceite',                     label: 'Aceite da Proposta',              ordem: 13 },
+  { tipo: 'contato',                    label: 'Contato e Endereço',              ordem: 14 },
 ]
 
 // ─── MODELO DE BLOCO ─────────────────────────────────────────────────────────
