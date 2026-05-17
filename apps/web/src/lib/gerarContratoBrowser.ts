@@ -171,10 +171,11 @@ const CSS = `
     display: flex;
     align-items: center;
     margin-bottom: 8mm;
-    border-bottom: 2px solid #2D9C4E;
-    padding-bottom: 4mm;
+    background: #1a2744;
+    border-radius: 4px;
+    padding: 6px 12px;
   }
-  .header img { height: 32px; }
+  .header img { height: 36px; }
   .header-line { flex: 1; }
 
   /* Title */
@@ -249,13 +250,20 @@ const CSS = `
     margin-top: 12mm;
     text-align: center;
   }
-  .assinatura-linha {
+  .assinatura-wrapper {
     display: inline-block;
     width: 220px;
-    border-top: 1px solid #000;
     margin: 0 20px;
+    vertical-align: bottom;
+  }
+  .assinatura-espaco {
+    height: 18mm;
+  }
+  .assinatura-linha {
+    border-top: 1px solid #000;
     padding-top: 3px;
     font-size: 10pt;
+    text-align: center;
   }
   .data-local {
     text-align: right;
@@ -335,7 +343,7 @@ function buildHtml(dados: any): string {
   const rep2Full = rep2Desc
     ? `${rep2Nome}, ${rep2Desc}${rep2Cpf ? ` e CPF/MF nº ${rep2Cpf}` : ''}`
     : rep2Nome + (rep2Cpf ? `, CPF ${rep2Cpf}` : '')
-  const hasRep2 = rep2Nome !== '_______________________________'
+  const hasRep2 = !!(empresa?.rep2Nome)
   const repsText = hasRep2
     ? `${rep1Full}, e <strong>${rep2Full}</strong>`
     : rep1Full
@@ -732,29 +740,59 @@ function buildHtml(dados: any): string {
   </div>
 
   <div class="assinaturas-bloco">
-    <div style="margin-bottom:14mm;">
-      <div style="margin-bottom:6mm;">
+    <div style="margin-bottom:10mm;">
+      <div class="assinatura-wrapper">
+        <div class="assinatura-espaco"></div>
         <div class="assinatura-linha">
           ${cliNome}<br>
-          <small>CPF: ${cliCpf || '___.___.___-__'}</small>
+          <small>CPF: ${cliCpf || '___.___.___-__'}</small><br>
+          <small>CONTRATANTE</small>
         </div>
       </div>
     </div>
 
     <div>
-      <p style="font-weight:700;font-size:10pt;margin-bottom:6mm;text-align:center;">
+      <p style="font-weight:700;font-size:10pt;margin-bottom:4mm;text-align:center;">
         ${empNome}<br>
         <small>CNPJ: ${empCnpj}</small>
       </p>
       <div>
-        <div class="assinatura-linha">
-          ${rep1Nome}<br>
-          <small>CPF: ${rep1Cpf}</small>
+        <div class="assinatura-wrapper">
+          <div class="assinatura-espaco"></div>
+          <div class="assinatura-linha">
+            ${rep1Nome}<br>
+            <small>CPF: ${rep1Cpf}</small>
+          </div>
         </div>
-        ${hasRep2 ? `<div class="assinatura-linha">
-          ${rep2Nome}<br>
-          <small>CPF: ${rep2Cpf}</small>
+        ${hasRep2 ? `<div class="assinatura-wrapper">
+          <div class="assinatura-espaco"></div>
+          <div class="assinatura-linha">
+            ${rep2Nome}<br>
+            <small>CPF: ${rep2Cpf}</small>
+          </div>
         </div>` : ''}
+      </div>
+    </div>
+
+    <div style="margin-top:10mm;">
+      <p style="font-size:10pt;margin-bottom:4mm;text-align:center;font-weight:700;">Testemunhas:</p>
+      <div>
+        <div class="assinatura-wrapper">
+          <div class="assinatura-espaco"></div>
+          <div class="assinatura-linha">
+            _______________________________<br>
+            <small>CPF: ___.___.___-__</small><br>
+            <small>Testemunha 1</small>
+          </div>
+        </div>
+        <div class="assinatura-wrapper">
+          <div class="assinatura-espaco"></div>
+          <div class="assinatura-linha">
+            _______________________________<br>
+            <small>CPF: ___.___.___-__</small><br>
+            <small>Testemunha 2</small>
+          </div>
+        </div>
       </div>
     </div>
   </div>
