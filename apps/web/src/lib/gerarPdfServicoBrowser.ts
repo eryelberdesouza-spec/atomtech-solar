@@ -58,17 +58,7 @@ const stripPrefix = (s: string) => s.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*|
 
 function renderListaNumerada(txt: string, cor1: string): string {
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  // Verifica se o texto usa prefixos (-, •, 1., a.) para decidir como agrupar
-  const lines = txt.split('\n').map(l => l.trim()).filter(Boolean)
-  const temPrefixo = lines.some(l =>
-    /^[-•]\s/.test(l) || /^\d+\.\s/.test(l) || /^[a-zA-Z]\.\s/.test(l)
-  )
-  // Com prefixos → usa agruparItens (suporta título + corpo)
-  // Sem prefixos → cada linha vira seu próprio item numerado
-  const grupos = temPrefixo
-    ? agruparItens(txt)
-    : lines.map(l => ({ titulo: l, corpo: [] as string[] }))
-  return grupos.map(({ titulo, corpo }, idx) => {
+  return agruparItens(txt).map(({ titulo, corpo }, idx) => {
     const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
     return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
