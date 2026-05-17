@@ -119,7 +119,7 @@ const CSS_SERVICO = `
     display: flex; justify-content: space-between; align-items: flex-start;
   }
   .capa-body {
-    flex: 1; padding: 0 40px 48px; /* padding-bottom = altura do footer fixo */
+    flex: 1; padding: 0 40px 48px;
     display: flex; flex-direction: column; justify-content: center;
   }
   .capa-pretitle {
@@ -137,15 +137,17 @@ const CSS_SERVICO = `
   .capa-meta-label { font-size: 10px; font-weight: 300; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; }
   .capa-meta-value { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.95); margin-top: 4px; }
 
-  /* ─── TABELA DE DOCUMENTO: <thead> repete em cada página impressa ── */
+  /* ─── TABELA DE DOCUMENTO: thead/tfoot repetem em cada página impressa */
   .doc-table {
     width: 210mm;
     border-collapse: collapse;
     border-spacing: 0;
   }
   .doc-table thead { display: table-header-group; }
+  .doc-table tfoot { display: table-footer-group; } /* repete rodapé no fim de cada página, igual ao thead */
   .doc-table tbody { display: table-row-group; }
-  .doc-thead-cell { padding: 0 0 20px 0; border: none; } /* padding-bottom cria espaço abaixo do header em todas as páginas */
+  .doc-thead-cell { padding: 0 0 20px 0; border: none; }
+  .doc-tfoot-cell { padding: 0; border: none; }
   .doc-tbody-cell  { padding: 0; border: none; vertical-align: top; }
 
   /* ─── HEADER INTERNO (dentro do <thead>) ───────────────────────── */
@@ -165,23 +167,8 @@ const CSS_SERVICO = `
   }
   .header-tag { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; }
 
-  /* ─── FOOTER FIXO: aparece em todas as páginas impressas ────────── */
-  .footer {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    height: 48px;
-    background: #0E2040 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    padding: 0 36px;
-    display: flex; align-items: center; justify-content: space-between;
-    z-index: 100;
-  }
-  .footer-text { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.7); }
-  .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
-
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
-  .doc-content { padding: 0 36px 64px; } /* padding-bottom deixa espaço acima do footer fixo */
+  .doc-content { padding: 0 36px 28px; }
   .section { margin-bottom: 24px; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
@@ -247,6 +234,7 @@ const CSS_SERVICO = `
 
   @media print {
     body { margin: 0; }
+    /* margin: 0 — o tfoot cuida do rodapé sem precisar de margem reservada */
     @page { size: A4; margin: 0; }
   }
 `
@@ -282,7 +270,7 @@ function footerServico(numero: string, empresa: any) {
     empresa?.email,
     empresa?.telefone,
   ].filter(Boolean).join(' · ')
-  return `<div style="position:fixed;bottom:0;left:0;right:0;height:48px;background-color:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;z-index:100;">
+  return `<div style="width:100%;height:48px;background-color:#0E2040;padding:0 36px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.7);font-family:inherit;">${partes}</div>
     <div style="font-size:9px;color:rgba(255,255,255,0.5);font-family:inherit;">${numero}</div>
   </div>`
@@ -542,11 +530,11 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   ${sections ? `
   <table class="doc-table">
     <thead><tr><td class="doc-thead-cell">${headerHtml}</td></tr></thead>
+    <tfoot><tr><td class="doc-tfoot-cell">${footerHtml}</td></tr></tfoot>
     <tbody><tr><td class="doc-tbody-cell">
       <div class="doc-content">${sections}</div>
     </td></tr></tbody>
   </table>` : ''}
-  ${footerHtml}
   <script>
     window.onload = function() { setTimeout(function() { window.print(); }, 800); };
   </script>
