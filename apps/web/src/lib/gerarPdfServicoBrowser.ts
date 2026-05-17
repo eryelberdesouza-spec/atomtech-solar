@@ -61,7 +61,7 @@ function renderListaNumerada(txt: string, cor1: string): string {
   return agruparItens(txt).map(({ titulo, corpo }, idx) => {
     const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
-    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7">
+    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
       <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx + 1}</span>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
@@ -77,7 +77,7 @@ function renderListaLetras(txt: string): string {
   return agruparItens(txt).map(({ titulo, corpo }, idx) => {
     const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
-    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start">
+    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;page-break-inside:avoid;break-inside:avoid">
       <span style="min-width:24px;height:24px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${letras[idx] ?? String(idx + 1)}</span>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
@@ -99,7 +99,6 @@ const CSS_SERVICO = `
     color: #1C1C2E; background: white;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     -webkit-font-smoothing: antialiased;
-    padding-bottom: 48px; /* reserva espaço para o footer fixo */
   }
   p { font-size: 13.5px; font-weight: 300; color: #333; line-height: 1.85; margin-bottom: 10px; }
   strong, b { font-family: 'Jost', sans-serif; font-weight: 600; color: #0E2040; }
@@ -181,7 +180,7 @@ const CSS_SERVICO = `
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
   .doc-content { padding: 0 36px 8px; } /* sem padding-top — o thead-cell já faz esse papel */
-  .section { margin-bottom: 24px; page-break-inside: avoid; break-inside: avoid; }
+  .section { margin-bottom: 24px; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
@@ -246,8 +245,10 @@ const CSS_SERVICO = `
 
   @media print {
     body { margin: 0; }
-    /* margin-bottom reserva espaço para o footer fixo em todas as páginas impressas */
-    @page { size: A4; margin: 0 0 48px 0; }
+    /* margem inferior em todas as páginas reserva espaço para o footer fixo */
+    @page          { size: A4; margin: 0 0 48px 0; }
+    /* primeira página (capa) não tem margem — capa é exatamente 297mm */
+    @page :first   { margin: 0; }
   }
 `
 
