@@ -458,6 +458,15 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     sections += sec('Garantias Inclusas', renderListaNumerada(txtGar || defaultGar, cor1))
   }
 
+  // Observações Complementares
+  if (blocoAtivo(blocos, 'observacoes_complementares')) {
+    const bloco = (blocos ?? []).find((b: any) => b.tipoBloco === 'observacoes_complementares')
+    const txtObs = bloco?.textoOverride?.trim() || ''
+    if (txtObs) {
+      sections += sec('Observações Complementares', renderTexto(txtObs))
+    }
+  }
+
   // Considerações Gerais
   const DEFAULT_CONSIDERACOES = `- **Atendimento:** Prestado em horário comercial, de segunda a sexta-feira das 8h às 18h.
 - **Autoria do Orçamento:** Este documento é de uso exclusivo desta negociação e não deve ser repassado a terceiros.

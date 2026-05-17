@@ -669,10 +669,10 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
   )
 }
 
-const BLOCOS_TEXTO_EDITAVEL   = new Set(['escopo_entregas', 'consideracoes_gerais'])
-const BLOCOS_COM_CATALOGO     = new Set(['garantias', 'consideracoes_gerais', 'escopo_entregas', 'fornecedores', 'regulamentacao', 'como_funciona'])
+const BLOCOS_TEXTO_EDITAVEL   = new Set(['escopo_entregas', 'consideracoes_gerais', 'observacoes_complementares'])
+const BLOCOS_COM_CATALOGO     = new Set(['garantias', 'consideracoes_gerais', 'escopo_entregas', 'fornecedores', 'regulamentacao', 'como_funciona', 'observacoes_complementares'])
 const BLOCOS_OBRIGATORIOS_PDF = new Set(['garantias', 'escopo_entregas'])
-const BLOCOS_MULTISELECT      = new Set(['consideracoes_gerais', 'escopo_entregas'])
+const BLOCOS_MULTISELECT      = new Set(['consideracoes_gerais', 'escopo_entregas', 'observacoes_complementares'])
 const BLOCOS_LABELS: Record<string, string> = {
   capa: 'Capa', apresentacao_empresa: 'Apresentação da Empresa',
   o_que_inclui: 'O que inclui', como_funciona: 'Como funciona',
@@ -685,6 +685,7 @@ const BLOCOS_LABELS: Record<string, string> = {
   formas_pagamento: 'Formas de Pagamento', aceite: 'Aceite da Proposta',
   contato: 'Contato e Endereço', escopo_servico: 'Escopo do Serviço',
   escopo_entregas: 'O que Propomos Entregar', consideracoes_gerais: 'Considerações Gerais',
+  observacoes_complementares: 'Observações Complementares',
 }
 
 const DEFAULT_CONSIDERACOES_PREVIEW = `- **Atendimento:** Horário comercial, segunda a sexta das 8h às 18h.
