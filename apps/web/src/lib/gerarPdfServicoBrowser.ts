@@ -170,7 +170,9 @@ const CSS_SERVICO = `
     position: fixed;
     bottom: 0; left: 0; right: 0;
     height: 48px;
-    background: #0E2040;
+    background: #0E2040 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
     padding: 0 36px;
     display: flex; align-items: center; justify-content: space-between;
     z-index: 100;
@@ -179,7 +181,7 @@ const CSS_SERVICO = `
   .footer-numero { font-size: 9px; color: rgba(255,255,255,0.5); }
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
-  .doc-content { padding: 0 36px 8px; } /* sem padding-top — o thead-cell já faz esse papel */
+  .doc-content { padding: 0 36px 64px; } /* padding-bottom deixa espaço acima do footer fixo */
   .section { margin-bottom: 24px; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
@@ -245,10 +247,7 @@ const CSS_SERVICO = `
 
   @media print {
     body { margin: 0; }
-    /* margem inferior em todas as páginas reserva espaço para o footer fixo */
-    @page          { size: A4; margin: 0 0 48px 0; }
-    /* primeira página (capa) não tem margem — capa é exatamente 297mm */
-    @page :first   { margin: 0; }
+    @page { size: A4; margin: 0; }
   }
 `
 
