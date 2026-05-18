@@ -166,18 +166,17 @@ const CSS = `
   }
   .page:last-child { page-break-after: avoid; }
 
-  /* Logo header */
+  /* Logo header — fundo escuro para logo branca */
   .header {
     display: flex;
     align-items: center;
-    margin-bottom: 8mm;
+    margin-bottom: 6mm;
     background: #1a2744;
     border-radius: 4px;
     padding: 6px 12px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
   .header img { height: 36px; }
+  .header span { color: #fff; }
   .header-line { flex: 1; }
 
   /* Title */
@@ -197,17 +196,17 @@ const CSS = `
     font-weight: 700;
     text-decoration: underline;
     text-transform: uppercase;
-    margin: 6mm 0 3mm;
+    margin: 3.5mm 0 1.5mm;
   }
   .clausula {
     text-align: justify;
-    margin-bottom: 3mm;
+    margin-bottom: 2mm;
     hyphens: auto;
   }
   .clausula strong { font-weight: 700; }
   .paragrafo {
     text-align: justify;
-    margin-bottom: 2.5mm;
+    margin-bottom: 1.5mm;
     hyphens: auto;
   }
   .lista-clausula {
@@ -249,17 +248,17 @@ const CSS = `
 
   /* Assinaturas */
   .assinaturas-bloco {
-    margin-top: 12mm;
+    margin-top: 8mm;
     text-align: center;
   }
   .assinatura-wrapper {
     display: inline-block;
     width: 220px;
-    margin: 0 20px;
+    margin: 0 16px;
     vertical-align: bottom;
   }
   .assinatura-espaco {
-    height: 18mm;
+    height: 14mm;
   }
   .assinatura-linha {
     border-top: 1px solid #000;
@@ -277,6 +276,14 @@ const CSS = `
     @page { size: A4; margin: 0; }
     body { margin: 0; }
     .page { margin: 0; }
+    /* Na impressão: remove fundo escuro e torna a logo preta (visível no papel branco) */
+    .header {
+      background: none !important;
+      border-bottom: 2px solid #1a2744;
+      padding-bottom: 4px;
+    }
+    .header img { filter: brightness(0); }
+    .header span { color: #000 !important; }
   }
 `
 
@@ -292,9 +299,15 @@ function logoTag(logoUrl: string | null | undefined): string {
 function buildHtml(dados: any): string {
   const { proposta, dimensionamento, equipamentos, precificacao, condicoesComerciais, empresa, cliente } = dados
 
-  // Seleciona condição comercial ativa (parcelado_marcos preferencial)
+  // Seleciona condição comercial: prefere parcelado_marcos com mais parcelas,
+  // depois qualquer ativa com mais parcelas, depois a primeira disponível
   const condicoes: any[] = condicoesComerciais ?? []
-  const condicaoAtiva = condicoes.find((c: any) => c.ativa) ?? condicoes[0]
+  const ativas = condicoes.filter((c: any) => c.ativa)
+  const condicaoAtiva = (
+    ativas.find((c: any) => c.tipo === 'parcelado_marcos' && (c.parcelas?.length ?? 0) > 1) ??
+    [...ativas].sort((a: any, b: any) => (b.parcelas?.length ?? 0) - (a.parcelas?.length ?? 0))[0] ??
+    condicoes[0]
+  )
   const parcelas: any[] = condicaoAtiva?.parcelas ?? []
 
   const valorTotal = Number(condicaoAtiva?.valorTotal ?? precificacao?.precoFinal ?? 0)
