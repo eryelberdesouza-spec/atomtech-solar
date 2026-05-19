@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
+import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return '—'
@@ -162,9 +163,7 @@ export function DashboardPage() {
             <div style={{ padding: '48px 24px', textAlign: 'center', color: '#3A5070' }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
               <p style={{ margin: '0 0 16px', fontSize: 14 }}>Nenhuma proposta ainda.</p>
-              <button onClick={() => navigate('/propostas/nova')}
-                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #F5A623, #E8720C)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-              >+ Criar primeira proposta</button>
+              <NovaPropostaDropdown label="+ Criar primeira proposta" />
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -215,8 +214,10 @@ export function DashboardPage() {
           {/* Ações Rápidas */}
           <div style={{ background: 'linear-gradient(135deg, #111D2E, #0E1A2A)', borderRadius: 14, border: '1px solid #1E3050', padding: '20px 22px' }}>
             <h3 style={{ color: '#E2EAF5', fontSize: 14, fontWeight: 700, margin: '0 0 14px' }}>Ações Rápidas</h3>
+            <div style={{ marginBottom: 6 }}>
+              <NovaPropostaDropdown label="+ Nova Proposta" size="md" />
+            </div>
             {[
-              { label: '+ Nova Proposta',  path: '/propostas/nova', color: '#F5A623', icon: '📋' },
               { label: '+ Novo Cliente',   path: '/clientes',       color: '#3EBB7A', icon: '👤' },
               { label: '+ Nova Fatura',    path: '/faturas/nova',   color: '#BC8CFF', icon: '⚡' },
               { label: '⚙ Configurações', path: '/configuracoes',  color: '#8B949E', icon: '⚙️' },
