@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { z } from 'zod'
-import { eq, and, desc, like, not } from 'drizzle-orm'
+import { eq, and, desc, like, not, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from './trpc'
 import {
@@ -95,6 +95,16 @@ export const propostaRouter = router({
       const { pagina = 1, porPagina = 20, status, clienteId, isTemplate } = input ?? {}
       const offset = (pagina - 1) * porPagina
 
+      // Subquery: soma dos itens de serviço por proposta
+      const itemServicoSum = ctx.db
+        .select({
+          propostaId: itemServicoProposta.propostaId,
+          total: sql<string>`CAST(SUM(${itemServicoProposta.valorTotal}) AS CHAR)`.as('total'),
+        })
+        .from(itemServicoProposta)
+        .groupBy(itemServicoProposta.propostaId)
+        .as('item_servico_sum')
+
       const propostas = await ctx.db
         .select({
           id: proposta.id,
@@ -111,9 +121,13 @@ export const propostaRouter = router({
           clienteId: proposta.clienteId,
           clienteNome: cliente.nome,
           clienteEstado: cliente.estado,
+          // Valor final: precoFinal (fotovoltaico) OU soma dos itens (serviço)
+          valorFinal: sql<string>`CAST(COALESCE(${precTable.precoFinal}, ${itemServicoSum.total}) AS CHAR)`,
         })
         .from(proposta)
         .leftJoin(cliente, eq(proposta.clienteId, cliente.id))
+        .leftJoin(precTable, eq(precTable.propostaId, proposta.id))
+        .leftJoin(itemServicoSum, eq(itemServicoSum.propostaId, proposta.id))
         .where(
           and(
             eq(proposta.empresaId, empresaId),
