@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Btn, Badge, PageWrapper, Spinner, C } from '../../components/ui'
+import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
 
 type StatusFiltro = 'todos' | 'rascunho' | 'enviada' | 'aceita' | 'recusada' | 'expirada'
 
@@ -25,9 +26,8 @@ const STATUS_COLOR: Record<string, string> = {
 
 export function PropostasPage() {
   const navigate = useNavigate()
-  const [filtro, setFiltro]     = useState<StatusFiltro>('todos')
-  const [busca, setBusca]       = useState('')
-  const [menuNova, setMenuNova] = useState(false)
+  const [filtro, setFiltro] = useState<StatusFiltro>('todos')
+  const [busca, setBusca]   = useState('')
 
   const { data, isLoading } = trpc.proposta.list.useQuery({ isTemplate: false, porPagina: 100 })
   const lista = data?.data ?? []
@@ -52,34 +52,7 @@ export function PropostasPage() {
           <h2 style={{ color: '#E2EAF5', fontSize: 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
           <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
         </div>
-        <div style={{ position: 'relative' }}>
-          <Btn onClick={() => setMenuNova(v => !v)}>+ Nova Proposta ▾</Btn>
-          {menuNova && (
-            <div
-              onMouseLeave={() => setMenuNova(false)}
-              style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#111D2E', border: '1px solid #1E3050', borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 100, minWidth: 240 }}
-            >
-              <button
-                onClick={() => { setMenuNova(false); navigate('/propostas/nova') }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #1E3050' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F5A62310')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-              >
-                <span style={{ color: '#E2EAF5', fontSize: 13, fontWeight: 700 }}>☀️ Sistema Fotovoltaico</span>
-                <span style={{ color: '#4A6080', fontSize: 11, marginTop: 2 }}>Proposta com dimensionamento e análise financeira</span>
-              </button>
-              <button
-                onClick={() => { setMenuNova(false); navigate('/propostas/nova-servico') }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F5A62310')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-              >
-                <span style={{ color: '#E2EAF5', fontSize: 13, fontWeight: 700 }}>🔧 Serviço / Instalação</span>
-                <span style={{ color: '#4A6080', fontSize: 11, marginTop: 2 }}>CFTV, Carregadores, Elétrica, Manutenção...</span>
-              </button>
-            </div>
-          )}
-        </div>
+        <NovaPropostaDropdown />
       </div>
 
       {/* Stats */}

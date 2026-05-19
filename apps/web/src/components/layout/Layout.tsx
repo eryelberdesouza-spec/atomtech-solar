@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { trpc } from '../../lib/trpc'
+import { NovaPropostaDropdown } from '../ui/NovaPropostaDropdown'
 
 const IconLogout = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -309,18 +310,7 @@ export function Layout() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              onClick={() => navigate('/propostas/nova')}
-              style={{
-                padding: '7px 16px', borderRadius: 8, border: 'none',
-                background: 'linear-gradient(135deg, #F5A623, #E8720C)',
-                color: '#fff', cursor: 'pointer', fontSize: 12,
-                fontWeight: 700, fontFamily: 'inherit',
-                boxShadow: '0 2px 10px rgba(245,166,35,0.35)',
-              }}
-            >
-              + Nova Proposta
-            </button>
+            <NovaPropostaDropdown />
 
             {/* Avatar com dropdown de usuário */}
             <div ref={userMenuRef} style={{ position: 'relative' }}>

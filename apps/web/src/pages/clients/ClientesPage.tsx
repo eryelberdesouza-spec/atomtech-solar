@@ -10,6 +10,7 @@ import {
   Btn, Card, Input, Select, Badge,
   PageWrapper, SectionHeader, EmptyState, Spinner, C,
 } from '../../components/ui'
+import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
 
 const AVATAR_COLORS: Record<string, string> = {
   A:'#F59E0B', B:'#3B82F6', C:'#10B981', D:'#8B5CF6', E:'#EF4444',
@@ -282,7 +283,7 @@ export function ClienteDetailPage() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn variant="ghost" size="sm" onClick={() => setShowEdit(true)}>✏ Editar</Btn>
-          <Btn size="sm" onClick={() => navigate('/propostas/nova')}>+ Nova Proposta</Btn>
+          <NovaPropostaDropdown size="sm" />
         </div>
       </div>
 
@@ -353,7 +354,7 @@ export function ClienteDetailPage() {
                 <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Propostas</p>
                 {(propostas?.data?.length ?? 0) > 0 && <span style={{ background: `${C.accent}20`, color: C.accent, fontSize: 10, fontWeight: 700, borderRadius: 5, padding: '2px 7px' }}>{propostas!.data.length}</span>}
               </div>
-              <Btn variant="ghost" size="sm" onClick={() => navigate('/propostas/nova')}>+ Nova</Btn>
+              <NovaPropostaDropdown label="+ Nova" size="sm" />
             </div>
             {!propostas?.data?.length ? (
               <div style={{ padding: '24px', textAlign: 'center', color: C.textDim, fontSize: 13 }}>Nenhuma proposta para este cliente</div>

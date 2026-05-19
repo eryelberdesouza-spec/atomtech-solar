@@ -61,7 +61,7 @@ function renderListaNumerada(txt: string, cor1: string): string {
   return agruparItens(txt).map(({ titulo, corpo }, idx) => {
     const tituloHtml = bold(stripPrefix(titulo))
     const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
-    return `<div style="display:flex;gap:12px;margin-bottom:8px;align-items:flex-start;padding-bottom:8px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
+    return `<div style="display:flex;gap:12px;margin-bottom:5px;align-items:flex-start;padding-bottom:5px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
       <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx + 1}</span>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
@@ -80,7 +80,7 @@ function renderListaLetras(txt: string): string {
   if (!items.length) return ''
   return items.map((item, idx) => {
     const clean = bold(stripPrefix(item))
-    return `<div style="display:flex;gap:12px;margin-bottom:10px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
+    return `<div style="display:flex;gap:12px;margin-bottom:6px;align-items:flex-start;padding-bottom:6px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
       <span style="min-width:26px;height:26px;background:#0E2040;color:#F5A623;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${letras[idx] ?? idx + 1}</span>
       <div style="flex:1;font-size:13px;font-weight:300;color:#333;line-height:1.85;padding-top:3px">${clean}</div>
     </div>`
@@ -146,7 +146,7 @@ const CSS_SERVICO = `
   .doc-table thead { display: table-header-group; }
   .doc-table tfoot { display: table-footer-group; } /* repete rodapé no fim de cada página, igual ao thead */
   .doc-table tbody { display: table-row-group; }
-  .doc-thead-cell { padding: 0 0 20px 0; border: none; }
+  .doc-thead-cell { padding: 0 0 10px 0; border: none; }
   .doc-tfoot-cell { padding: 0; border: none; }
   .doc-tbody-cell  { padding: 0; border: none; vertical-align: top; }
 
@@ -168,15 +168,15 @@ const CSS_SERVICO = `
   .header-tag { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; }
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
-  .doc-content { padding: 0 36px 28px; }
-  .section { margin-bottom: 24px; }
+  .doc-content { padding: 0 36px 16px; }
+  .section { margin-bottom: 14px; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
-    margin-bottom: 14px; line-height: 1.2;
+    margin-bottom: 10px; line-height: 1.2;
     page-break-after: avoid; break-after: avoid;
   }
-  .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 18px 0; }
+  .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 12px 0; }
 
   /* ─── TABELA DE ITENS ──────────────────────────────────────────── */
   .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 14px; page-break-inside: auto; }
@@ -257,7 +257,7 @@ function headerInterno(numero: string, nomeEmpresa: string, logoUrl?: string | n
   const logoHtml = logoUrl
     ? `<img src="${logoUrl}" style="height:32px;max-width:160px;object-fit:contain;display:block;" alt="Logo"/>`
     : `<div class="header-logo-nome">${nomeEmpresa}</div><div class="header-logo-tag">Proposta de Serviços</div>`
-  return `<div class="header-interno">
+  return `<div class="header-interno" style="background-color:#0E2040 !important;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;">
     <div class="header-logo">${logoHtml}</div>
     <div class="header-tag">Proposta de Serviços &middot; ${numero}</div>
   </div>`
@@ -505,22 +505,22 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   }
   if (temContato) {
     sections += sec('Entre em Contato', `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:4px">
         ${empresa?.telefone ? `<div>
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Telefone</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
         </div>` : ''}
         ${empresa?.email ? `<div>
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">E-mail</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">E-mail</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
         </div>` : ''}
         ${empresa?.site ? `<div>
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Site</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Site</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
         </div>` : ''}
-        ${empresa?.endereco ? `<div style="grid-column:1/-1">
-          <p style="color:#8A9BB5;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Endereço</p>
-          <p style="font-size:16px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
+        ${empresa?.endereco ? `<div style="grid-column:1/-1;margin-top:2px">
+          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>`)
   }
@@ -547,7 +547,32 @@ export function abrirPdfServicoNoNavegador(data: any): void {
     </td></tr></tbody>
   </table>` : ''}
   <script>
-    window.onload = function() { setTimeout(function() { window.print(); }, 800); };
+    window.onload = function() {
+      setTimeout(function() {
+        // Empurra o tfoot ao pé da última página calculando o espaço restante
+        try {
+          var content  = document.querySelector('.doc-content');
+          var thead    = document.querySelector('.doc-table thead');
+          var tfoot    = document.querySelector('.doc-table tfoot');
+          if (content && thead && tfoot) {
+            var pageH   = Math.round(297 * 96 / 25.4); // 297mm em px a 96dpi ≈ 1122px
+            var theadH  = thead.offsetHeight;
+            var tfootH  = tfoot.offsetHeight;
+            var availH  = pageH - theadH - tfootH;
+            var contentH = content.scrollHeight; // já inclui o padding-bottom de 28px
+            if (availH > 0) {
+              var pages   = Math.ceil(contentH / availH) || 1;
+              var extra   = (pages * availH) - contentH;
+              // Só aplica se o ganho for significativo (> 20px) para evitar ruído
+              if (extra > 20) {
+                content.style.paddingBottom = (28 + extra) + 'px';
+              }
+            }
+          }
+        } catch(e) {}
+        window.print();
+      }, 800);
+    };
   </script>
 </body>
 </html>`
