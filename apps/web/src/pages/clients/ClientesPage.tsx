@@ -39,8 +39,8 @@ const FORM_VAZIO: ClienteForm = {
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
 const DISTRIBUIDORAS = ['Neoenergia Brasília','Neoenergia Pernambuco','Neoenergia Coelba','Neoenergia Cosern','Equatorial Goiás','Equatorial Pará','Equatorial Piauí','Equatorial Maranhão','CEMIG','COPEL','CPFL','Enel São Paulo','Enel Rio','Enel Ceará','Light','Energisa','CELPE','COELCE','CELESC','CEMAT','Outra']
 
-function ClienteFormModal({ inicial, onSave, onClose, loading }: {
-  inicial: ClienteForm; onSave: (data: ClienteForm) => void; onClose: () => void; loading?: boolean
+function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
+  inicial: ClienteForm; onSave: (data: ClienteForm) => void; onClose: () => void; loading?: boolean; erro?: string
 }) {
   const [form, setForm] = useState<ClienteForm>(inicial)
   const [cepLoading, setCepLoading] = useState(false)
@@ -150,7 +150,13 @@ function ClienteFormModal({ inicial, onSave, onClose, loading }: {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 26, paddingTop: 20, borderTop: `1px solid ${C.darkBorder}40` }}>
+        {erro && (
+          <div style={{ background: '#7F1D1D20', border: '1px solid #B91C1C', borderRadius: 8, padding: '10px 14px', marginTop: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <span style={{ color: '#FCA5A5', fontSize: 13 }}>{erro}</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18, paddingTop: 18, borderTop: `1px solid ${C.darkBorder}40` }}>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
           <Btn onClick={() => onSave(form)} disabled={!form.nome || !form.telefone || loading}>
             {loading ? 'Salvando...' : '✓ Salvar Cliente'}
@@ -238,7 +244,7 @@ export function ClientesPage() {
         </div>
       )}
 
-      {showModal && <ClienteFormModal inicial={FORM_VAZIO} onSave={form => createMutation.mutate(form as any)} onClose={() => setShowModal(false)} loading={createMutation.isPending} />}
+      {showModal && <ClienteFormModal inicial={FORM_VAZIO} onSave={form => createMutation.mutate(form as any)} onClose={() => setShowModal(false)} loading={createMutation.isLoading} erro={createMutation.error?.message} />}
     </PageWrapper>
   )
 }
@@ -249,12 +255,22 @@ export function ClienteDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [showEdit, setShowEdit] = useState(false)
+  const [updateErro, setUpdateErro] = useState('')
 
   const clienteId = Number(id)
   const { data: cliente, isLoading, refetch } = trpc.cliente.byId.useQuery({ id: clienteId }, { enabled: !!clienteId })
   const { data: faturas } = trpc.fatura.byCliente.useQuery({ clienteId }, { enabled: !!clienteId })
   const { data: propostas } = trpc.proposta.list.useQuery({ clienteId }, { enabled: !!clienteId })
-  const updateMutation = trpc.cliente.update.useMutation({ onSuccess: () => { setShowEdit(false); refetch() } })
+  const updateMutation = trpc.cliente.update.useMutation({
+    onSuccess: () => {
+      setShowEdit(false)
+      setUpdateErro('')
+      refetch()
+    },
+    onError: (err: any) => {
+      setUpdateErro(err?.message ?? 'Erro ao salvar. Tente novamente.')
+    },
+  })
 
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spinner size={36} /></div>
   if (!cliente) return <EmptyState icon="❌" title="Cliente não encontrado" />
@@ -377,7 +393,7 @@ export function ClienteDetailPage() {
         </div>
       </div>
 
-      {showEdit && <ClienteFormModal inicial={{ ...FORM_VAZIO, ...cliente, tipoPessoa: cliente.tipoPessoa as any }} onSave={form => updateMutation.mutate({ id: clienteId, ...form } as any)} onClose={() => setShowEdit(false)} loading={updateMutation.isLoading} />}
+      {showEdit && <ClienteFormModal inicial={{ ...FORM_VAZIO, ...cliente, tipoPessoa: cliente.tipoPessoa as any }} onSave={form => { setUpdateErro(''); updateMutation.mutate({ id: clienteId, ...form } as any) }} onClose={() => { setShowEdit(false); setUpdateErro('') }} loading={updateMutation.isLoading} erro={updateErro} />}
     </PageWrapper>
   )
 }
