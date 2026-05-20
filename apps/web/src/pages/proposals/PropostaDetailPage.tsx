@@ -1263,6 +1263,8 @@ export function PropostaDetailPage() {
   const [tabServico, setTabServico]     = useState('itens')
   const [gerandoPdf, setGerandoPdf] = useState(false)
   const [gerandoContrato, setGerandoContrato] = useState(false)
+  const [showClonar, setShowClonar]         = useState(false)
+  const [showAltCliente, setShowAltCliente] = useState(false)
 
   const propostaId = Number(id)
   const { data, isLoading } = trpc.proposta.byId.useQuery({ id: propostaId }, { enabled: !!propostaId })
@@ -1274,6 +1276,15 @@ export function PropostaDetailPage() {
   )
   const updateStatus = trpc.proposta.updateStatus.useMutation()
   const utils = trpc.useUtils()
+
+  const clonarMutation = (trpc as any).proposta.clonar.useMutation({
+    onSuccess: (res: any) => { navigate(`/propostas/${res.propostaId}`) },
+    onError: (e: any) => alert('Erro ao clonar: ' + (e?.message ?? 'Tente novamente')),
+  })
+  const updateClienteMutation = (trpc as any).proposta.updateCliente.useMutation({
+    onSuccess: () => { setShowAltCliente(false); utils.proposta.byId.invalidate({ id: propostaId }); (utils as any).cliente.byId.invalidate() },
+    onError: (e: any) => alert('Erro ao alterar cliente: ' + (e?.message ?? 'Tente novamente')),
+  })
 
   const handleGerarPdf = () => {
     if (!data) { alert('Dados da proposta ainda não carregados.'); return }
@@ -1382,6 +1393,10 @@ export function PropostaDetailPage() {
           )}
           <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')}
             style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
+          <Btn variant="ghost" size="sm" onClick={() => setShowAltCliente(true)}
+            style={{ color: C.textMuted, borderColor: C.darkBorder }}>👤 Alt. Cliente</Btn>
+          <Btn variant="ghost" size="sm" onClick={() => setShowClonar(true)}
+            style={{ color: C.accent, borderColor: C.accent + '50' }}>⎘ Clonar</Btn>
           {!isServico && (
             <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
               style={{ borderColor: C.green + '60', color: C.green }}>
@@ -1419,6 +1434,174 @@ export function PropostaDetailPage() {
             {tab === 'blocos'          && <TabBlocos blocos={blocos} propostaId={propostaId} textos={(() => { const t: Record<string, any> = {}; if (textosData) { (textosData as any[]).forEach((x: any) => { t[x.chave] = x }); } return t })()} />}
           </>
         )}
+      </div>
+
+      {/* ── MODAL: CLONAR PROPOSTA ───────────────────────────────── */}
+      {showClonar && (
+        <ModalSelecionarCliente
+          titulo="Clonar Proposta"
+          subtitulo={`Clonando: ${proposta.numero}`}
+          descricao="Escolha para qual cliente deseja clonar. Todos os dados (dimensionamento, precificação, condições) serão copiados."
+          clienteAtualId={proposta.clienteId}
+          clienteAtualNome={clienteData?.nome}
+          labelManterCliente="Manter mesmo cliente"
+          labelAcao={clonarMutation.isLoading ? '⏳ Clonando...' : '⎘ Clonar Proposta'}
+          loading={clonarMutation.isLoading}
+          onConfirm={(clienteId) => clonarMutation.mutate({ propostaId, clienteId })}
+          onClose={() => setShowClonar(false)}
+        />
+      )}
+
+      {/* ── MODAL: ALTERAR CLIENTE ───────────────────────────────── */}
+      {showAltCliente && (
+        <ModalSelecionarCliente
+          titulo="Alterar Cliente da Proposta"
+          subtitulo={`Proposta: ${proposta.numero}`}
+          descricao="Selecione o novo cliente. A proposta e seus dados serão mantidos, apenas o titular será alterado."
+          clienteAtualId={proposta.clienteId}
+          clienteAtualNome={clienteData?.nome}
+          labelManterCliente={null}
+          labelAcao={updateClienteMutation.isLoading ? '⏳ Salvando...' : '✓ Confirmar Alteração'}
+          loading={updateClienteMutation.isLoading}
+          onConfirm={(clienteId) => updateClienteMutation.mutate({ id: propostaId, clienteId })}
+          onClose={() => setShowAltCliente(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── MODAL REUTILIZÁVEL: SELECIONAR CLIENTE ──────────────────────────────────
+function ModalSelecionarCliente({
+  titulo, subtitulo, descricao,
+  clienteAtualId, clienteAtualNome,
+  labelManterCliente, labelAcao, loading,
+  onConfirm, onClose,
+}: {
+  titulo: string; subtitulo: string; descricao: string;
+  clienteAtualId: number; clienteAtualNome?: string;
+  labelManterCliente: string | null;
+  labelAcao: string; loading: boolean;
+  onConfirm: (clienteId: number) => void;
+  onClose: () => void;
+}) {
+  const [busca, setBusca] = useState('')
+  const [clienteEscolhidoId, setClienteEscolhidoId]     = useState<number | null>(null)
+  const [clienteEscolhidoNome, setClienteEscolhidoNome] = useState('')
+  const [manterMesmo, setManterMesmo] = useState(labelManterCliente !== null)
+
+  const { data: resultados } = (trpc as any).cliente.list.useQuery(
+    { busca: busca || undefined, porPagina: 10 },
+    { enabled: busca.length >= 2, staleTime: 0 },
+  )
+  const lista: any[] = resultados?.data ?? []
+
+  const clienteFinal = manterMesmo ? clienteAtualId : clienteEscolhidoId
+  const podeConfirmar = clienteFinal !== null && clienteFinal !== undefined
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' }}>
+      <div style={{ background: C.darkCard, borderRadius: 16, border: `1px solid ${C.darkBorder}`, width: 520, maxHeight: '90vh', overflow: 'auto', padding: 28, boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+          <div>
+            <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>{titulo}</h2>
+            <p style={{ color: C.accent, fontSize: 12, fontFamily: 'monospace', margin: 0 }}>{subtitulo}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Descrição */}
+        <p style={{ color: C.textMuted, fontSize: 12, lineHeight: 1.6, margin: '0 0 20px', padding: '10px 14px', background: `${C.accent}08`, borderRadius: 8, border: `1px solid ${C.darkBorder}` }}>
+          {descricao}
+        </p>
+
+        {/* Opção: manter mesmo cliente */}
+        {labelManterCliente !== null && (
+          <div
+            onClick={() => setManterMesmo(true)}
+            style={{ padding: '12px 16px', borderRadius: 10, marginBottom: 12, cursor: 'pointer', border: `2px solid ${manterMesmo ? C.accent : C.darkBorder}`, background: manterMesmo ? `${C.accent}10` : 'transparent', transition: 'all 0.15s' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${manterMesmo ? C.accent : C.textDim}`, background: manterMesmo ? C.accent : 'transparent', flexShrink: 0 }} />
+              <div>
+                <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{labelManterCliente}</div>
+                <div style={{ color: C.textMuted, fontSize: 11 }}>{clienteAtualNome ?? `ID ${clienteAtualId}`}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Opção: selecionar outro cliente */}
+        <div
+          onClick={() => setManterMesmo(false)}
+          style={{ padding: '12px 16px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${!manterMesmo ? C.solar : C.darkBorder}`, background: !manterMesmo ? `${C.solar}10` : 'transparent', transition: 'all 0.15s' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: !manterMesmo ? 12 : 0 }}>
+            <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${!manterMesmo ? C.solar : C.textDim}`, background: !manterMesmo ? C.solar : 'transparent', flexShrink: 0 }} />
+            <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>
+              {labelManterCliente !== null ? 'Selecionar outro cliente' : 'Pesquisar cliente'}
+            </div>
+          </div>
+
+          {!manterMesmo && (
+            <div onClick={e => e.stopPropagation()}>
+              {/* Campo de busca */}
+              <input
+                autoFocus
+                value={busca}
+                onChange={e => { setBusca(e.target.value); setClienteEscolhidoId(null); setClienteEscolhidoNome('') }}
+                placeholder="Digite o nome, CPF/CNPJ..."
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
+
+              {/* Cliente selecionado */}
+              {clienteEscolhidoId && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: `${C.solar}12`, border: `1px solid ${C.solar}40`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.solar, fontSize: 13, fontWeight: 600 }}>✓ {clienteEscolhidoNome}</span>
+                  <button onClick={() => { setClienteEscolhidoId(null); setClienteEscolhidoNome(''); setBusca('') }} style={{ background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 16 }}>×</button>
+                </div>
+              )}
+
+              {/* Lista de resultados */}
+              {lista.length > 0 && !clienteEscolhidoId && (
+                <div style={{ marginTop: 6, borderRadius: 8, border: `1px solid ${C.darkBorder}`, overflow: 'hidden', maxHeight: 200, overflowY: 'auto' }}>
+                  {lista.map((c: any) => (
+                    <div
+                      key={c.id}
+                      onClick={() => { setClienteEscolhidoId(c.id); setClienteEscolhidoNome(c.nome); setBusca('') }}
+                      style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30`, background: 'transparent', transition: 'background 0.1s' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = `${C.darkBorder}40`}
+                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+                    >
+                      <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{c.nome}</div>
+                      {(c.cpfCnpj || c.cidade) && (
+                        <div style={{ color: C.textDim, fontSize: 11, marginTop: 2 }}>
+                          {[c.cpfCnpj, c.cidade && c.estado ? `${c.cidade}/${c.estado}` : c.cidade].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {busca.length >= 2 && lista.length === 0 && (
+                <p style={{ color: C.textDim, fontSize: 12, margin: '8px 0 0', textAlign: 'center' }}>Nenhum cliente encontrado</p>
+              )}
+              {busca.length > 0 && busca.length < 2 && (
+                <p style={{ color: C.textDim, fontSize: 11, margin: '6px 0 0' }}>Digite ao menos 2 caracteres para buscar</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Botões */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+          <Btn variant="ghost" onClick={onClose} disabled={loading}>Cancelar</Btn>
+          <Btn onClick={() => podeConfirmar && onConfirm(clienteFinal!)} disabled={!podeConfirmar || loading}>
+            {labelAcao}
+          </Btn>
+        </div>
       </div>
     </div>
   )

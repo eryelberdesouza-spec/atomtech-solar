@@ -1246,4 +1246,165 @@ export const propostaRouter = router({
 
       return { ok: true }
     }),
+
+  // ─── ALTERAR CLIENTE DA PROPOSTA ─────────────────────────────────────────
+  updateCliente: protectedProcedure
+    .input(z.object({
+      id:        z.number().int().positive(),
+      clienteId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+
+      const [prop] = await ctx.db.select({ id: proposta.id })
+        .from(proposta)
+        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const [cli] = await ctx.db.select({ id: cliente.id })
+        .from(cliente)
+        .where(and(eq(cliente.id, input.clienteId), eq(cliente.empresaId, empresaId)))
+        .limit(1)
+      if (!cli) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+
+      await ctx.db.update(proposta)
+        .set({ clienteId: input.clienteId })
+        .where(eq(proposta.id, input.id))
+        .execute()
+
+      return { ok: true }
+    }),
+
+  // ─── CLONAR PROPOSTA ─────────────────────────────────────────────────────
+  clonar: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      clienteId:  z.number().int().positive().optional(), // se omitido, mantém o mesmo cliente
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId, id: usuarioId } = ctx.usuario
+
+      // ── 1. Carrega proposta original ──────────────────────────────
+      const [orig] = await ctx.db.select().from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, empresaId)))
+        .limit(1)
+      if (!orig) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const novoClienteId = input.clienteId ?? orig.clienteId
+
+      // Valida cliente de destino
+      const [cli] = await ctx.db.select({ id: cliente.id }).from(cliente)
+        .where(and(eq(cliente.id, novoClienteId), eq(cliente.empresaId, empresaId)))
+        .limit(1)
+      if (!cli) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+
+      // ── 2. Carrega todos os dados relacionados em paralelo ────────
+      const [dims, equips, precs, itensPrec, afs, conds, blocos, snapshots, itensServ] = await Promise.all([
+        ctx.db.select().from(dimTable).where(eq(dimTable.propostaId, input.propostaId)).limit(1),
+        ctx.db.select().from(equipamentoProposta).where(eq(equipamentoProposta.propostaId, input.propostaId)),
+        ctx.db.select().from(precTable).where(eq(precTable.propostaId, input.propostaId)).limit(1),
+        ctx.db.select().from(itemPrecTable).where(eq(itemPrecTable.propostaId, input.propostaId)),
+        ctx.db.select().from(afTable).where(eq(afTable.propostaId, input.propostaId)).limit(1),
+        ctx.db.select().from(ccTable).where(eq(ccTable.propostaId, input.propostaId)).orderBy(ccTable.ordem),
+        ctx.db.select().from(blocoTable).where(eq(blocoTable.propostaId, input.propostaId)).orderBy(blocoTable.ordem),
+        ctx.db.select().from(premissasSnapshot).where(eq(premissasSnapshot.propostaId, input.propostaId)).limit(1),
+        ctx.db.select().from(itemServicoProposta).where(eq(itemServicoProposta.propostaId, input.propostaId)).orderBy(itemServicoProposta.ordem),
+      ])
+
+      // Carrega parcelas de cada condição
+      const parcelasMap: Record<number, any[]> = {}
+      for (const c of conds) {
+        if (c.id) {
+          parcelasMap[c.id] = await ctx.db.select().from(ppTable)
+            .where(eq(ppTable.condicaoId, c.id)).orderBy(ppTable.numeroParcela)
+        }
+      }
+
+      // ── 3. Cria nova proposta ─────────────────────────────────────
+      const numero = await gerarNumeroProposta(ctx.db, empresaId)
+      const hoje   = new Date().toISOString().split('T')[0]
+
+      const [novaPropResult] = await ctx.db.insert(proposta).values({
+        empresaId,
+        numero,
+        clienteId:         novoClienteId,
+        faturaId:          orig.faturaId,
+        tipoProposta:      orig.tipoProposta,
+        tituloServico:     orig.tituloServico,
+        usuarioId,
+        status:            'rascunho',
+        versao:            1,
+        dataEmissao:       hoje,
+        dataValidade:      orig.dataValidade,
+        templateOrigemId:  input.propostaId, // referência à origem
+        observacoesInternas: orig.observacoesInternas
+          ? `[Clonada de ${orig.numero}] ${orig.observacoesInternas}`
+          : `[Clonada de ${orig.numero}]`,
+        createdBy: usuarioId,
+      }).execute()
+
+      const novaId = (novaPropResult as { insertId: number }).insertId
+
+      // ── 4. Copia dimensionamento ──────────────────────────────────
+      if (dims[0]) {
+        const { id: _, propostaId: __, createdAt: ___, updatedAt: ____, ...d } = dims[0] as any
+        await ctx.db.insert(dimTable).values({ ...d, propostaId: novaId }).execute()
+      }
+
+      // ── 5. Copia equipamentos ─────────────────────────────────────
+      for (const e of equips) {
+        const { id: _, propostaId: __, createdAt: ___, ...eq_ } = e as any
+        await ctx.db.insert(equipamentoProposta).values({ ...eq_, propostaId: novaId }).execute()
+      }
+
+      // ── 6. Copia precificação e itens ─────────────────────────────
+      if (precs[0]) {
+        const { id: _, propostaId: __, createdAt: ___, updatedAt: ____, ...p } = precs[0] as any
+        await ctx.db.insert(precTable).values({ ...p, propostaId: novaId }).execute()
+      }
+      for (const item of itensPrec) {
+        const { id: _, propostaId: __, ...it } = item as any
+        await ctx.db.insert(itemPrecTable).values({ ...it, propostaId: novaId }).execute()
+      }
+
+      // ── 7. Copia análise financeira ───────────────────────────────
+      if (afs[0]) {
+        const { id: _, propostaId: __, createdAt: ___, updatedAt: ____, ...af } = afs[0] as any
+        await ctx.db.insert(afTable).values({ ...af, propostaId: novaId }).execute()
+      }
+
+      // ── 8. Copia condições comerciais + parcelas ──────────────────
+      for (const cond of conds) {
+        const { id: condOrigId, propostaId: __, createdAt: ___, updatedAt: ____, ...c } = cond as any
+        const [novaCond] = await ctx.db.insert(ccTable)
+          .values({ ...c, propostaId: novaId }).execute()
+        const novaCondId = (novaCond as { insertId: number }).insertId
+
+        for (const parcela of (parcelasMap[condOrigId] ?? [])) {
+          const { id: _, condicaoId: __, ...par } = parcela as any
+          await ctx.db.insert(ppTable).values({ ...par, condicaoId: novaCondId }).execute()
+        }
+      }
+
+      // ── 9. Copia blocos ───────────────────────────────────────────
+      for (const bloco of blocos) {
+        const { id: _, propostaId: __, createdAt: ___, updatedAt: ____, ...bl } = bloco as any
+        await ctx.db.insert(blocoTable).values({ ...bl, propostaId: novaId }).execute()
+      }
+
+      // ── 10. Copia itens de serviço (se proposta de serviço) ───────
+      for (const item of itensServ) {
+        const { id: _, propostaId: __, ...is_ } = item as any
+        await ctx.db.insert(itemServicoProposta).values({ ...is_, propostaId: novaId }).execute()
+      }
+
+      // ── 11. Copia snapshot de premissas ───────────────────────────
+      if (snapshots[0]) {
+        const { id: _, propostaId: __, ...snap } = snapshots[0] as any
+        await ctx.db.insert(premissasSnapshot).values({ ...snap, propostaId: novaId }).execute()
+      }
+
+      return { propostaId: novaId, numero, ok: true }
+    }),
   })
