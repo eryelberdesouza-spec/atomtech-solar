@@ -89,45 +89,57 @@ const CSS = `
     break-after: page;
   }
 
-  /* ─── CAPA ────────────────────────────────────────────────────── */
-  .capa { background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%); }
-  .capa-top { padding: 28px 36px 0; display: flex; justify-content: space-between; align-items: center; }
-  .capa-body { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 36px; }
+  /* ─── CAPA (layout split: sidebar navy + área branca) ─────────── */
+  .capa { background: #fff; flex-direction: row !important; align-items: stretch; }
+  .capa-sidebar {
+    width: 188px; flex-shrink: 0;
+    background: #0E2040;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 44px 22px; gap: 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .capa-main {
+    flex: 1; background: #fff;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .capa-main-top { height: 6px; background: #F5A623; flex-shrink: 0; }
+  .capa-main-body { flex: 1; padding: 64px 52px; display: flex; flex-direction: column; justify-content: center; }
+  .capa-main-bottom { height: 4px; background: #0E2040; flex-shrink: 0; }
   .capa-pretitle {
     font-family: Calibri, Candara, sans-serif;
-    font-size: 10px; font-weight: 400;
-    color: #F5A623; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 16px;
+    font-size: 9px; font-weight: 400;
+    color: #F5A623; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 22px;
   }
   .capa-title {
     font-family: Calibri, Candara, sans-serif;
-    font-size: 48px; font-weight: 700;
-    color: #fff; line-height: 1.1; margin-bottom: 8px;
+    font-size: 46px; font-weight: 700;
+    color: #0E2040; line-height: 1.05; margin-bottom: 4px;
   }
-  .capa-title span { color: #F5A623; }
-  .capa-divider { width: 60px; height: 3px; background: #F5A623; margin: 18px 0; border-radius: 2px; }
+  .capa-title-sub {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 20px; font-weight: 300; letter-spacing: 3px;
+    color: #0E2040; text-transform: uppercase; margin-bottom: 28px;
+  }
+  .capa-divider { width: 56px; height: 3px; background: #F5A623; margin-bottom: 32px; border-radius: 2px; }
   .capa-cliente-label {
     font-family: Calibri, Candara, sans-serif;
     font-size: 9px; font-weight: 300;
-    color: rgba(255,255,255,0.5); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px;
+    color: #aaa; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px;
   }
   .capa-cliente-nome {
     font-family: Calibri, Candara, sans-serif;
     font-size: 30px; font-weight: 600;
-    color: #fff; line-height: 1.15;
+    color: #0E2040; line-height: 1.15; margin-bottom: 28px;
   }
-  .capa-meta { display: flex; gap: 32px; margin-top: 20px; }
+  .capa-meta { display: flex; gap: 32px; }
   .capa-meta-label {
-    font-size: 9px; font-weight: 300;
-    color: rgba(255,255,255,0.4); letter-spacing: 2px; text-transform: uppercase;
+    font-size: 8px; font-weight: 300;
+    color: #bbb; letter-spacing: 2px; text-transform: uppercase;
   }
   .capa-meta-value {
     font-family: Calibri, Candara, sans-serif;
-    font-size: 13px; font-weight: 400;
-    color: rgba(255,255,255,0.85); margin-top: 2px;
+    font-size: 13px; font-weight: 400; color: #0E2040; margin-top: 3px;
   }
-  .capa-footer { padding: 20px 36px; display: flex; justify-content: space-between; align-items: flex-end; }
-  .capa-footer-left { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.3); line-height: 1.6; }
-  .capa-footer-right { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.3); text-align: right; }
 
   /* ─── HEADER INTERNO ─────────────────────────────────────────── */
   .header-interno {
@@ -333,32 +345,68 @@ function gerarHTML(data: any): string {
 
   // ── CAPA ─────────────────────────────────────────────────────────────────
   const capa = tem('capa') ? `<div class="page capa">
-    <div class="capa-top">
-      <div>
+
+    <!-- ─ SIDEBAR ESQUERDA (navy) ─ -->
+    <div class="capa-sidebar" style="background:#0E2040 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+
+      <!-- Logo -->
+      <div style="margin-bottom:auto;text-align:center;">
         ${logoUrl
-          ? `<img src="${logoUrl}" style="height:60px;max-width:180px;object-fit:contain;" alt="Logo"/>`
-          : `<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:2px">ATOM TECH</div>
-             <div style="font-size:10px;font-weight:400;color:#F5A623;letter-spacing:6px;text-transform:uppercase">Energia Solar</div>`
+          ? `<img src="${logoUrl}" style="width:138px;max-height:90px;object-fit:contain;" alt="Logo"/>`
+          : `<div style="font-size:21px;font-weight:900;color:#fff;letter-spacing:2px;text-align:center;line-height:1.1;">ATOM<br><span style="color:#F5A623;">TECH</span></div>
+             <div style="font-size:8px;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:8px;text-align:center;">Energia Solar</div>`
         }
       </div>
-      <div style="font-size:9px;color:rgba(255,255,255,0.3);text-align:right">${emp?.cidade ?? 'Bras\u00edlia'}/DF<br>www.atomtech.tec.br</div>
-    </div>
-    <div class="capa-body">
-      <div class="capa-pretitle">Proposta Comercial</div>
-      <div class="capa-title">ENERGIA<br><span>SOLAR</span><br>PARA VOC\u00ca</div>
-      <div class="capa-divider"></div>
-      <div class="capa-cliente-label">Preparado exclusivamente para</div>
-      <div class="capa-cliente-nome">${cli?.nome ?? ''}</div>
-      <div class="capa-meta">
-        <div><div class="capa-meta-label">Data</div><div class="capa-meta-value">${formatDate(prop?.dataEmissao)}</div></div>
-        <div><div class="capa-meta-label">Validade</div><div class="capa-meta-value">${prop?.dataValidade ? formatDate(prop.dataValidade) : '5 dias'}</div></div>
-        <div><div class="capa-meta-label">Proposta</div><div class="capa-meta-value">${numero}</div></div>
+
+      <!-- Ícone solar (outline apenas, pouca tinta) -->
+      <div style="margin:auto 0;text-align:center;">
+        <svg width="108" height="108" viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="54" cy="54" r="30" stroke="#F5A623" stroke-width="1.8" opacity="0.65"/>
+          <line x1="54" y1="10" x2="54" y2="20" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="54" y1="88" x2="54" y2="98" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="10" y1="54" x2="20" y2="54" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="88" y1="54" x2="98" y2="54" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="23" y1="23" x2="30" y2="30" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="78" y1="78" x2="85" y2="85" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="85" y1="23" x2="78" y2="30" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <line x1="30" y1="78" x2="23" y2="85" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
+          <rect x="34" y="42" width="40" height="26" rx="2" stroke="#F5A623" stroke-width="1.5" opacity="0.55" fill="none"/>
+          <line x1="34" y1="51" x2="74" y2="51" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
+          <line x1="34" y1="60" x2="74" y2="60" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
+          <line x1="47" y1="42" x2="47" y2="68" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
+          <line x1="61" y1="42" x2="61" y2="68" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
+          <line x1="54" y1="68" x2="54" y2="78" stroke="#F5A623" stroke-width="1.2" opacity="0.5"/>
+          <line x1="44" y1="78" x2="64" y2="78" stroke="#F5A623" stroke-width="1.2" opacity="0.5"/>
+        </svg>
+      </div>
+
+      <!-- Contato empresa -->
+      <div style="margin-top:auto;text-align:center;color:rgba(255,255,255,0.32);font-family:Calibri,Candara,sans-serif;font-size:8px;line-height:1.9;">
+        ${emp?.cidade ?? 'Brasília'}/DF<br>
+        ${emp?.email ?? 'contato@atomtech.tec.br'}<br>
+        ${emp?.telefone ?? '(61) 3978-1738'}
       </div>
     </div>
-    <div class="capa-footer">
-      <div class="capa-footer-left">${emp?.endereco ?? 'Edif\u00edcio SIA Centro Empresarial \u2014 Sala 231 B'}<br>${emp?.cidade ?? 'Bras\u00edlia'}/DF</div>
-      <div class="capa-footer-right">${emp?.email ?? 'contato@atomtech.tec.br'}<br>${emp?.telefone ?? '(61) 3978-1738'}</div>
+
+    <!-- ─ ÁREA BRANCA (direita) ─ -->
+    <div class="capa-main">
+      <div class="capa-main-top" style="background:#F5A623 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+      <div class="capa-main-body">
+        <div class="capa-pretitle">Proposta Comercial</div>
+        <div class="capa-title">ENERGIA<br>SOLAR</div>
+        <div class="capa-title-sub">para você</div>
+        <div class="capa-divider" style="background:#F5A623 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+        <div class="capa-cliente-label">Preparado exclusivamente para</div>
+        <div class="capa-cliente-nome">${cli?.nome ?? ''}</div>
+        <div class="capa-meta">
+          <div><div class="capa-meta-label">Data</div><div class="capa-meta-value">${formatDate(prop?.dataEmissao)}</div></div>
+          <div><div class="capa-meta-label">Validade</div><div class="capa-meta-value">${prop?.dataValidade ? formatDate(prop.dataValidade) : '5 dias'}</div></div>
+          <div><div class="capa-meta-label">Proposta</div><div class="capa-meta-value">${numero}</div></div>
+        </div>
+      </div>
+      <div class="capa-main-bottom" style="background:#0E2040 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
     </div>
+
   </div>` : ''
 
   // ── APRESENTAÇÃO ─────────────────────────────────────────────────────────

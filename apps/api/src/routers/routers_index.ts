@@ -14,6 +14,7 @@ import { pdfRouter }       from './pdf.router'
 import { calculoRouter }   from './calculo.router'
 import { usuarioRouter }   from './usuario.router'
 import { textoRouter }     from './texto.router'
+import { finRouter }       from './fin.router'
 
 export const appRouter = router({
   auth:     authRouter,
@@ -26,6 +27,7 @@ export const appRouter = router({
   pdf:      pdfRouter,
   usuario:  usuarioRouter,
   textoInstitucional: textoRouter,
+  fin:      finRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -165,7 +165,7 @@ export function NovaPropostaPage() {
   const [mostrarParcelamento, setMostrarParcela] = useState(false)
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  const { data: clientes }   = trpc.cliente.list.useQuery({ porPagina: 200 })
+  const { data: clientes }   = trpc.cliente.list.useQuery({ porPagina: 200 }, { staleTime: 0 })
   const { data: catModulos } = trpc.equipamento.listModulos.useQuery({ apenasAtivos: true }, { enabled: step === 2 })
   const { data: catInversores } = trpc.equipamento.listInversores.useQuery({ apenasAtivos: true }, { enabled: step === 2 })
 

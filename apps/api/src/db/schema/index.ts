@@ -493,6 +493,9 @@ export const itemServicoProposta = mysqlTable('item_servico_proposta', {
   ordem: int('ordem').default(0).notNull(),
 })
 
+// ─── FINANCEIRO ──────────────────────────────────────────────────────────────
+export * from './fin_schema'
+
 export const propostaRelations = relations(proposta, ({ one, many }) => ({
   cliente: one(cliente, { fields: [proposta.clienteId], references: [cliente.id] }),
   fatura: one(fatura, { fields: [proposta.faturaId], references: [fatura.id] }),

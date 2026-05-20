@@ -377,7 +377,7 @@ export function ClienteDetailPage() {
         </div>
       </div>
 
-      {showEdit && <ClienteFormModal inicial={{ ...FORM_VAZIO, ...cliente, tipoPessoa: cliente.tipoPessoa as any }} onSave={form => updateMutation.mutate({ id: clienteId, ...form } as any)} onClose={() => setShowEdit(false)} loading={updateMutation.isPending} />}
+      {showEdit && <ClienteFormModal inicial={{ ...FORM_VAZIO, ...cliente, tipoPessoa: cliente.tipoPessoa as any }} onSave={form => updateMutation.mutate({ id: clienteId, ...form } as any)} onClose={() => setShowEdit(false)} loading={updateMutation.isLoading} />}
     </PageWrapper>
   )
 }
