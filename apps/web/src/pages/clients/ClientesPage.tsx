@@ -249,6 +249,28 @@ export function ClientesPage() {
   )
 }
 
+// Converte campos null do banco para string vazia (Zod rejeita null em z.string().optional())
+function clienteParaForm(c: any): ClienteForm {
+  return {
+    tipoPessoa:      c.tipoPessoa      ?? 'fisica',
+    nome:            c.nome            ?? '',
+    razaoSocial:     c.razaoSocial     ?? '',
+    cpfCnpj:         c.cpfCnpj         ?? '',
+    nomeResponsavel: c.nomeResponsavel ?? '',
+    telefone:        c.telefone        ?? '',
+    email:           c.email           ?? '',
+    cep:             c.cep             ?? '',
+    endereco:        c.endereco        ?? '',
+    numero:          c.numero          ?? '',
+    complemento:     c.complemento     ?? '',
+    bairro:          c.bairro          ?? '',
+    cidade:          c.cidade          ?? '',
+    estado:          c.estado          ?? '',
+    distribuidora:   c.distribuidora   ?? '',
+    observacoes:     c.observacoes     ?? '',
+  }
+}
+
 // ─── DETALHE DO CLIENTE ─────────────────────────────────────────────
 
 export function ClienteDetailPage() {
@@ -393,7 +415,7 @@ export function ClienteDetailPage() {
         </div>
       </div>
 
-      {showEdit && <ClienteFormModal inicial={{ ...FORM_VAZIO, ...cliente, tipoPessoa: cliente.tipoPessoa as any }} onSave={form => { setUpdateErro(''); updateMutation.mutate({ id: clienteId, ...form } as any) }} onClose={() => { setShowEdit(false); setUpdateErro('') }} loading={updateMutation.isLoading} erro={updateErro} />}
+      {showEdit && <ClienteFormModal inicial={clienteParaForm(cliente)} onSave={form => { setUpdateErro(''); updateMutation.mutate({ id: clienteId, ...form } as any) }} onClose={() => { setShowEdit(false); setUpdateErro('') }} loading={updateMutation.isLoading} erro={updateErro} />}
     </PageWrapper>
   )
 }

@@ -10,23 +10,26 @@ import { cliente, empresa } from '../db/schema'
 
 // ─── SCHEMA DE VALIDAÇÃO ─────────────────────────────────────────────
 
+// Aceita string, undefined OU null (null vira undefined no transform)
+const ns = (max: number) => z.string().max(max).nullable().optional().transform(v => v ?? undefined)
+
 const clienteCreateSchema = z.object({
   tipoPessoa: z.enum(['fisica', 'juridica']).default('fisica'),
   nome: z.string().min(2, 'Nome deve ter ao menos 2 caracteres').max(200),
-  razaoSocial: z.string().max(200).optional(),
-  cpfCnpj: z.string().max(18).optional(),
-  nomeResponsavel: z.string().max(200).optional(),
-  telefone: z.string().max(20).optional(),
-  email: z.string().email('E-mail inválido').max(150).optional().or(z.literal('')),
-  cep: z.string().max(9).optional(),
-  endereco: z.string().max(300).optional(),
-  numero: z.string().max(10).optional(),
-  complemento: z.string().max(100).optional(),
-  bairro: z.string().max(100).optional(),
-  cidade: z.string().max(100).optional(),
-  estado: z.string().max(2).optional(),
-  distribuidora: z.string().max(100).optional(),
-  observacoes: z.string().optional(),
+  razaoSocial:     ns(200),
+  cpfCnpj:         ns(18),
+  nomeResponsavel: ns(200),
+  telefone:        ns(20),
+  email: z.string().email('E-mail inválido').max(150).nullable().optional().transform(v => v || undefined).or(z.literal('').transform(() => undefined)),
+  cep:          ns(9),
+  endereco:     ns(300),
+  numero:       ns(10),
+  complemento:  ns(100),
+  bairro:       ns(100),
+  cidade:       ns(100),
+  estado:       ns(2),
+  distribuidora: ns(100),
+  observacoes: z.string().nullable().optional().transform(v => v ?? undefined),
 })
 
 const clienteUpdateSchema = clienteCreateSchema.partial().extend({
