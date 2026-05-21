@@ -171,9 +171,15 @@ function htmlPagamento(
     ${campo('CHAVE PIX', titulo.pessoaChavePix)}
     ${campo('TIPO DE SERVIÇO / PLANO', titulo.planoNome)}
     ${campo('CENTRO DE CUSTO', titulo.centroNome)}
-    ${campo('DATA DE PAGAMENTO', fmtData(parcela.dataPagamento ?? parcela.vencimento))}
+    ${parcela.dataPagamento
+      ? campo('DATA DE PAGAMENTO', fmtData(parcela.dataPagamento))
+      : campo('DATA DE VENCIMENTO', fmtData(parcela.vencimento))
+    }
     ${campo('PARCELA', `${parcela.numero}ª parcela`)}
-    ${campo('VALOR', fmtBRL(parcela.valorPago ?? parcela.valor))}
+    ${parcela.valorPago
+      ? campo('VALOR PAGO', fmtBRL(parcela.valorPago))
+      : campo('VALOR', fmtBRL(parcela.valor))
+    }
     ${campo('DESCRIÇÃO', titulo.descricao)}
     ${(titulo.observacoes || observacoesExtra) ? campo('OBSERVAÇÕES', observacoesExtra || titulo.observacoes) : ''}
 
@@ -258,7 +264,10 @@ function htmlRecebimento(
     ${campo('VALOR TOTAL', fmtBRL(valorTotal))}
     ${campo('SERVIÇO / PLANO', titulo.planoNome)}
     ${campo('CENTRO DE CUSTO', titulo.centroNome)}
-    ${campo('VALOR RECEBIDO', fmtBRL(valorRecebido))}
+    ${valorRecebido > 0
+      ? campo('VALOR RECEBIDO', fmtBRL(valorRecebido))
+      : campo('VALOR A RECEBER', fmtBRL(valorTotal))
+    }
     ${campo('DESCRIÇÃO', titulo.descricao)}
     ${(titulo.observacoes || observacoesExtra) ? campo('OBSERVAÇÕES', observacoesExtra || titulo.observacoes) : ''}
 
