@@ -46,6 +46,316 @@ function gerarParcelas(qtd: number, valor: number, primeiroVenc: string) {
   })
 }
 
+// ─── MODAL EDITAR LANÇAMENTO ──────────────────────────────────────────────────
+
+function ModalEditarLancamento({
+  tituloId,
+  tipo,
+  onClose,
+  onSuccess,
+}: {
+  tituloId:  number
+  tipo:      'PAGAR' | 'RECEBER'
+  onClose:   () => void
+  onSuccess: () => void
+}) {
+  const { data: byId, isLoading } = (trpc as any).fin.titulo.byId.useQuery({ tituloId }, { staleTime: 0 })
+  const { data: pessoas      = [] } = (trpc as any).fin.pessoa.list.useQuery()
+  const { data: planosContas = [] } = (trpc as any).fin.planoContas.list.useQuery()
+  const { data: centrosCusto = [] } = (trpc as any).fin.centroCusto.list.useQuery()
+
+  const [form, setForm] = useState<any>(null)
+  const [parcelas, setParcelas] = useState<any[]>([])
+  const [erro, setErro] = useState('')
+
+  // Preenche form quando dados chegam
+  useMemo(() => {
+    if (!byId || form) return
+    const t = byId.titulo
+    setForm({
+      descricao:     t.descricao     ?? '',
+      documento:     t.documento     ?? '',
+      pessoaId:      t.pessoaId      ? String(t.pessoaId)      : '',
+      planoContasId: t.planoContasId ? String(t.planoContasId) : '',
+      centroCustoId: t.centroCustoId ? String(t.centroCustoId) : '',
+      emissao:       t.emissao       ? String(t.emissao).slice(0, 10) : hoje(),
+      observacoes:   t.observacoes   ?? '',
+    })
+    setParcelas(byId.parcelas.map((p: any) => ({
+      parcelaId:  p.id,
+      numero:     p.numero,
+      valor:      maskMoeda(Number(p.valor)),
+      vencimento: String(p.vencimento).slice(0, 10),
+      status:     p.status,
+    })))
+  }, [byId])
+
+  const update = (trpc as any).fin.titulo.update.useMutation({
+    onSuccess: () => { onSuccess(); onClose() },
+    onError:   (e: any) => setErro(e.message ?? 'Erro ao salvar'),
+  })
+
+  function salvar() {
+    setErro('')
+    if (!form?.descricao?.trim()) return setErro('Descrição é obrigatória')
+    const parcelasPayload = parcelas
+      .filter(p => p.status === 'ABERTA')
+      .map(p => {
+        const v = parseMoeda(p.valor)
+        if (v <= 0) { setErro(`Valor inválido na parcela ${p.numero}`); return null }
+        return { parcelaId: p.parcelaId, valor: v, vencimento: p.vencimento }
+      })
+    if (parcelasPayload.some(p => p === null)) return
+
+    update.mutate({
+      tituloId:      tituloId,
+      descricao:     form.descricao.trim(),
+      documento:     form.documento  || undefined,
+      pessoaId:      form.pessoaId      ? parseInt(form.pessoaId)      : undefined,
+      planoContasId: form.planoContasId ? parseInt(form.planoContasId) : undefined,
+      centroCustoId: form.centroCustoId ? parseInt(form.centroCustoId) : undefined,
+      observacoes:   form.observacoes   || undefined,
+      emissao:       form.emissao,
+      parcelas:      parcelasPayload.filter(Boolean),
+    })
+  }
+
+  const pessoasFiltradas = pessoas.filter((p: any) => tipo === 'PAGAR' ? p.isFornecedor : p.isCliente)
+  const planosFiltrados  = planosContas.filter((p: any) => p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO')
+  const label = tipo === 'PAGAR' ? 'Pagar' : 'Receber'
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={`✏ Editar Conta a ${label}`}
+      width={640}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn disabled={isLoading || update.isLoading || !form} onClick={salvar}>
+            {update.isLoading ? 'Salvando...' : 'Salvar Alterações'}
+          </Btn>
+        </>
+      }
+    >
+      {isLoading || !form ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><Spinner /></div>
+      ) : (
+        <>
+          {erro && <div style={{ marginBottom: 16 }}><Alert type="danger">{erro}</Alert></div>}
+
+          {/* Campos do título */}
+          <FormRow>
+            <Input label="Descrição *" value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} />
+            <Input label="Documento / NF" value={form.documento} onChange={e => setForm({ ...form, documento: e.target.value })} />
+          </FormRow>
+
+          <FormRow>
+            <Select
+              label={tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'}
+              value={form.pessoaId}
+              onChange={e => setForm({ ...form, pessoaId: e.target.value })}
+              placeholder="— Nenhum —"
+              options={pessoasFiltradas.map((p: any) => ({ value: String(p.id), label: p.nome }))}
+            />
+            <Select
+              label="Plano de Contas"
+              value={form.planoContasId}
+              onChange={e => setForm({ ...form, planoContasId: e.target.value })}
+              placeholder="— Nenhum —"
+              options={planosFiltrados.map((p: any) => ({ value: String(p.id), label: `${p.codigo} — ${p.nome}` }))}
+            />
+          </FormRow>
+
+          <FormRow>
+            <Select
+              label="Centro de Custo"
+              value={form.centroCustoId}
+              onChange={e => setForm({ ...form, centroCustoId: e.target.value })}
+              placeholder="— Nenhum —"
+              options={centrosCusto.map((c: any) => ({ value: String(c.id), label: `${c.codigo} — ${c.nome}` }))}
+            />
+            <Input label="Data de Emissão" type="date" value={form.emissao} onChange={e => setForm({ ...form, emissao: e.target.value })} />
+          </FormRow>
+
+          <div style={{ marginBottom: 16 }}>
+            <Textarea
+              label="Observações"
+              value={form.observacoes}
+              onChange={e => setForm({ ...form, observacoes: e.target.value })}
+              style={{ minHeight: 60 }}
+            />
+          </div>
+
+          {/* Parcelas */}
+          <div style={{ borderTop: '1px solid ' + C.border, paddingTop: 16 }}>
+            <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+              Parcelas
+            </p>
+            {parcelas.map((p, i) => {
+              const isPaga = p.status !== 'ABERTA'
+              return (
+                <div key={p.parcelaId} style={{
+                  display: 'grid', gridTemplateColumns: '36px 1fr 1fr auto',
+                  gap: 8, alignItems: 'flex-end', marginBottom: 8,
+                  opacity: isPaga ? 0.6 : 1,
+                }}>
+                  {/* Número */}
+                  <div style={{ paddingBottom: 8, color: C.textMuted, fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
+                    {p.numero}
+                  </div>
+
+                  {/* Valor */}
+                  {isPaga ? (
+                    <div>
+                      <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Valor</div>
+                      <div style={{ padding: '8px 12px', background: C.bg, borderRadius: 6, border: '1px solid ' + C.border, fontSize: 13, color: C.textMuted }}>
+                        {maskMoeda(Number(parseMoeda(p.valor)))}
+                      </div>
+                    </div>
+                  ) : (
+                    <InputMoeda
+                      label="Valor *"
+                      value={p.valor}
+                      onChange={v => setParcelas(prev => prev.map((x, j) => j === i ? { ...x, valor: v } : x))}
+                    />
+                  )}
+
+                  {/* Vencimento */}
+                  {isPaga ? (
+                    <div>
+                      <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Vencimento</div>
+                      <div style={{ padding: '8px 12px', background: C.bg, borderRadius: 6, border: '1px solid ' + C.border, fontSize: 13, color: C.textMuted }}>
+                        {fmtData(p.vencimento)}
+                      </div>
+                    </div>
+                  ) : (
+                    <Input
+                      label="Vencimento *"
+                      type="date"
+                      value={p.vencimento}
+                      onChange={e => setParcelas(prev => prev.map((x, j) => j === i ? { ...x, vencimento: e.target.value } : x))}
+                    />
+                  )}
+
+                  {/* Badge de status */}
+                  <div style={{ paddingBottom: 8 }}>
+                    <StatusBadge s={isPaga ? p.status : 'ABERTA'} />
+                  </div>
+                </div>
+              )
+            })}
+            {parcelas.some(p => p.status !== 'ABERTA') && (
+              <p style={{ color: C.textMuted, fontSize: 11, margin: '4px 0 0' }}>
+                🔒 Parcelas pagas/canceladas não podem ser alteradas.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </Modal>
+  )
+}
+
+// ─── MODAL EDITAR TRANSFERÊNCIA ────────────────────────────────────────────────
+
+function ModalEditarTransferencia({
+  transferencia,
+  contas,
+  onClose,
+  onSuccess,
+}: {
+  transferencia: any
+  contas:        any[]
+  onClose:       () => void
+  onSuccess:     () => void
+}) {
+  const [form, setForm] = useState({
+    contaOrigemId:  String(transferencia.contaOrigemId),
+    contaDestinoId: String(transferencia.contaDestinoId),
+    valor:          maskMoeda(Number(transferencia.valor)),
+    data:           String(transferencia.data).slice(0, 10),
+    descricao:      transferencia.descricao ?? '',
+  })
+  const [erro, setErro] = useState('')
+
+  const update = (trpc as any).fin.transferencia.update.useMutation({
+    onSuccess: () => { onSuccess(); onClose() },
+    onError:   (e: any) => setErro(e.message ?? 'Erro ao salvar'),
+  })
+
+  function salvar() {
+    setErro('')
+    if (!form.contaOrigemId)  return setErro('Selecione a conta de origem')
+    if (!form.contaDestinoId) return setErro('Selecione a conta de destino')
+    if (form.contaOrigemId === form.contaDestinoId) return setErro('Origem e destino devem ser diferentes')
+    const valor = parseMoeda(form.valor)
+    if (valor <= 0) return setErro('Valor deve ser maior que zero')
+
+    update.mutate({
+      id:             transferencia.id,
+      contaOrigemId:  parseInt(form.contaOrigemId),
+      contaDestinoId: parseInt(form.contaDestinoId),
+      valor,
+      data:      form.data,
+      descricao: form.descricao.trim() || undefined,
+    })
+  }
+
+  const contaOptions = contas.map((c: any) => ({ value: String(c.id), label: c.nome }))
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="✏ Editar Transferência"
+      width={460}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn disabled={update.isLoading} onClick={salvar}>
+            {update.isLoading ? 'Salvando...' : 'Salvar Alterações'}
+          </Btn>
+        </>
+      }
+    >
+      {erro && <div style={{ marginBottom: 16 }}><Alert type="danger">{erro}</Alert></div>}
+
+      <FormRow cols={1}>
+        <Select
+          label="Conta de Origem (débito) *"
+          value={form.contaOrigemId}
+          onChange={e => setForm({ ...form, contaOrigemId: e.target.value })}
+          placeholder="— De qual conta —"
+          options={contaOptions}
+        />
+      </FormRow>
+      <FormRow cols={1}>
+        <Select
+          label="Conta de Destino (crédito) *"
+          value={form.contaDestinoId}
+          onChange={e => setForm({ ...form, contaDestinoId: e.target.value })}
+          placeholder="— Para qual conta —"
+          options={contaOptions.filter(o => o.value !== form.contaOrigemId)}
+        />
+      </FormRow>
+      <FormRow>
+        <InputMoeda label="Valor *" value={form.valor} onChange={v => setForm({ ...form, valor: v })} />
+        <Input label="Data *" type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} />
+      </FormRow>
+      <FormRow cols={1}>
+        <Input
+          label="Descrição"
+          value={form.descricao}
+          onChange={e => setForm({ ...form, descricao: e.target.value })}
+          placeholder="Motivo da transferência (opcional)"
+        />
+      </FormRow>
+    </Modal>
+  )
+}
+
 // ─── MODAL COMPROVANTE ─────────────────────────────────────────────────────────
 
 function ModalComprovante({
@@ -242,6 +552,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [dataIni, setDataIni]           = useState(mesAtualIni())
   const [dataFim, setDataFim]           = useState('')
   const [showNovo, setShowNovo]         = useState(false)
+  const [editandoTituloId, setEditandoTituloId]   = useState<number | null>(null)
   const [baixandoParcela, setBaixandoParcela]     = useState<any>(null)
   const [comprovanteRow, setComprovanteRow]       = useState<any>(null)
   const [confirmDelete, setConfirmDelete]         = useState<any>(null)
@@ -388,6 +699,13 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             status: <StatusBadge s={r.statusDisplay} />,
             acoes: (
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                {/* Editar */}
+                <Btn
+                  size="sm" variant="ghost"
+                  onClick={() => setEditandoTituloId(r.tituloId)}
+                  title="Editar lançamento"
+                >✏</Btn>
+
                 {/* Comprovante */}
                 <Btn
                   size="sm" variant="ghost"
@@ -454,6 +772,16 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
           tituloId={comprovanteRow.tituloId}
           parcelaAtual={comprovanteRow}
           onClose={() => setComprovanteRow(null)}
+        />
+      )}
+
+      {/* Modal: Editar Lançamento */}
+      {editandoTituloId && (
+        <ModalEditarLancamento
+          tituloId={editandoTituloId}
+          tipo={tipo}
+          onClose={() => setEditandoTituloId(null)}
+          onSuccess={() => { setEditandoTituloId(null); refetch() }}
         />
       )}
 
@@ -760,6 +1088,7 @@ function TabTransferencias() {
   const [dataIni, setDataIni]             = useState(mesAtualIni())
   const [dataFim, setDataFim]             = useState('')
   const [showNova, setShowNova]           = useState(false)
+  const [editandoTransf, setEditandoTransf] = useState<any>(null)
   const [confirmDelete, setConfirmDelete] = useState<any>(null)
   const [deleteErro, setDeleteErro]       = useState('')
   const [erro, setErro]                   = useState('')
@@ -812,7 +1141,7 @@ function TabTransferencias() {
             { key: 'destino',   label: 'Para' },
             { key: 'descricao', label: 'Descrição' },
             { key: 'valor',     label: 'Valor', align: 'right', width: '120px' },
-            { key: 'acoes',     label: '',      align: 'right', width: '60px' },
+            { key: 'acoes',     label: '',      align: 'right', width: '90px' },
           ]}
           rows={transferencias.map((t: any) => ({
             data:      <span style={{ color: C.textMuted, fontSize: 12 }}>{fmtData(t.data)}</span>,
@@ -823,11 +1152,18 @@ function TabTransferencias() {
               : <span style={{ color: C.textDim }}>—</span>,
             valor: <span style={{ fontWeight: 700, color: C.text }}>{fmtBRLFull(Number(t.valor))}</span>,
             acoes: (
-              <Btn
-                size="sm" variant="danger"
-                onClick={() => { setDeleteErro(''); setConfirmDelete(t) }}
-                title="Excluir transferência"
-              >✕</Btn>
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <Btn
+                  size="sm" variant="ghost"
+                  onClick={() => setEditandoTransf(t)}
+                  title="Editar transferência"
+                >✏</Btn>
+                <Btn
+                  size="sm" variant="danger"
+                  onClick={() => { setDeleteErro(''); setConfirmDelete(t) }}
+                  title="Excluir transferência"
+                >✕</Btn>
+              </div>
             ),
           }))}
           emptyMessage="Nenhuma transferência no período"
@@ -840,6 +1176,16 @@ function TabTransferencias() {
           contas={contas}
           onClose={() => setShowNova(false)}
           onSuccess={() => { setShowNova(false); refetch() }}
+        />
+      )}
+
+      {/* Modal: Editar Transferência */}
+      {editandoTransf && (
+        <ModalEditarTransferencia
+          transferencia={editandoTransf}
+          contas={contas}
+          onClose={() => setEditandoTransf(null)}
+          onSuccess={() => { setEditandoTransf(null); refetch() }}
         />
       )}
 

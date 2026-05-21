@@ -532,6 +532,77 @@ const tituloRouter = router({
       return { tituloId, ok: true }
     }),
 
+  // Atualiza título + parcelas ABERTAS
+  update: protectedProcedure
+    .input(z.object({
+      tituloId:      z.number(),
+      descricao:     z.string().min(1),
+      documento:     z.string().nullish(),
+      pessoaId:      z.number().nullish(),
+      planoContasId: z.number().nullish(),
+      centroCustoId: z.number().nullish(),
+      observacoes:   z.string().nullish(),
+      emissao:       z.string(),
+      parcelas: z.array(z.object({
+        parcelaId:  z.number(),
+        valor:      z.number().positive(),
+        vencimento: z.string(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [titulo] = await ctx.db
+        .select({ id: finTitulo.id })
+        .from(finTitulo)
+        .where(and(eq(finTitulo.id, input.tituloId), eq(finTitulo.empresaId, empId)))
+        .limit(1)
+
+      if (!titulo) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      // Calcula novo valorOriginal: soma de todas as parcelas (editadas + pagas intactas)
+      const todasParcelas = await ctx.db
+        .select({ id: finParcela.id, status: finParcela.status, valor: finParcela.valor })
+        .from(finParcela)
+        .where(eq(finParcela.tituloId, input.tituloId))
+
+      const editMap = new Map(input.parcelas.map(p => [p.parcelaId, p]))
+      const novoTotal = todasParcelas.reduce((sum, p) => {
+        const edit = editMap.get(p.id)
+        return sum + Number(edit ? edit.valor : p.valor)
+      }, 0)
+
+      // Atualiza cabeçalho do título
+      await ctx.db
+        .update(finTitulo)
+        .set({
+          descricao:     input.descricao,
+          documento:     input.documento ?? null,
+          pessoaId:      input.pessoaId ?? null,
+          planoContasId: input.planoContasId ?? null,
+          centroCustoId: input.centroCustoId ?? null,
+          observacoes:   input.observacoes ?? null,
+          emissao:       input.emissao as any,
+          valorOriginal: novoTotal.toFixed(2),
+          updatedAt:     new Date(),
+        })
+        .where(eq(finTitulo.id, input.tituloId))
+
+      // Atualiza apenas parcelas ABERTAS (nunca sobrescreve PAGA/CANCELADA)
+      for (const p of input.parcelas) {
+        await ctx.db
+          .update(finParcela)
+          .set({ valor: p.valor.toFixed(2), vencimento: p.vencimento as any })
+          .where(and(
+            eq(finParcela.id, p.parcelaId),
+            eq(finParcela.tituloId, input.tituloId),
+            eq(finParcela.status, 'ABERTA'),
+          ))
+      }
+
+      return { ok: true }
+    }),
+
   // Exclui título (e cascata parcelas) — requer senha de administrador
   delete: protectedProcedure
     .input(z.object({ tituloId: z.number(), senhaAdmin: z.string() }))
@@ -722,6 +793,43 @@ const transferenciaRouter = router({
         data:           input.data as any,
         descricao:      input.descricao ?? null,
       })
+
+      return { ok: true }
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id:             z.number(),
+      contaOrigemId:  z.number(),
+      contaDestinoId: z.number(),
+      valor:          z.number().positive(),
+      data:           z.string(),
+      descricao:      z.string().nullish(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      if (input.contaOrigemId === input.contaDestinoId)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Origem e destino devem ser contas diferentes' })
+
+      const [transf] = await ctx.db
+        .select({ id: finTransferencia.id })
+        .from(finTransferencia)
+        .where(and(eq(finTransferencia.id, input.id), eq(finTransferencia.empresaId, empId)))
+        .limit(1)
+
+      if (!transf) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      await ctx.db
+        .update(finTransferencia)
+        .set({
+          contaOrigemId:  input.contaOrigemId,
+          contaDestinoId: input.contaDestinoId,
+          valor:          input.valor.toFixed(2),
+          data:           input.data as any,
+          descricao:      input.descricao ?? null,
+        })
+        .where(eq(finTransferencia.id, input.id))
 
       return { ok: true }
     }),

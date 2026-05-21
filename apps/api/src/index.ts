@@ -9,17 +9,17 @@ const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
 
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:5174',
   'https://atomtech-solar-web.vercel.app',
   'https://atomtech-financeiro.vercel.app',
+  'https://financeiro-two-mu.vercel.app',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_FIN_URL,
 ].filter(Boolean) as string[]
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    // Permite qualquer porta localhost em desenvolvimento
+    if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true)
     } else {
       callback(new Error('Not allowed by CORS'))
