@@ -314,6 +314,21 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
   }
 })
 
+// ── Reset senha admin (temporário) ───────────────────────────────────────────
+app.get('/reset-senha-admin', async (_, res) => {
+  try {
+    const { createHash } = await import('crypto')
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const hash = createHash('sha256').update('Atom@2026' + 'atomtech_salt').digest('hex')
+    await conn.execute('UPDATE usuario SET senha_hash = ? WHERE email = ?', [hash, 'eryelber@atomtech.tec.br'])
+    await conn.end()
+    res.json({ ok: true, message: 'Senha redefinida com sucesso' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {
