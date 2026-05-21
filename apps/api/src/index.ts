@@ -314,57 +314,6 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
   }
 })
 
-// ── Migração de dados locais para produção (temporário) ───────────────────────
-app.get('/run-migration-dados-iniciais', async (_, res) => {
-  try {
-    const mysql2 = await import('mysql2/promise')
-    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
-
-    // Pessoas
-    await conn.execute(`
-      INSERT IGNORE INTO fin_pessoa
-        (id, empresa_id, tipo_pessoa, nome, fantasia, cpf_cnpj, email, telefone,
-         is_cliente, is_fornecedor, cep, logradouro, numero, complemento,
-         bairro, cidade, estado, regime, observacoes, ativo)
-      VALUES
-        (1, 1, 'JURIDICA', 'HORUS S/A DISTRIBUÍDORA DE SOLUÇÕES TECNOLÓGICAS', 'HORUS TELECOM',
-         '02.677.045/0001-20', NULL, '(61) 3486-8000', 0, 1,
-         '71736-102', 'Quadra 1 Conjunto B Lote 15', 'sn', 'Núcleo Bandeirante',
-         'Setor de Indústrias Bernardo Sayão (Núcleo Bandeirante)', 'Brasília', 'DF',
-         'nao_se_aplica', 'FORNECEDOR PRODUTOS INTELBRÁS', 1),
-        (2, 1, 'JURIDICA', 'IMPETUS ENERGY E BUSINESS LTDA', 'IMPETUS ENERGY',
-         '33.282.877/0001-71', 'manoel@impetusenergy.com.br', '(61) 99626-7115', 1, 0,
-         '73006-045', 'Quadra 8 Comércio Local 17 Sala 105', 'sn', 'Edifício Teodoro Freire',
-         'Sobradinho', 'Brasília', 'DF', NULL, NULL, 1)
-    `)
-
-    // Títulos
-    await conn.execute(`
-      INSERT IGNORE INTO fin_titulo
-        (id, empresa_id, tipo, descricao, documento, pessoa_id, plano_contas_id,
-         centro_custo_id, valor_original, emissao, ativo)
-      VALUES
-        (1, 1, 'PAGAR',   'TESTES', 'NT2022', 1, 13, 3, 10.00, '2026-05-21', 1),
-        (2, 1, 'RECEBER', 'TESTE',  NULL,     2,  3, 3, 10.00, '2026-05-21', 1)
-    `)
-
-    // Parcelas
-    await conn.execute(`
-      INSERT IGNORE INTO fin_parcela
-        (id, titulo_id, numero, valor, vencimento, status, juros, multa, desconto)
-      VALUES
-        (1, 1, 1, 10.00, '2026-06-21', 'ABERTA', 0, 0, 0),
-        (2, 2, 1, 10.00, '2026-05-21', 'ABERTA', 0, 0, 0)
-    `)
-
-    await conn.end()
-    res.json({ ok: true, message: 'Dados migrados com sucesso: 2 pessoas, 2 títulos, 2 parcelas' })
-  } catch (e: any) {
-    console.error(e)
-    res.status(500).json({ ok: false, error: e.message })
-  }
-})
-
 async function main() {
   await testConnection()
   app.listen(PORT, () => {
