@@ -4,7 +4,7 @@ import {
   PageWrapper, SectionHeader, Card, Btn, Table, Badge, Modal,
   Input, Select, InputMoeda, FormRow, Spinner, EmptyState, C, Alert,
 } from '../../components/ui'
-import { fmtBRLFull } from '../../lib/masks'
+import { fmtBRLFull, maskMoeda } from '../../lib/masks'
 
 const TIPO_OPTIONS = [
   { value: 'CORRENTE', label: 'Conta Corrente' },
@@ -41,7 +41,7 @@ export function ContasBancariasPage() {
     setForm({
       nome: c.nome, tipo: c.tipo, banco: c.banco ?? '',
       agencia: c.agencia ?? '', conta: c.conta ?? '',
-      saldoInicial: c.saldoInicial?.toString() ?? '', ativo: c.ativo,
+      saldoInicial: maskMoeda(Number(c.saldoInicial ?? 0)), ativo: c.ativo,
     })
     setEditId(c.id); setErro(''); setModal(true)
   }
