@@ -10,6 +10,7 @@ import {
 } from '../components/ui'
 import { parseMoeda, fmtBRLFull, maskMoeda } from '../lib/masks'
 import { fmtData } from '../lib/utils'
+import { gerarComprovantePdf } from '../lib/gerarComprovantePdf'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,158 @@ function gerarParcelas(qtd: number, valor: number, primeiroVenc: string) {
     d.setMonth(d.getMonth() + i)
     return { numero: i + 1, valor: v, vencimento: d.toISOString().slice(0, 10) }
   })
+}
+
+// ─── MODAL COMPROVANTE ─────────────────────────────────────────────────────────
+
+function ModalComprovante({
+  tituloId,
+  parcelaAtual,
+  onClose,
+}: {
+  tituloId:     number
+  parcelaAtual: any   // dados da linha clicada (para PAGAR)
+  onClose:      () => void
+}) {
+  const [obs, setObs] = useState('')
+
+  const { data: byId, isLoading: l1 } = (trpc as any).fin.titulo.byId.useQuery({ tituloId })
+  const { data: empresa, isLoading: l2 } = (trpc as any).fin.empresa.minha.useQuery()
+
+  const isLoading = l1 || l2
+
+  function imprimir() {
+    if (!byId || !empresa) return
+    gerarComprovantePdf({
+      tipo:          byId.titulo.tipo,
+      empresa,
+      titulo:        byId.titulo,
+      parcelas:      byId.parcelas,
+      parcelaAtual:  byId.titulo.tipo === 'PAGAR' ? {
+        id:            parcelaAtual.parcelaId,
+        numero:        parcelaAtual.numero,
+        valor:         parcelaAtual.valor,
+        vencimento:    parcelaAtual.vencimento,
+        status:        parcelaAtual.statusDisplay ?? parcelaAtual.status,
+        dataPagamento: parcelaAtual.dataPagamento,
+        valorPago:     parcelaAtual.valorPago,
+      } : undefined,
+      observacoesExtra: obs,
+    })
+  }
+
+  const tipo = parcelaAtual?.tipo ?? byId?.titulo?.tipo ?? 'PAGAR'
+  const titleLabel = tipo === 'PAGAR' ? 'Comprovante de Pagamento' : 'Comprovante de Recebimento'
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={`🖨 ${titleLabel}`}
+      width={560}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn disabled={isLoading} onClick={imprimir}>
+            {isLoading ? 'Carregando...' : '🖨 Gerar / Imprimir PDF'}
+          </Btn>
+        </>
+      }
+    >
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><Spinner /></div>
+      ) : (
+        <>
+          {/* Resumo */}
+          <div style={{ background: C.bg, borderRadius: 8, border: '1px solid ' + C.border, padding: '12px 14px', marginBottom: 20 }}>
+            <p style={{ margin: 0, color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {titleLabel}
+            </p>
+            <p style={{ margin: '4px 0 0', color: C.text, fontSize: 14, fontWeight: 600 }}>
+              {byId?.titulo?.descricao}
+            </p>
+            <p style={{ margin: '4px 0 0', color: C.textMuted, fontSize: 12 }}>
+              {byId?.titulo?.pessoaNome && <span>{byId.titulo.pessoaNome} &nbsp;·&nbsp; </span>}
+              {byId?.parcelas?.length ?? 0} parcela(s)
+              {tipo === 'PAGAR' && parcelaAtual && (
+                <> &nbsp;·&nbsp; Parcela {parcelaAtual.numero} — {fmtData(parcelaAtual.vencimento)} — {fmtBRLFull(Number(parcelaAtual.valor))}</>
+              )}
+            </p>
+          </div>
+
+          {/* Observações extras para o comprovante */}
+          <Textarea
+            label="Observações para incluir no comprovante (opcional)"
+            value={obs}
+            onChange={e => setObs(e.target.value)}
+            placeholder="Ex: Referente ao serviço executado em 05/2026, conforme proposta..."
+            style={{ minHeight: 80 }}
+          />
+          <p style={{ color: C.textMuted, fontSize: 11, margin: '6px 0 0' }}>
+            As observações serão impressas no comprovante. Deixe em branco para usar as observações do lançamento.
+          </p>
+        </>
+      )}
+    </Modal>
+  )
+}
+
+// ─── MODAL EXCLUIR COM SENHA ───────────────────────────────────────────────────
+
+function ModalSenhaAdmin({
+  titulo: textoTitulo,
+  descricao,
+  onConfirmar,
+  isLoading,
+  erro,
+  onClose,
+}: {
+  titulo:      string
+  descricao:   string
+  onConfirmar: (senha: string) => void
+  isLoading:   boolean
+  erro:        string
+  onClose:     () => void
+}) {
+  const [senha, setSenha] = useState('')
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title={textoTitulo}
+      width={420}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn
+            variant="danger"
+            disabled={isLoading || !senha}
+            onClick={() => onConfirmar(senha)}
+          >
+            {isLoading ? 'Excluindo...' : 'Excluir'}
+          </Btn>
+        </>
+      }
+    >
+      <p style={{ color: C.text, margin: '0 0 16px' }}>{descricao}</p>
+
+      {erro && <div style={{ marginBottom: 12 }}><Alert type="danger">{erro}</Alert></div>}
+
+      <Input
+        label="Senha do Administrador *"
+        type="password"
+        value={senha}
+        onChange={e => setSenha(e.target.value)}
+        placeholder="Digite a senha de administrador"
+        onKeyDown={e => { if (e.key === 'Enter' && senha) onConfirmar(senha) }}
+        autoFocus
+      />
+      <p style={{ color: C.textMuted, fontSize: 11, margin: '6px 0 0' }}>
+        A exclusão requer autorização do administrador do sistema.
+      </p>
+    </Modal>
+  )
 }
 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
@@ -89,8 +242,10 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [dataIni, setDataIni]           = useState(mesAtualIni())
   const [dataFim, setDataFim]           = useState('')
   const [showNovo, setShowNovo]         = useState(false)
-  const [baixandoParcela, setBaixandoParcela] = useState<any>(null)
-  const [confirmDelete, setConfirmDelete]     = useState<any>(null)
+  const [baixandoParcela, setBaixandoParcela]     = useState<any>(null)
+  const [comprovanteRow, setComprovanteRow]       = useState<any>(null)
+  const [confirmDelete, setConfirmDelete]         = useState<any>(null)
+  const [deleteErro, setDeleteErro]               = useState('')
   const [erro, setErro]                 = useState('')
 
   const { data: rows = [], isLoading, refetch } = (trpc as any).fin.titulo.list.useQuery({
@@ -106,8 +261,8 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const { data: centrosCusto = [] } = (trpc as any).fin.centroCusto.list.useQuery()
 
   const deletarTitulo = (trpc as any).fin.titulo.delete.useMutation({
-    onSuccess: () => { setConfirmDelete(null); setErro(''); refetch() },
-    onError:   (e: any) => setErro(e.message ?? 'Erro ao excluir'),
+    onSuccess: () => { setConfirmDelete(null); setDeleteErro(''); setErro(''); refetch() },
+    onError:   (e: any) => setDeleteErro(e.message ?? 'Erro ao excluir'),
   })
 
   const estornar = (trpc as any).fin.parcela.estornar.useMutation({
@@ -203,7 +358,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             { key: 'documento',  label: 'Documento',  width: '110px' },
             { key: 'valor',      label: 'Valor',      align: 'right', width: '115px' },
             { key: 'status',     label: 'Status',     align: 'center', width: '110px' },
-            { key: 'acoes',      label: '',           align: 'right',  width: '105px' },
+            { key: 'acoes',      label: '',           align: 'right',  width: '135px' },
           ]}
           rows={rows.map((r: any) => ({
             vencimento: (
@@ -232,10 +387,20 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             ),
             status: <StatusBadge s={r.statusDisplay} />,
             acoes: (
-              <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                {/* Comprovante */}
+                <Btn
+                  size="sm" variant="ghost"
+                  onClick={() => setComprovanteRow(r)}
+                  title="Gerar comprovante"
+                >🖨</Btn>
+
+                {/* Baixar */}
                 {r.statusDisplay !== 'PAGA' && r.statusDisplay !== 'CANCELADA' && (
                   <Btn size="sm" variant="success" onClick={() => setBaixandoParcela(r)} title="Registrar pagamento">✓</Btn>
                 )}
+
+                {/* Estornar */}
                 {r.status === 'PAGA' && (
                   <Btn
                     size="sm" variant="ghost"
@@ -244,10 +409,12 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
                     title="Estornar pagamento"
                   >↩</Btn>
                 )}
+
+                {/* Excluir */}
                 {r.status !== 'PAGA' && (
                   <Btn
                     size="sm" variant="danger"
-                    onClick={() => { setErro(''); setConfirmDelete({ tituloId: r.tituloId, descricao: r.descricao }) }}
+                    onClick={() => { setDeleteErro(''); setConfirmDelete({ tituloId: r.tituloId, descricao: r.descricao }) }}
                     title="Excluir título"
                   >✕</Btn>
                 )}
@@ -281,36 +448,25 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
         />
       )}
 
-      {/* Modal: Confirmar exclusão */}
+      {/* Modal: Comprovante */}
+      {comprovanteRow && (
+        <ModalComprovante
+          tituloId={comprovanteRow.tituloId}
+          parcelaAtual={comprovanteRow}
+          onClose={() => setComprovanteRow(null)}
+        />
+      )}
+
+      {/* Modal: Confirmar exclusão com senha admin */}
       {confirmDelete && (
-        <Modal
-          open={true}
-          onClose={() => setConfirmDelete(null)}
-          title="Confirmar Exclusão"
-          width={420}
-          footer={
-            <>
-              <Btn variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Btn>
-              <Btn
-                variant="danger"
-                disabled={deletarTitulo.isLoading}
-                onClick={() => deletarTitulo.mutate({ tituloId: confirmDelete.tituloId })}
-              >
-                {deletarTitulo.isLoading ? 'Excluindo...' : 'Excluir'}
-              </Btn>
-            </>
-          }
-        >
-          <p style={{ color: C.text, margin: '0 0 8px' }}>
-            Excluir o título <strong>"{confirmDelete.descricao}"</strong> e todas as suas parcelas?
-          </p>
-          <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>Esta ação não pode ser desfeita.</p>
-          {deletarTitulo.error && (
-            <div style={{ marginTop: 12 }}>
-              <Alert type="danger">{(deletarTitulo.error as any)?.message}</Alert>
-            </div>
-          )}
-        </Modal>
+        <ModalSenhaAdmin
+          titulo="Excluir Lançamento"
+          descricao={`Excluir o título "${confirmDelete.descricao}" e todas as suas parcelas? Esta ação não pode ser desfeita.`}
+          isLoading={deletarTitulo.isLoading}
+          erro={deleteErro}
+          onClose={() => { setConfirmDelete(null); setDeleteErro('') }}
+          onConfirmar={senha => deletarTitulo.mutate({ tituloId: confirmDelete.tituloId, senhaAdmin: senha })}
+        />
       )}
     </>
   )
@@ -601,11 +757,12 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
 // ─── TAB TRANSFERÊNCIAS ───────────────────────────────────────────────────────
 
 function TabTransferencias() {
-  const [dataIni, setDataIni]           = useState(mesAtualIni())
-  const [dataFim, setDataFim]           = useState('')
-  const [showNova, setShowNova]         = useState(false)
+  const [dataIni, setDataIni]             = useState(mesAtualIni())
+  const [dataFim, setDataFim]             = useState('')
+  const [showNova, setShowNova]           = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<any>(null)
-  const [erro, setErro]                 = useState('')
+  const [deleteErro, setDeleteErro]       = useState('')
+  const [erro, setErro]                   = useState('')
 
   const { data: transferencias = [], isLoading, refetch } = (trpc as any).fin.transferencia.list.useQuery({
     dataIni: dataIni || undefined,
@@ -615,8 +772,8 @@ function TabTransferencias() {
   const { data: contas = [] } = (trpc as any).fin.conta.list.useQuery()
 
   const deletar = (trpc as any).fin.transferencia.delete.useMutation({
-    onSuccess: () => { setConfirmDelete(null); setErro(''); refetch() },
-    onError:   (e: any) => setErro(e.message ?? 'Erro ao excluir'),
+    onSuccess: () => { setConfirmDelete(null); setDeleteErro(''); setErro(''); refetch() },
+    onError:   (e: any) => setDeleteErro(e.message ?? 'Erro ao excluir'),
   })
 
   const total = transferencias.reduce((s: number, t: any) => s + Number(t.valor), 0)
@@ -668,7 +825,7 @@ function TabTransferencias() {
             acoes: (
               <Btn
                 size="sm" variant="danger"
-                onClick={() => { setErro(''); setConfirmDelete(t) }}
+                onClick={() => { setDeleteErro(''); setConfirmDelete(t) }}
                 title="Excluir transferência"
               >✕</Btn>
             ),
@@ -686,29 +843,16 @@ function TabTransferencias() {
         />
       )}
 
-      {/* Modal: Confirmar exclusão */}
+      {/* Modal: Confirmar exclusão com senha admin */}
       {confirmDelete && (
-        <Modal
-          open={true}
-          onClose={() => setConfirmDelete(null)}
-          title="Confirmar Exclusão"
-          width={400}
-          footer={
-            <>
-              <Btn variant="ghost" onClick={() => setConfirmDelete(null)}>Cancelar</Btn>
-              <Btn variant="danger" disabled={deletar.isLoading} onClick={() => deletar.mutate({ id: confirmDelete.id })}>
-                {deletar.isLoading ? 'Excluindo...' : 'Excluir'}
-              </Btn>
-            </>
-          }
-        >
-          <p style={{ color: C.text, margin: '0 0 6px' }}>
-            Excluir transferência de{' '}
-            <strong>{fmtBRLFull(Number(confirmDelete.valor))}</strong>{' '}
-            em <strong>{fmtData(confirmDelete.data)}</strong>?
-          </p>
-          <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>Esta ação não pode ser desfeita.</p>
-        </Modal>
+        <ModalSenhaAdmin
+          titulo="Excluir Transferência"
+          descricao={`Excluir a transferência de ${fmtBRLFull(Number(confirmDelete.valor))} em ${fmtData(confirmDelete.data)}? Esta ação não pode ser desfeita.`}
+          isLoading={deletar.isLoading}
+          erro={deleteErro}
+          onClose={() => { setConfirmDelete(null); setDeleteErro('') }}
+          onConfirmar={senha => deletar.mutate({ id: confirmDelete.id, senhaAdmin: senha })}
+        />
       )}
     </>
   )

@@ -18,11 +18,27 @@ const ESTADOS = [
 ].map(uf => ({ value: uf, label: uf }))
 
 const REGIME_OPTIONS = [
-  { value: 'simples',    label: 'Simples Nacional' },
+  { value: 'simples',         label: 'Simples Nacional' },
   { value: 'lucro_presumido', label: 'Lucro Presumido' },
-  { value: 'lucro_real', label: 'Lucro Real' },
-  { value: 'mei',        label: 'MEI' },
-  { value: 'nao_se_aplica', label: 'Não se aplica' },
+  { value: 'lucro_real',      label: 'Lucro Real' },
+  { value: 'mei',             label: 'MEI' },
+  { value: 'nao_se_aplica',   label: 'Não se aplica' },
+]
+
+const TIPO_PIX_OPTIONS = [
+  { value: 'CPF',       label: 'CPF' },
+  { value: 'CNPJ',      label: 'CNPJ' },
+  { value: 'Email',     label: 'E-mail' },
+  { value: 'Telefone',  label: 'Telefone' },
+  { value: 'Aleatório', label: 'Chave Aleatória' },
+]
+
+const TIPO_PAGAMENTO_OPTIONS = [
+  { value: 'Pix',     label: 'Pix' },
+  { value: 'Boleto',  label: 'Boleto' },
+  { value: 'TED',     label: 'TED' },
+  { value: 'DOC',     label: 'DOC' },
+  { value: 'Dinheiro', label: 'Dinheiro' },
 ]
 
 interface PessoaForm {
@@ -30,11 +46,13 @@ interface PessoaForm {
   email: string; telefone: string; isCliente: boolean; isFornecedor: boolean
   cep: string; logradouro: string; numero: string; complemento: string
   bairro: string; cidade: string; estado: string; regime: string; observacoes: string
+  banco: string; tipoPix: string; chavePix: string; tipoPagamento: string
 }
 const EMPTY: PessoaForm = {
   tipoPessoa: 'JURIDICA', nome: '', fantasia: '', cpfCnpj: '',
   email: '', telefone: '', isCliente: true, isFornecedor: false,
   cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '', regime: '', observacoes: '',
+  banco: '', tipoPix: '', chavePix: '', tipoPagamento: '',
 }
 
 export function PessoasPage() {
@@ -59,6 +77,7 @@ export function PessoasPage() {
       cep: p.cep ?? '', logradouro: p.logradouro ?? '', numero: p.numero ?? '',
       complemento: p.complemento ?? '', bairro: p.bairro ?? '', cidade: p.cidade ?? '',
       estado: p.estado ?? '', regime: p.regime ?? '', observacoes: p.observacoes ?? '',
+      banco: p.banco ?? '', tipoPix: p.tipoPix ?? '', chavePix: p.chavePix ?? '', tipoPagamento: p.tipoPagamento ?? '',
     })
     setEditId(p.id); setErro(''); setModal(true)
   }
@@ -77,6 +96,8 @@ export function PessoasPage() {
       bairro: form.bairro || null, cidade: form.cidade || null,
       estado: form.estado || null, regime: form.regime || null,
       observacoes: form.observacoes || null,
+      banco: form.banco || null, tipoPix: form.tipoPix || null,
+      chavePix: form.chavePix || null, tipoPagamento: form.tipoPagamento || null,
     }
     if (editId) update.mutate({ id: editId, ...payload })
     else create.mutate(payload)
@@ -338,6 +359,40 @@ export function PessoasPage() {
               />
             </div>
           </div>
+        </FormRow>
+
+        <Divider label="Dados Bancários / PIX" />
+
+        <FormRow cols={2}>
+          <Input
+            label="Banco"
+            value={form.banco}
+            onChange={e => setForm({ ...form, banco: e.target.value })}
+            placeholder="Ex: Sicoob, Itaú, Nubank..."
+          />
+          <Select
+            label="Tipo de Pagamento Preferido"
+            value={form.tipoPagamento}
+            onChange={e => setForm({ ...form, tipoPagamento: e.target.value })}
+            options={TIPO_PAGAMENTO_OPTIONS}
+            placeholder="— Selecione —"
+          />
+        </FormRow>
+
+        <FormRow cols={2}>
+          <Select
+            label="Tipo de Chave PIX"
+            value={form.tipoPix}
+            onChange={e => setForm({ ...form, tipoPix: e.target.value })}
+            options={TIPO_PIX_OPTIONS}
+            placeholder="— Selecione —"
+          />
+          <Input
+            label="Chave PIX"
+            value={form.chavePix}
+            onChange={e => setForm({ ...form, chavePix: e.target.value })}
+            placeholder="CPF, e-mail, telefone ou chave aleatória"
+          />
         </FormRow>
 
         <Divider label="Observações" />

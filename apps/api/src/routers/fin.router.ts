@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { eq, and, like, or, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
 import { protectedProcedure } from './trpc'
 import { TRPCError } from '@trpc/server'
+import { createHash } from 'crypto'
 import {
   finContaBancaria,
   finPlanoContas,
@@ -16,6 +17,8 @@ import {
   finTitulo,
   finParcela,
   finTransferencia,
+  empresa,
+  usuario,
 } from '../db/schema'
 
 // ─── CONTAS BANCÁRIAS ─────────────────────────────────────────────────────────
@@ -221,23 +224,27 @@ const pessoaRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      tipoPessoa:   z.enum(['FISICA', 'JURIDICA']),
-      nome:         z.string().min(1),
-      fantasia:     z.string().nullish(),
-      cpfCnpj:      z.string().nullish(),
-      email:        z.string().email().nullish().or(z.literal('')),
-      telefone:     z.string().nullish(),
-      isCliente:    z.boolean(),
-      isFornecedor: z.boolean(),
-      cep:          z.string().nullish(),
-      logradouro:   z.string().nullish(),
-      numero:       z.string().nullish(),
-      complemento:  z.string().nullish(),
-      bairro:       z.string().nullish(),
-      cidade:       z.string().nullish(),
-      estado:       z.string().nullish(),
-      regime:       z.string().nullish(),
-      observacoes:  z.string().nullish(),
+      tipoPessoa:    z.enum(['FISICA', 'JURIDICA']),
+      nome:          z.string().min(1),
+      fantasia:      z.string().nullish(),
+      cpfCnpj:       z.string().nullish(),
+      email:         z.string().email().nullish().or(z.literal('')),
+      telefone:      z.string().nullish(),
+      isCliente:     z.boolean(),
+      isFornecedor:  z.boolean(),
+      cep:           z.string().nullish(),
+      logradouro:    z.string().nullish(),
+      numero:        z.string().nullish(),
+      complemento:   z.string().nullish(),
+      bairro:        z.string().nullish(),
+      cidade:        z.string().nullish(),
+      estado:        z.string().nullish(),
+      regime:        z.string().nullish(),
+      observacoes:   z.string().nullish(),
+      banco:         z.string().nullish(),
+      tipoPix:       z.string().nullish(),
+      chavePix:      z.string().nullish(),
+      tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.insert(finPessoa).values({
@@ -249,24 +256,28 @@ const pessoaRouter = router({
 
   update: protectedProcedure
     .input(z.object({
-      id:           z.number(),
-      tipoPessoa:   z.enum(['FISICA', 'JURIDICA']),
-      nome:         z.string().min(1),
-      fantasia:     z.string().nullish(),
-      cpfCnpj:      z.string().nullish(),
-      email:        z.string().email().nullish().or(z.literal('')),
-      telefone:     z.string().nullish(),
-      isCliente:    z.boolean(),
-      isFornecedor: z.boolean(),
-      cep:          z.string().nullish(),
-      logradouro:   z.string().nullish(),
-      numero:       z.string().nullish(),
-      complemento:  z.string().nullish(),
-      bairro:       z.string().nullish(),
-      cidade:       z.string().nullish(),
-      estado:       z.string().nullish(),
-      regime:       z.string().nullish(),
-      observacoes:  z.string().nullish(),
+      id:            z.number(),
+      tipoPessoa:    z.enum(['FISICA', 'JURIDICA']),
+      nome:          z.string().min(1),
+      fantasia:      z.string().nullish(),
+      cpfCnpj:       z.string().nullish(),
+      email:         z.string().email().nullish().or(z.literal('')),
+      telefone:      z.string().nullish(),
+      isCliente:     z.boolean(),
+      isFornecedor:  z.boolean(),
+      cep:           z.string().nullish(),
+      logradouro:    z.string().nullish(),
+      numero:        z.string().nullish(),
+      complemento:   z.string().nullish(),
+      bairro:        z.string().nullish(),
+      cidade:        z.string().nullish(),
+      estado:        z.string().nullish(),
+      regime:        z.string().nullish(),
+      observacoes:   z.string().nullish(),
+      banco:         z.string().nullish(),
+      tipoPix:       z.string().nullish(),
+      chavePix:      z.string().nullish(),
+      tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
@@ -425,6 +436,49 @@ const tituloRouter = router({
       }))
     }),
 
+  // Busca título completo com parcelas e pessoa (para comprovante PDF)
+  byId: protectedProcedure
+    .input(z.object({ tituloId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [titulo] = await ctx.db
+        .select({
+          id:            finTitulo.id,
+          tipo:          finTitulo.tipo,
+          descricao:     finTitulo.descricao,
+          documento:     finTitulo.documento,
+          valorOriginal: finTitulo.valorOriginal,
+          emissao:       finTitulo.emissao,
+          observacoes:   finTitulo.observacoes,
+          propostaId:    finTitulo.propostaId,
+          pessoaNome:       finPessoa.nome,
+          pessoaCpfCnpj:    finPessoa.cpfCnpj,
+          pessoaBanco:      finPessoa.banco,
+          pessoaTipoPix:    finPessoa.tipoPix,
+          pessoaChavePix:   finPessoa.chavePix,
+          pessoaTipoPagamento: finPessoa.tipoPagamento,
+          planoNome:     finPlanoContas.nome,
+          centroNome:    finCentroCusto.nome,
+        })
+        .from(finTitulo)
+        .leftJoin(finPessoa,       eq(finTitulo.pessoaId,      finPessoa.id))
+        .leftJoin(finPlanoContas,  eq(finTitulo.planoContasId, finPlanoContas.id))
+        .leftJoin(finCentroCusto,  eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .where(and(eq(finTitulo.id, input.tituloId), eq(finTitulo.empresaId, empId)))
+        .limit(1)
+
+      if (!titulo) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      const parcelas = await ctx.db
+        .select()
+        .from(finParcela)
+        .where(eq(finParcela.tituloId, input.tituloId))
+        .orderBy(asc(finParcela.numero))
+
+      return { titulo, parcelas }
+    }),
+
   // Cria título + parcelas
   create: protectedProcedure
     .input(z.object({
@@ -478,11 +532,25 @@ const tituloRouter = router({
       return { tituloId, ok: true }
     }),
 
-  // Exclui título (e cascata parcelas)
+  // Exclui título (e cascata parcelas) — requer senha de administrador
   delete: protectedProcedure
-    .input(z.object({ tituloId: z.number() }))
+    .input(z.object({ tituloId: z.number(), senhaAdmin: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
+
+      // Valida senha do administrador
+      const senhaHash = createHash('sha256').update(input.senhaAdmin + 'atomtech_salt').digest('hex')
+      const [admin] = await ctx.db
+        .select({ id: usuario.id })
+        .from(usuario)
+        .where(and(
+          eq(usuario.empresaId, empId),
+          eq(usuario.role, 'admin'),
+          eq(usuario.senhaHash, senhaHash),
+        ))
+        .limit(1)
+      if (!admin) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Senha de administrador incorreta' })
+
       const [titulo] = await ctx.db
         .select({ id: finTitulo.id })
         .from(finTitulo)
@@ -659,9 +727,22 @@ const transferenciaRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number(), senhaAdmin: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
+
+      // Valida senha do administrador
+      const senhaHash = createHash('sha256').update(input.senhaAdmin + 'atomtech_salt').digest('hex')
+      const [admin] = await ctx.db
+        .select({ id: usuario.id })
+        .from(usuario)
+        .where(and(
+          eq(usuario.empresaId, empId),
+          eq(usuario.role, 'admin'),
+          eq(usuario.senhaHash, senhaHash),
+        ))
+        .limit(1)
+      if (!admin) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Senha de administrador incorreta' })
 
       const [transf] = await ctx.db
         .select({ id: finTransferencia.id })
@@ -676,9 +757,32 @@ const transferenciaRouter = router({
     }),
 })
 
+// ─── EMPRESA (dados da empresa para cabeçalho dos comprovantes) ───────────────
+
+const empresaFinRouter = router({
+  minha: protectedProcedure.query(async ({ ctx }) => {
+    const [emp] = await ctx.db
+      .select({
+        nome:     empresa.nome,
+        cnpj:     empresa.cnpj,
+        telefone: empresa.telefone,
+        email:    empresa.email,
+        logoUrl:  empresa.logoUrl,
+        cidade:   empresa.cidade,
+        estado:   empresa.estado,
+      })
+      .from(empresa)
+      .where(eq(empresa.id, ctx.usuario.empresaId))
+      .limit(1)
+    if (!emp) throw new TRPCError({ code: 'NOT_FOUND' })
+    return emp
+  }),
+})
+
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────
 
 export const finRouter = router({
+  empresa:       empresaFinRouter,
   conta:         contaRouter,
   planoContas:   planoContasRouter,
   centroCusto:   centroCustoRouter,
