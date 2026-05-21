@@ -49,8 +49,16 @@ function fmtBRL(v: number | string | null | undefined): string {
 
 function fmtData(s: string | null | undefined): string {
   if (!s) return '—'
-  const [y, m, d] = s.split('-')
+  // MySQL pode retornar "2026-05-21T00:00:00.000Z" — pega só os 10 primeiros chars
+  const dateStr = String(s).slice(0, 10)
+  const [y, m, d] = dateStr.split('-')
+  if (!y || !m || !d) return String(s)
   return `${d}/${m}/${y}`
+}
+
+// Normaliza a data para comparação (YYYY-MM-DD)
+function normDate(s: string | null | undefined): string {
+  return s ? String(s).slice(0, 10) : ''
 }
 
 function fmtCnpj(v: string | null | undefined): string {
@@ -83,8 +91,8 @@ function statusBg(status: string): string {
 }
 
 // ─── Número do comprovante ────────────────────────────────────────────────────
-function numComprovante(tipo: 'PAGAR' | 'RECEBER', id: number, emissao: string): string {
-  const mes = emissao?.slice(0, 7) ?? new Date().toISOString().slice(0, 7)
+function numComprovante(tipo: 'PAGAR' | 'RECEBER', id: number, emissao: string | null | undefined): string {
+  const mes = emissao ? String(emissao).slice(0, 7) : new Date().toISOString().slice(0, 7)
   const prefix = tipo === 'PAGAR' ? 'PAG' : 'REC'
   return `N° ${prefix}-${mes}-${id}`
 }
@@ -137,7 +145,7 @@ function htmlPagamento(
   parcela: ParcelaInfo,
   observacoesExtra: string,
 ): string {
-  const statusParcela = parcela.status === 'ABERTA' && parcela.vencimento < new Date().toISOString().slice(0, 10)
+  const statusParcela = parcela.status === 'ABERTA' && normDate(parcela.vencimento) < new Date().toISOString().slice(0, 10)
     ? 'VENCIDA' : parcela.status
 
   return `
@@ -195,8 +203,23 @@ function htmlRecebimento(
     ? `CTR-${titulo.emissao?.slice(0, 7) ?? ''}-${titulo.propostaId}`
     : (titulo.documento ?? '—')
 
+  // Badge dinâmico baseado no status real das parcelas
+  const hoje = new Date().toISOString().slice(0, 10)
+  const qtdPagas   = parcelas.filter(p => p.status === 'PAGA').length
+  const qtdVencidas = parcelas.filter(p => p.status === 'ABERTA' && normDate(p.vencimento) < hoje).length
+  let badgeLabel: string, badgeBg: string, badgeColor: string
+  if (qtdPagas === totalParcelas) {
+    badgeLabel = 'Recebido';  badgeBg = '#D1FAE5'; badgeColor = '#064E3B'
+  } else if (qtdPagas > 0) {
+    badgeLabel = 'Parcial';   badgeBg = '#FEF3C7'; badgeColor = '#92400E'
+  } else if (qtdVencidas > 0) {
+    badgeLabel = 'Vencido';   badgeBg = '#FEE2E2'; badgeColor = '#7C2D12'
+  } else {
+    badgeLabel = 'Pendente';  badgeBg = '#DBEAFE'; badgeColor = '#1E3A5F'
+  }
+
   const rowsParcelas = parcelas.map(p => {
-    const statusP = p.status === 'ABERTA' && p.vencimento < new Date().toISOString().slice(0, 10) ? 'VENCIDA' : p.status
+    const statusP = p.status === 'ABERTA' && normDate(p.vencimento) < hoje ? 'VENCIDA' : p.status
     return `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:11px;color:#475569;">${p.numero}ª</td>
@@ -220,9 +243,9 @@ function htmlRecebimento(
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <span style="
         display:inline-block;padding:5px 16px;border-radius:20px;
-        background:#D1FAE5;color:#064E3B;
+        background:${badgeBg};color:${badgeColor};
         font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;
-      ">Recebido</span>
+      ">${badgeLabel}</span>
       <span style="font-size:13px;font-weight:600;color:#475569;">
         ${numComprovante('RECEBER', titulo.id, titulo.emissao)}
       </span>
