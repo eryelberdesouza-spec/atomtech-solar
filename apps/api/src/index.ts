@@ -282,6 +282,38 @@ app.get('/run-migration-financeiro', async (_, res) => {
   }
 })
 
+// ── Migração: campos bancários em fin_pessoa ──────────────────────────────────
+app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    // Verifica se a coluna banco já existe
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fin_pessoa' AND COLUMN_NAME = 'banco'`
+    )
+
+    if (cols.length === 0) {
+      await conn.execute(`
+        ALTER TABLE fin_pessoa
+          ADD COLUMN banco          VARCHAR(100) NULL AFTER observacoes,
+          ADD COLUMN tipo_pix       VARCHAR(30)  NULL AFTER banco,
+          ADD COLUMN chave_pix      VARCHAR(150) NULL AFTER tipo_pix,
+          ADD COLUMN tipo_pagamento VARCHAR(50)  NULL AFTER chave_pix
+      `)
+      await conn.end()
+      res.json({ ok: true, message: 'Colunas banco/tipo_pix/chave_pix/tipo_pagamento adicionadas a fin_pessoa' })
+    } else {
+      await conn.end()
+      res.json({ ok: true, message: 'Colunas já existiam — nenhuma alteração necessária' })
+    }
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {
