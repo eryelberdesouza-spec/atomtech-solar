@@ -305,7 +305,20 @@ export const clienteRouter = router({
         })
       }
 
-      // TODO: Verificar se tem propostas associadas antes de excluir
+      // Impede exclusão se houver propostas vinculadas
+      const { proposta } = await import('../db/schema')
+      const propostasVinculadas = await ctx.db
+        .select({ id: proposta.id })
+        .from(proposta)
+        .where(eq(proposta.clienteId, input.id))
+        .limit(1)
+
+      if (propostasVinculadas.length > 0) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Este cliente possui propostas vinculadas e não pode ser excluído. Exclua ou transfira as propostas primeiro.',
+        })
+      }
 
       await ctx.db.delete(cliente).where(eq(cliente.id, input.id)).execute()
 

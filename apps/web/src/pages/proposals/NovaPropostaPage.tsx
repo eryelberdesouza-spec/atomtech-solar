@@ -442,7 +442,7 @@ export function NovaPropostaPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
               <Btn variant="ghost" onClick={() => setStep(2)}>← Voltar</Btn>
-              <Btn onClick={handleCreate} disabled={form.custoKitFotovoltaico <= 0 || createMutation.isPending}>{createMutation.isPending ? '⏳ Criando...' : '✓ Criar Proposta'}</Btn>
+              <Btn onClick={handleCreate} disabled={form.custoKitFotovoltaico <= 0 || createMutation.isLoading}>{createMutation.isLoading ? '⏳ Criando...' : '✓ Criar Proposta'}</Btn>
             </div>
           </div>
         )}

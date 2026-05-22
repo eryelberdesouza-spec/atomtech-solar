@@ -149,8 +149,8 @@ function AbaEmpresa() {
         {updateMutation.isSuccess && (
           <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>✔ Salvo com sucesso</span>
         )}
-        <Btn onClick={handleSave} disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
+        <Btn onClick={handleSave} disabled={updateMutation.isLoading}>
+          {updateMutation.isLoading ? 'Salvando...' : 'Salvar Configurações'}
         </Btn>
       </div>
     </div>
@@ -559,8 +559,8 @@ function AbaPremissas() {
         {updateMutation.isSuccess && (
           <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>✔ Salvo com sucesso</span>
         )}
-        <Btn onClick={handleSave} disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? 'Salvando...' : 'Salvar Premissas'}
+        <Btn onClick={handleSave} disabled={updateMutation.isLoading}>
+          {updateMutation.isLoading ? 'Salvando...' : 'Salvar Premissas'}
         </Btn>
       </div>
     </div>
@@ -642,8 +642,8 @@ function AbaTextos() {
           {updateMutation.isSuccess && (
             <span style={{ color: C.green, fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>✔ Salvo</span>
           )}
-          <Btn onClick={handleSave} disabled={updateMutation.isPending || conteudo[chaveAtiva] === undefined}>
-            {updateMutation.isPending ? 'Salvando...' : 'Salvar Texto'}
+          <Btn onClick={handleSave} disabled={updateMutation.isLoading || conteudo[chaveAtiva] === undefined}>
+            {updateMutation.isLoading ? 'Salvando...' : 'Salvar Texto'}
           </Btn>
         </div>
       </div>
@@ -761,8 +761,8 @@ function AbaModelos() {
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditId(null); setForm(VAZIO_MODELO) }}>Cancelar</Btn>
-              <Btn size="sm" onClick={salvar} disabled={!form.titulo.trim() || !form.conteudo.trim() || createMut.isPending || updateMut.isPending}>
-                {createMut.isPending || updateMut.isPending ? 'Salvando...' : 'Salvar Modelo'}
+              <Btn size="sm" onClick={salvar} disabled={!form.titulo.trim() || !form.conteudo.trim() || createMut.isLoading || updateMut.isLoading}>
+                {createMut.isLoading || updateMut.isLoading ? 'Salvando...' : 'Salvar Modelo'}
               </Btn>
             </div>
           </Card>
@@ -916,7 +916,7 @@ function AbaUsuarios() {
 
   // ── FORMULÁRIO (novo/editar) ──────────────────────────────────────
   if (modo === 'novo' || modo === 'editar') {
-    const isPending = createMutation.isPending || updateMutation.isPending
+    const isPending = createMutation.isLoading || updateMutation.isLoading
     const erro = createMutation.error?.message || updateMutation.error?.message
 
     return (
@@ -1150,7 +1150,7 @@ function AbaUsuarios() {
                   {isAdmin && u.id !== (meData as any)?.id && (
                     <button
                       onClick={() => toggleAtivoMutation.mutate({ id: u.id })}
-                      disabled={toggleAtivoMutation.isPending}
+                      disabled={toggleAtivoMutation.isLoading}
                       style={{
                         padding: '6px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                         border: `1px solid ${u.ativo ? '#EF444440' : '#2D9C4E40'}`,
@@ -1204,9 +1204,9 @@ function AbaUsuarios() {
               </Btn>
               <Btn
                 onClick={() => redefinirSenhaMutation.mutate({ id: senhaModal.id, novaSenha })}
-                disabled={novaSenha.length < 6 || redefinirSenhaMutation.isPending}
+                disabled={novaSenha.length < 6 || redefinirSenhaMutation.isLoading}
               >
-                {redefinirSenhaMutation.isPending ? 'Salvando...' : 'Redefinir Senha'}
+                {redefinirSenhaMutation.isLoading ? 'Salvando...' : 'Redefinir Senha'}
               </Btn>
             </div>
           </div>
@@ -1331,7 +1331,7 @@ function AbaCatalogo() {
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-            <Btn onClick={handleSalvar} disabled={createModulo.isPending || updateModulo.isPending || createInversor.isPending || updateInversor.isPending}>
+            <Btn onClick={handleSalvar} disabled={createModulo.isLoading || updateModulo.isLoading || createInversor.isLoading || updateInversor.isLoading}>
               {editandoId ? '✔ Salvar Alterações' : '✔ Adicionar ao Catálogo'}
             </Btn>
           </div>

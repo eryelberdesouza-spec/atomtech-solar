@@ -505,10 +505,10 @@ export function NovaFaturaPage() {
             )}
             <Btn
               onClick={handleSave}
-              disabled={!clienteId || !form.consumoKwh || !form.valorTotal || createMutation.isPending}
+              disabled={!clienteId || !form.consumoKwh || !form.valorTotal || createMutation.isLoading}
               style={{ width: '100%', justifyContent: 'center' }}
             >
-              {createMutation.isPending ? 'Salvando...' : '✓ Salvar Fatura'}
+              {createMutation.isLoading ? 'Salvando...' : '✓ Salvar Fatura'}
             </Btn>
             <Btn
               variant="ghost"

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import {
@@ -79,6 +79,23 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
   })
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
+  // Atualiza o form quando os dados chegam via API (evita form vazio na abertura)
+  useEffect(() => {
+    const mod = equips?.find((e: any) => e.tipo === 'modulo')
+    const inv = equips?.find((e: any) => e.tipo === 'inversor' || e.tipo === 'microinversor')
+    setForm({
+      potenciaFinalKwp:     Number(dim?.potenciaFinalKwp ?? 0),
+      quantidadeModulos:    mod?.quantidade ?? 0,
+      fabricanteModulo:     mod?.fabricante ?? '',
+      modeloModulo:         mod?.modelo ?? '',
+      potenciaModuloWp:     mod?.potenciaWp ?? 620,
+      quantidadeInversores: inv?.quantidade ?? 0,
+      fabricanteInversor:   inv?.fabricante ?? '',
+      modeloInversor:       inv?.modelo ?? '',
+      potenciaInversorWp:   inv?.potenciaWp ?? 0,
+    })
+  }, [dim, equips])
+
   if (!dim) return <EmptyState icon="☀️" title="Dimensionamento não calculado" />
 
   const kpisPrincipais = [
@@ -151,8 +168,8 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
-              <Btn onClick={() => updateDim.mutate({ propostaId, ...form })} disabled={updateDim.isPending}>
-                {updateDim.isPending ? '⏳ Salvando...' : '✔ Salvar Alterações'}
+              <Btn onClick={() => updateDim.mutate({ propostaId, ...form })} disabled={updateDim.isLoading}>
+                {updateDim.isLoading ? '⏳ Salvando...' : '✔ Salvar Alterações'}
               </Btn>
             </div>
           </div>
@@ -435,8 +452,8 @@ function TabPrecificacao({ prec, propostaId }: any) {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
-              <Btn onClick={handleSalvar} disabled={updatePrec.isPending || (modoPrecoFinal && !precoFinalDiretoNum)}>
-                {updatePrec.isPending ? '⏳ Salvando...' : '✔ Salvar e Recalcular'}
+              <Btn onClick={handleSalvar} disabled={updatePrec.isLoading || (modoPrecoFinal && !precoFinalDiretoNum)}>
+                {updatePrec.isLoading ? '⏳ Salvando...' : '✔ Salvar e Recalcular'}
               </Btn>
             </div>
           </div>
@@ -543,8 +560,8 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
           )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Btn variant="ghost" onClick={() => setShowAddForm(false)}>Cancelar</Btn>
-            <Btn onClick={handleAddCondicao} disabled={addCond.isPending}>
-              {addCond.isPending ? '⏳ Criando...' : '✔ Criar Condição'}
+            <Btn onClick={handleAddCondicao} disabled={addCond.isLoading}>
+              {addCond.isLoading ? '⏳ Criando...' : '✔ Criar Condição'}
             </Btn>
           </div>
         </Card>
@@ -618,8 +635,8 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <Btn variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                  <Btn onClick={() => { const valorFinal = formAvista.desconto > 0 ? Number(c.valorTotal) * (1 - formAvista.desconto / 100) : Number(c.valorTotal); updateCond.mutate({ propostaId, condicaoId: c.id, descricao: formAvista.desconto > 0 ? `Pagamento à Vista — ${formAvista.desconto}% de desconto` : 'Pagamento à Vista', valorTotal: valorFinal, parcelas: [{ numeroParcela: 1, descricaoEvento: formAvista.desconto > 0 ? `À vista com ${formAvista.desconto}% de desconto` : 'Pagamento à vista', percentualDoTotal: 100, valor: valorFinal, prazoDias: formAvista.prazoDias, tipoPrazo: formAvista.tipoPrazo as any }] }) }} disabled={updateCond.isPending}>
-                    {updateCond.isPending ? '⏳ Salvando...' : '✔ Salvar'}
+                  <Btn onClick={() => { const valorFinal = formAvista.desconto > 0 ? Number(c.valorTotal) * (1 - formAvista.desconto / 100) : Number(c.valorTotal); updateCond.mutate({ propostaId, condicaoId: c.id, descricao: formAvista.desconto > 0 ? `Pagamento à Vista — ${formAvista.desconto}% de desconto` : 'Pagamento à Vista', valorTotal: valorFinal, parcelas: [{ numeroParcela: 1, descricaoEvento: formAvista.desconto > 0 ? `À vista com ${formAvista.desconto}% de desconto` : 'Pagamento à vista', percentualDoTotal: 100, valor: valorFinal, prazoDias: formAvista.prazoDias, tipoPrazo: formAvista.tipoPrazo as any }] }) }} disabled={updateCond.isLoading}>
+                    {updateCond.isLoading ? '⏳ Salvando...' : '✔ Salvar'}
                   </Btn>
                 </div>
               </div>
@@ -656,8 +673,8 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
                   <span style={{ fontSize: 12, fontWeight: 700, color: Math.abs(totalPct - 100) < 0.01 ? C.green : C.danger }}>Total: {totalPct.toFixed(0)}% {Math.abs(totalPct - 100) < 0.01 ? '✔' : '⚠ deve ser 100%'}</span>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Btn variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                    <Btn disabled={Math.abs(totalPct - 100) > 0.01 || updateCond.isPending} onClick={() => updateCond.mutate({ propostaId, condicaoId: c.id, parcelas: formParcelas })}>
-                      {updateCond.isPending ? '⏳ Salvando...' : '✔ Salvar'}
+                    <Btn disabled={Math.abs(totalPct - 100) > 0.01 || updateCond.isLoading} onClick={() => updateCond.mutate({ propostaId, condicaoId: c.id, parcelas: formParcelas })}>
+                      {updateCond.isLoading ? '⏳ Salvando...' : '✔ Salvar'}
                     </Btn>
                   </div>
                 </div>
@@ -881,7 +898,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                       </div>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                         <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                        <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>{updateBlocos.isPending ? 'Salvando...' : 'Salvar'}</Btn>
+                        <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isLoading}>{updateBlocos.isLoading ? 'Salvando...' : 'Salvar'}</Btn>
                       </div>
                     </>
                   ) : isEscopoEntregas ? (
@@ -964,7 +981,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                          <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>{updateBlocos.isPending ? 'Salvando...' : 'Salvar'}</Btn>
+                          <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isLoading}>{updateBlocos.isLoading ? 'Salvando...' : 'Salvar'}</Btn>
                         </div>
                       </div>
                     </>
@@ -1060,8 +1077,8 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                           />
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                            <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
-                              {updateBlocos.isPending ? 'Salvando...' : 'Salvar'}
+                            <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isLoading}>
+                              {updateBlocos.isLoading ? 'Salvando...' : 'Salvar'}
                             </Btn>
                           </div>
                         </>
@@ -1082,8 +1099,8 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                       />
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                         <Btn size="sm" variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                        <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isPending}>
-                          {updateBlocos.isPending ? 'Salvando...' : 'Salvar'}
+                        <Btn size="sm" onClick={() => salvarTexto(b)} disabled={updateBlocos.isLoading}>
+                          {updateBlocos.isLoading ? 'Salvando...' : 'Salvar'}
                         </Btn>
                       </div>
                     </>
@@ -1182,7 +1199,7 @@ function TabItensServico({ itens, propostaId, tituloServico }: { itens: any[]; p
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, alignItems: 'center' }}>
               <Btn size="sm" variant="ghost" onClick={() => setForm(f => [...f, { id: Date.now(), descricao: '', unidade: 'un', quantidade: '1', valorUnitario: '' }])}>+ Adicionar Item</Btn>
-              <Btn size="sm" onClick={salvar} disabled={updateItens.isPending}>{updateItens.isPending ? 'Salvando...' : 'Salvar Itens'}</Btn>
+              <Btn size="sm" onClick={salvar} disabled={updateItens.isLoading}>{updateItens.isLoading ? 'Salvando...' : 'Salvar Itens'}</Btn>
             </div>
           </div>
         ) : (
@@ -1249,8 +1266,8 @@ function PrazoExecucaoBar({ proposta, propostaId }: { proposta: any; propostaId:
         autoFocus
       />
       <Btn size="sm" variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
-      <Btn size="sm" onClick={() => updatePrazo.mutate({ propostaId, prazoExecucao: valor })} disabled={updatePrazo.isPending}>
-        {updatePrazo.isPending ? '...' : '✔ Salvar'}
+      <Btn size="sm" onClick={() => updatePrazo.mutate({ propostaId, prazoExecucao: valor })} disabled={updatePrazo.isLoading}>
+        {updatePrazo.isLoading ? '...' : '✔ Salvar'}
       </Btn>
     </div>
   )

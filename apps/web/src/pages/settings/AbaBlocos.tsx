@@ -106,9 +106,9 @@ export function AbaBlocos() {
         })}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 24 }}>
-        <button onClick={salvar} disabled={saveMut.isPending}
-          style={{ background: saveMut.isPending ? '#ccc' : '#F5A623', color: '#0E2040', border: 'none', borderRadius: 8, padding: '10px 28px', fontSize: 14, fontWeight: 700, cursor: saveMut.isPending ? 'not-allowed' : 'pointer' }}>
-          {saveMut.isPending ? 'Salvando...' : 'Salvar Template'}
+        <button onClick={salvar} disabled={saveMut.isLoading}
+          style={{ background: saveMut.isLoading ? '#ccc' : '#F5A623', color: '#0E2040', border: 'none', borderRadius: 8, padding: '10px 28px', fontSize: 14, fontWeight: 700, cursor: saveMut.isLoading ? 'not-allowed' : 'pointer' }}>
+          {saveMut.isLoading ? 'Salvando...' : 'Salvar Template'}
         </button>
         {saved && <span style={{ color: '#2D9C4E', fontSize: 13, fontWeight: 600 }}>✓ Template salvo!</span>}
       </div>

@@ -267,8 +267,8 @@ export function NovaPropostaServicoPage() {
           <button onClick={() => navigate('/propostas')} style={{ padding: '10px 20px', borderRadius: 10, background: 'transparent', border: `1px solid ${C.darkBorder}`, color: C.textDim, fontSize: 13, cursor: 'pointer' }}>
             Cancelar
           </button>
-          <Btn onClick={submeter} disabled={criar.isPending}>
-            {criar.isPending ? <Spinner size={14} /> : 'Criar Proposta'}
+          <Btn onClick={submeter} disabled={criar.isLoading}>
+            {criar.isLoading ? <Spinner size={14} /> : 'Criar Proposta'}
           </Btn>
         </div>
 

@@ -115,16 +115,16 @@ export function LoginPage() {
 
             <button
               onClick={handleLogin}
-              disabled={loginMutation.isPending}
+              disabled={loginMutation.isLoading}
               style={{
                 width: '100%', padding: '12px', borderRadius: 9,
-                background: loginMutation.isPending ? C.darkBorder : C.solar,
+                background: loginMutation.isLoading ? C.darkBorder : C.solar,
                 border: 'none', color: '#fff', fontSize: 14, fontWeight: 700,
-                cursor: loginMutation.isPending ? 'not-allowed' : 'pointer',
+                cursor: loginMutation.isLoading ? 'not-allowed' : 'pointer',
                 marginTop: 4,
               }}
             >
-              {loginMutation.isPending ? 'Entrando...' : 'Entrar'}
+              {loginMutation.isLoading ? 'Entrando...' : 'Entrar'}
             </button>
           </div>
 
