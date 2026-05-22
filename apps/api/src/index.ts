@@ -414,6 +414,44 @@ app.get('/run-migration-catalogo', async (_, res) => {
   }
 })
 
+// ── Diagnóstico de equipamentos por proposta ──────────────────────────────────
+app.get('/diag-equips', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [equips]: any = await conn.execute(`
+      SELECT ep.proposta_id, p.numero, ep.tipo, ep.fabricante, ep.modelo, ep.quantidade, ep.potencia_wp
+      FROM equipamento_proposta ep
+      JOIN proposta p ON p.id = ep.proposta_id
+      ORDER BY ep.proposta_id, ep.ordem
+    `)
+
+    const [semEquips]: any = await conn.execute(`
+      SELECT p.id, p.numero, p.cliente_id, c.nome as cliente_nome
+      FROM proposta p
+      LEFT JOIN equipamento_proposta ep ON ep.proposta_id = p.id
+      LEFT JOIN cliente c ON c.id = p.cliente_id
+      WHERE ep.id IS NULL AND p.tipo_proposta = 'fotovoltaico'
+      ORDER BY p.id
+    `)
+
+    const [catalogo]: any = await conn.execute(`
+      SELECT 'modulo' as tipo, id, empresa_id, fabricante, modelo, potencia_wp as potencia, ativo
+      FROM catalogo_modulo
+      UNION ALL
+      SELECT 'inversor', id, empresa_id, fabricante, modelo, potencia_w, ativo
+      FROM catalogo_inversor
+      ORDER BY tipo, id
+    `)
+
+    await conn.end()
+    res.json({ equips, semEquips, catalogo })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Diagnóstico + restauração de clientes com empresa_id errado ───────────────
 app.get('/diag-clientes', async (_, res) => {
   try {
