@@ -1,5 +1,5 @@
 import type { ReactNode, CSSProperties, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ChangeEvent } from 'react'
-import { useState, useEffect, forwardRef } from 'react'
+import { useState, useEffect, forwardRef, useRef } from 'react'
 import { maskCpfCnpj, maskCep, maskTelefone, maskMoeda, parseMoeda } from '../../lib/masks'
 export { buscarCep } from '../../lib/viaCep'
 
@@ -248,32 +248,37 @@ interface InputMoedaProps extends Omit<InputProps, 'onChange' | 'value'> {
   onChange?: (v: string) => void
 }
 export function InputMoeda({ value = '', onChange, ...props }: InputMoedaProps) {
-  const [editing, setEditing]   = useState(false)
-  const [draft,   setDraft]     = useState('')
+  const [editing, setEditing] = useState(false)
+  const [draft,   setDraft]   = useState('')
+  // Ref síncrono: evita closure stale no handleBlur quando o usuário
+  // digita o último dígito e imediatamente clica em salvar
+  const draftRef = useRef('')
 
   function handleFocus() {
     const num = parseMoeda(value)
-    setDraft(num > 0 ? String(num).replace('.', ',') : '')
+    const initial = num > 0 ? String(num).replace('.', ',') : ''
+    draftRef.current = initial
+    setDraft(initial)
     setEditing(true)
   }
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    // Permite apenas dígitos e vírgula (separador decimal BR)
     let raw = e.target.value.replace(/[^\d,]/g, '')
     // Garante no máximo uma vírgula
-    const parts = raw.split(',')
-    if (parts.length > 2) raw = parts[0] + ',' + parts.slice(1).join('')
-    // Limita a 2 casas decimais após a vírgula
-    if (parts[1] !== undefined && parts[1].length > 2) {
-      raw = parts[0] + ',' + parts[1].slice(0, 2)
+    const comma = raw.indexOf(',')
+    if (comma !== -1) {
+      const before = raw.slice(0, comma + 1)
+      const after  = raw.slice(comma + 1).replace(/,/g, '').slice(0, 2)
+      raw = before + after
     }
+    draftRef.current = raw   // atualiza ref de forma síncrona
     setDraft(raw)
     onChange?.(raw)
   }
 
   function handleBlur() {
     setEditing(false)
-    const num = parseMoeda(draft)
+    const num    = parseMoeda(draftRef.current)  // usa ref, nunca stale
     const masked = maskMoeda(num)
     onChange?.(masked)
   }

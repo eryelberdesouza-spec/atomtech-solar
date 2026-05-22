@@ -543,8 +543,9 @@ const tituloRouter = router({
       centroCustoId: z.number().nullish(),
       observacoes:   z.string().nullish(),
       emissao:       z.string(),
+      // parcelaId presente = atualiza existente; ausente = nova parcela
       parcelas: z.array(z.object({
-        parcelaId:  z.number(),
+        parcelaId:  z.number().optional(),
         valor:      z.number().positive(),
         vencimento: z.string(),
       })),
@@ -560,17 +561,22 @@ const tituloRouter = router({
 
       if (!titulo) throw new TRPCError({ code: 'NOT_FOUND' })
 
-      // Calcula novo valorOriginal: soma de todas as parcelas (editadas + pagas intactas)
+      const existentes = input.parcelas.filter(p => p.parcelaId !== undefined)
+      const novas      = input.parcelas.filter(p => p.parcelaId === undefined)
+
+      // Calcula novo valorOriginal: parcelas existentes editadas + pagas intactas + novas
       const todasParcelas = await ctx.db
-        .select({ id: finParcela.id, status: finParcela.status, valor: finParcela.valor })
+        .select({ id: finParcela.id, numero: finParcela.numero, status: finParcela.status, valor: finParcela.valor })
         .from(finParcela)
         .where(eq(finParcela.tituloId, input.tituloId))
 
-      const editMap = new Map(input.parcelas.map(p => [p.parcelaId, p]))
-      const novoTotal = todasParcelas.reduce((sum, p) => {
+      const editMap  = new Map(existentes.map(p => [p.parcelaId!, p]))
+      const somaExistentes = todasParcelas.reduce((sum, p) => {
         const edit = editMap.get(p.id)
         return sum + Number(edit ? edit.valor : p.valor)
       }, 0)
+      const somaNovas = novas.reduce((sum, p) => sum + p.valor, 0)
+      const novoTotal = somaExistentes + somaNovas
 
       // Atualiza cabeçalho do título
       await ctx.db
@@ -588,16 +594,31 @@ const tituloRouter = router({
         })
         .where(eq(finTitulo.id, input.tituloId))
 
-      // Atualiza apenas parcelas ABERTAS (nunca sobrescreve PAGA/CANCELADA)
-      for (const p of input.parcelas) {
+      // Atualiza parcelas ABERTAS existentes
+      for (const p of existentes) {
         await ctx.db
           .update(finParcela)
           .set({ valor: p.valor.toFixed(2), vencimento: p.vencimento as any })
           .where(and(
-            eq(finParcela.id, p.parcelaId),
+            eq(finParcela.id, p.parcelaId!),
             eq(finParcela.tituloId, input.tituloId),
             eq(finParcela.status, 'ABERTA'),
           ))
+      }
+
+      // Insere novas parcelas
+      if (novas.length > 0) {
+        // Descobre o maior número de parcela existente para continuar a sequência
+        const maxNum = todasParcelas.reduce((m, p) => Math.max(m, p.numero ?? 0), 0)
+        await ctx.db.insert(finParcela).values(
+          novas.map((p, i) => ({
+            tituloId:  input.tituloId,
+            numero:    maxNum + i + 1,
+            valor:     p.valor.toFixed(2),
+            vencimento: p.vencimento as any,
+            status:    'ABERTA' as const,
+          }))
+        )
       }
 
       return { ok: true }

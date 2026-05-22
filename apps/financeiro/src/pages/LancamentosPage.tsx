@@ -95,17 +95,46 @@ function ModalEditarLancamento({
     onError:   (e: any) => setErro(e.message ?? 'Erro ao salvar'),
   })
 
+  function adicionarParcela() {
+    const ultimo = parcelas[parcelas.length - 1]
+    const proximoVenc = ultimo?.vencimento
+      ? (() => {
+          const d = new Date(ultimo.vencimento + 'T12:00:00')
+          d.setMonth(d.getMonth() + 1)
+          return d.toISOString().slice(0, 10)
+        })()
+      : hoje()
+    const proximoNum = (parcelas[parcelas.length - 1]?.numero ?? 0) + 1
+    setParcelas(prev => [...prev, {
+      parcelaId:  undefined,   // nova parcela — sem ID
+      numero:     proximoNum,
+      valor:      '',
+      vencimento: proximoVenc,
+      status:     'ABERTA',
+      isNova:     true,
+    }])
+  }
+
+  function removerNovaParcela(i: number) {
+    setParcelas(prev => prev.filter((_, j) => j !== i))
+  }
+
   function salvar() {
     setErro('')
     if (!form?.descricao?.trim()) return setErro('Descrição é obrigatória')
+
+    let hasError = false
     const parcelasPayload = parcelas
-      .filter(p => p.status === 'ABERTA')
+      .filter(p => p.status === 'ABERTA' || p.isNova)
       .map(p => {
         const v = parseMoeda(p.valor)
-        if (v <= 0) { setErro(`Valor inválido na parcela ${p.numero}`); return null }
-        return { parcelaId: p.parcelaId, valor: v, vencimento: p.vencimento }
+        if (v <= 0) { setErro(`Valor inválido na parcela ${p.numero}`); hasError = true; return null }
+        if (!p.vencimento) { setErro(`Vencimento obrigatório na parcela ${p.numero}`); hasError = true; return null }
+        return p.parcelaId !== undefined
+          ? { parcelaId: p.parcelaId, valor: v, vencimento: p.vencimento }
+          : { valor: v, vencimento: p.vencimento }   // nova parcela sem parcelaId
       })
-    if (parcelasPayload.some(p => p === null)) return
+    if (hasError || parcelasPayload.some(p => p === null)) return
 
     update.mutate({
       tituloId:      tituloId,
@@ -116,7 +145,7 @@ function ModalEditarLancamento({
       centroCustoId: form.centroCustoId ? parseInt(form.centroCustoId) : undefined,
       observacoes:   form.observacoes   || undefined,
       emissao:       form.emissao,
-      parcelas:      parcelasPayload.filter(Boolean),
+      parcelas:      parcelasPayload.filter(Boolean) as any,
     })
   }
 
@@ -190,19 +219,23 @@ function ModalEditarLancamento({
 
           {/* Parcelas */}
           <div style={{ borderTop: '1px solid ' + C.border, paddingTop: 16 }}>
-            <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
-              Parcelas
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
+                Parcelas
+              </p>
+              <Btn size="sm" variant="ghost" onClick={adicionarParcela}>+ Adicionar Parcela</Btn>
+            </div>
+
             {parcelas.map((p, i) => {
-              const isPaga = p.status !== 'ABERTA'
+              const isPaga = p.status !== 'ABERTA' && !p.isNova
               return (
-                <div key={p.parcelaId} style={{
+                <div key={p.parcelaId ?? `nova-${i}`} style={{
                   display: 'grid', gridTemplateColumns: '36px 1fr 1fr auto',
                   gap: 8, alignItems: 'flex-end', marginBottom: 8,
                   opacity: isPaga ? 0.6 : 1,
                 }}>
                   {/* Número */}
-                  <div style={{ paddingBottom: 8, color: C.textMuted, fontSize: 12, fontWeight: 600, textAlign: 'center' }}>
+                  <div style={{ paddingBottom: 8, color: p.isNova ? C.success : C.textMuted, fontSize: 12, fontWeight: 700, textAlign: 'center' }}>
                     {p.numero}
                   </div>
 
@@ -216,7 +249,7 @@ function ModalEditarLancamento({
                     </div>
                   ) : (
                     <InputMoeda
-                      label="Valor *"
+                      label={p.isNova ? 'Valor * (nova)' : 'Valor *'}
                       value={p.valor}
                       onChange={v => setParcelas(prev => prev.map((x, j) => j === i ? { ...x, valor: v } : x))}
                     />
@@ -232,22 +265,27 @@ function ModalEditarLancamento({
                     </div>
                   ) : (
                     <Input
-                      label="Vencimento *"
+                      label={p.isNova ? 'Vencimento * (nova)' : 'Vencimento *'}
                       type="date"
                       value={p.vencimento}
                       onChange={e => setParcelas(prev => prev.map((x, j) => j === i ? { ...x, vencimento: e.target.value } : x))}
                     />
                   )}
 
-                  {/* Badge de status */}
+                  {/* Badge ou botão remover */}
                   <div style={{ paddingBottom: 8 }}>
-                    <StatusBadge s={isPaga ? p.status : 'ABERTA'} />
+                    {p.isNova ? (
+                      <Btn size="sm" variant="danger" onClick={() => removerNovaParcela(i)} title="Remover parcela">✕</Btn>
+                    ) : (
+                      <StatusBadge s={isPaga ? p.status : 'ABERTA'} />
+                    )}
                   </div>
                 </div>
               )
             })}
-            {parcelas.some(p => p.status !== 'ABERTA') && (
-              <p style={{ color: C.textMuted, fontSize: 11, margin: '4px 0 0' }}>
+
+            {parcelas.some(p => p.status !== 'ABERTA' && !p.isNova) && (
+              <p style={{ color: C.textMuted, fontSize: 11, margin: '8px 0 0' }}>
                 🔒 Parcelas pagas/canceladas não podem ser alteradas.
               </p>
             )}
