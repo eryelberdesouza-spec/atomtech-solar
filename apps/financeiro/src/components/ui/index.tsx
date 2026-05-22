@@ -1,6 +1,6 @@
-import type { ReactNode, CSSProperties, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { ReactNode, CSSProperties, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, ChangeEvent } from 'react'
 import { useState, useEffect, forwardRef } from 'react'
-import { maskCpfCnpj, maskCep, maskTelefone, maskMoeda } from '../../lib/masks'
+import { maskCpfCnpj, maskCep, maskTelefone, maskMoeda, parseMoeda } from '../../lib/masks'
 export { buscarCep } from '../../lib/viaCep'
 
 // ─── CORES DO TEMA FINANCEIRO (Verde Esmeralda) ──────────────────────────────
@@ -248,13 +248,45 @@ interface InputMoedaProps extends Omit<InputProps, 'onChange' | 'value'> {
   onChange?: (v: string) => void
 }
 export function InputMoeda({ value = '', onChange, ...props }: InputMoedaProps) {
+  const [editing, setEditing]   = useState(false)
+  const [draft,   setDraft]     = useState('')
+
+  function handleFocus() {
+    const num = parseMoeda(value)
+    setDraft(num > 0 ? String(num).replace('.', ',') : '')
+    setEditing(true)
+  }
+
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    // Permite apenas dígitos e vírgula (separador decimal BR)
+    let raw = e.target.value.replace(/[^\d,]/g, '')
+    // Garante no máximo uma vírgula
+    const parts = raw.split(',')
+    if (parts.length > 2) raw = parts[0] + ',' + parts.slice(1).join('')
+    // Limita a 2 casas decimais após a vírgula
+    if (parts[1] !== undefined && parts[1].length > 2) {
+      raw = parts[0] + ',' + parts[1].slice(0, 2)
+    }
+    setDraft(raw)
+    onChange?.(raw)
+  }
+
+  function handleBlur() {
+    setEditing(false)
+    const num = parseMoeda(draft)
+    const masked = maskMoeda(num)
+    onChange?.(masked)
+  }
+
   return (
     <Input
       {...props}
-      value={maskMoeda(value)}
+      value={editing ? draft : maskMoeda(value)}
       placeholder="R$ 0,00"
-      inputMode="numeric"
-      onChange={e => onChange?.(e.target.value)}
+      inputMode="decimal"
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onChange={handleChange}
       style={{ textAlign: 'right', ...props.style }}
     />
   )
