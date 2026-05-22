@@ -908,6 +908,106 @@ const empresaFinRouter = router({
   }),
 })
 
+// ─── FLUXO DE CAIXA ──────────────────────────────────────────────────────────
+
+const fluxoCaixaRouter = router({
+  projecao: protectedProcedure
+    .input(z.object({
+      dataIni: z.string(),  // YYYY-MM-DD
+      dataFim: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // Saldo atual = saldo_inicial das contas + recebimentos realizados - pagamentos realizados
+      const contas = await ctx.db
+        .select({ saldoInicial: finContaBancaria.saldoInicial })
+        .from(finContaBancaria)
+        .where(and(eq(finContaBancaria.empresaId, empId), eq(finContaBancaria.ativo, true)))
+
+      const saldoBase = contas.reduce((s, c) => s + Number(c.saldoInicial ?? 0), 0)
+
+      const parcelasPagas = await ctx.db
+        .select({ valorPago: finParcela.valorPago, tipo: finTitulo.tipo })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.status, 'PAGA'),
+          eq(finTitulo.ativo, true),
+        ))
+
+      const totalRecebido = parcelasPagas
+        .filter(p => p.tipo === 'RECEBER')
+        .reduce((s, p) => s + Number(p.valorPago ?? 0), 0)
+      const totalPago = parcelasPagas
+        .filter(p => p.tipo === 'PAGAR')
+        .reduce((s, p) => s + Number(p.valorPago ?? 0), 0)
+
+      const saldoAtual = saldoBase + totalRecebido - totalPago
+
+      // Parcelas abertas no período filtrado
+      const abertas = await ctx.db
+        .select({
+          id:         finParcela.id,
+          valor:      finParcela.valor,
+          vencimento: finParcela.vencimento,
+          numero:     finParcela.numero,
+          tipo:       finTitulo.tipo,
+          descricao:  finTitulo.descricao,
+          pessoaNome: finPessoa.nome,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.status, 'ABERTA'),
+          eq(finTitulo.ativo, true),
+          gte(finParcela.vencimento, input.dataIni as any),
+          lte(finParcela.vencimento, input.dataFim as any),
+        ))
+        .orderBy(asc(finParcela.vencimento))
+
+      // Parcelas vencidas (antes de dataIni, ainda abertas) — saldo em atraso
+      const vencidas = await ctx.db
+        .select({
+          id:         finParcela.id,
+          valor:      finParcela.valor,
+          vencimento: finParcela.vencimento,
+          numero:     finParcela.numero,
+          tipo:       finTitulo.tipo,
+          descricao:  finTitulo.descricao,
+          pessoaNome: finPessoa.nome,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.status, 'ABERTA'),
+          eq(finTitulo.ativo, true),
+          lte(finParcela.vencimento, input.dataIni as any),
+        ))
+
+      const normalize = (arr: typeof abertas) => arr.map(p => ({
+        id:         p.id,
+        vencimento: String(p.vencimento).slice(0, 10),
+        valor:      Number(p.valor),
+        numero:     p.numero,
+        tipo:       p.tipo as 'PAGAR' | 'RECEBER',
+        descricao:  p.descricao,
+        pessoaNome: p.pessoaNome ?? null,
+      }))
+
+      return {
+        saldoAtual,
+        parcelas:        normalize(abertas),
+        parcelasVencidas: normalize(vencidas),
+      }
+    }),
+})
+
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────
 
 export const finRouter = router({
@@ -920,4 +1020,5 @@ export const finRouter = router({
   titulo:        tituloRouter,
   parcela:       parcelaRouter,
   transferencia: transferenciaRouter,
+  fluxoCaixa:    fluxoCaixaRouter,
 })

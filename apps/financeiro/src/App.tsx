@@ -7,6 +7,7 @@ import { Layout } from './components/layout/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { LancamentosPage } from './pages/LancamentosPage'
+import { FluxoCaixaPage } from './pages/FluxoCaixaPage'
 import { PessoasPage } from './pages/pessoas/PessoasPage'
 import { ConfiguracoesPage } from './pages/config/ConfiguracoesPage'
 
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/lancamentos" element={<LancamentosPage />} />
+              <Route path="/fluxo-caixa" element={<FluxoCaixaPage />} />
               <Route path="/pessoas" element={<PessoasPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
             </Route>
