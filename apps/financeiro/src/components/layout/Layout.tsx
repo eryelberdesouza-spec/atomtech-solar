@@ -296,7 +296,7 @@ export function Layout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Link para a plataforma de propostas */}
             <a
-              href="http://localhost:5173"
+              href="https://atomtech-solar-web.vercel.app"
               target="_blank"
               rel="noreferrer"
               style={{
