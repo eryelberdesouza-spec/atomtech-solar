@@ -314,6 +314,133 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
   }
 })
 
+// ── Diagnóstico do banco de produção ─────────────────────────────────────────
+app.get('/diag-producao', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    // Tabelas existentes
+    const [tables]: any = await conn.execute("SHOW TABLES")
+    const tableNames = tables.map((t: any) => Object.values(t)[0] as string)
+
+    // Empresas
+    const [empresas]: any = await conn.execute('SELECT id, nome FROM empresa')
+
+    // Usuários
+    const [usuarios]: any = await conn.execute('SELECT id, empresa_id, nome, email FROM usuario')
+
+    // Clientes por empresa
+    const [clientes]: any = await conn.execute('SELECT empresa_id, COUNT(*) as total FROM cliente GROUP BY empresa_id')
+
+    // Propostas com join de cliente
+    const [propostas]: any = await conn.execute(`
+      SELECT p.id, p.numero, p.cliente_id, p.empresa_id,
+             c.nome as cliente_nome, c.empresa_id as cliente_empresa_id
+      FROM proposta p
+      LEFT JOIN cliente c ON p.cliente_id = c.id
+      ORDER BY p.id DESC LIMIT 20
+    `)
+
+    // Catálogo
+    const moduloOk = tableNames.includes('catalogo_modulo')
+    const inversorOk = tableNames.includes('catalogo_inversor')
+    let modulos = 0, inversores = 0
+    if (moduloOk) {
+      const [r]: any = await conn.execute('SELECT COUNT(*) as n FROM catalogo_modulo')
+      modulos = r[0].n
+    }
+    if (inversorOk) {
+      const [r]: any = await conn.execute('SELECT COUNT(*) as n FROM catalogo_inversor')
+      inversores = r[0].n
+    }
+
+    await conn.end()
+    res.json({
+      tabelas: tableNames,
+      empresas,
+      usuarios,
+      clientesPorEmpresa: clientes,
+      propostas: propostas.slice(0, 10),
+      catalogo: { moduloTabelaExiste: moduloOk, inversorTabelaExiste: inversorOk, modulos, inversores }
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Migração: tabelas de catálogo de equipamentos ──────────────────────────────
+app.get('/run-migration-catalogo', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS catalogo_modulo (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id     INT NOT NULL,
+        fabricante     VARCHAR(100) NOT NULL,
+        modelo         VARCHAR(200) NOT NULL,
+        potencia_wp    INT NOT NULL,
+        eficiencia     DECIMAL(5,2),
+        garantia_anos  INT DEFAULT 12,
+        preco_unitario DECIMAL(10,2),
+        ativo          TINYINT(1) NOT NULL DEFAULT 1,
+        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_cm_empresa (empresa_id)
+      )
+    `)
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS catalogo_inversor (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id     INT NOT NULL,
+        fabricante     VARCHAR(100) NOT NULL,
+        modelo         VARCHAR(200) NOT NULL,
+        potencia_w     INT NOT NULL,
+        tipo_inversor  ENUM('microinversor','string','hibrido','otimizador') NOT NULL,
+        garantia_anos  INT DEFAULT 12,
+        preco_unitario DECIMAL(10,2),
+        ativo          TINYINT(1) NOT NULL DEFAULT 1,
+        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ci_empresa (empresa_id)
+      )
+    `)
+
+    await conn.end()
+    res.json({ ok: true, message: 'Tabelas catalogo_modulo e catalogo_inversor criadas (ou já existiam)' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Diagnóstico + restauração de clientes com empresa_id errado ───────────────
+app.get('/diag-clientes', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [clientes]: any = await conn.execute(`
+      SELECT c.id, c.empresa_id, c.nome, c.cpf_cnpj, c.email,
+             (SELECT COUNT(*) FROM proposta p WHERE p.cliente_id = c.id) as num_propostas
+      FROM cliente c ORDER BY c.empresa_id, c.id
+    `)
+
+    const [propostas]: any = await conn.execute(`
+      SELECT p.id, p.numero, p.empresa_id as prop_empresa, p.cliente_id,
+             c.nome as cliente_nome, c.empresa_id as cliente_empresa
+      FROM proposta p
+      LEFT JOIN cliente c ON c.id = p.cliente_id
+      ORDER BY p.id
+    `)
+
+    await conn.end()
+    res.json({ clientes, propostas })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {
