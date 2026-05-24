@@ -75,7 +75,7 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
     quantidadeInversores: inversor?.quantidade ?? 0,
     fabricanteInversor:   inversor?.fabricante ?? '',
     modeloInversor:       inversor?.modelo ?? '',
-    potenciaInversorWp:   inversor?.potenciaWp ?? 0,
+    potenciaInversorWp:   (inversor?.potenciaWp ?? 0) / 1000,  // armazenado em Wp, exibido em kW
   })
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
@@ -92,7 +92,7 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
       quantidadeInversores: inv?.quantidade ?? 0,
       fabricanteInversor:   inv?.fabricante ?? '',
       modeloInversor:       inv?.modelo ?? '',
-      potenciaInversorWp:   inv?.potenciaWp ?? 0,
+      potenciaInversorWp:   (inv?.potenciaWp ?? 0) / 1000,  // armazenado em Wp, exibido em kW
     })
   }, [dim, equips])
 
@@ -163,12 +163,12 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 100px', gap: 12 }}>
               <Input label="Fabricante" value={form.fabricanteInversor} onChange={e => set('fabricanteInversor', e.target.value)} placeholder="Ex: Sungrow" />
               <Input label="Modelo" value={form.modeloInversor} onChange={e => set('modeloInversor', e.target.value)} placeholder="Ex: SG5.0RT" />
-              <Input label="Potência (Wp)" type="number" value={form.potenciaInversorWp} onChange={e => set('potenciaInversorWp', Number(e.target.value))} />
+              <Input label="Potência (kW)" type="number" value={form.potenciaInversorWp} onChange={e => set('potenciaInversorWp', Number(e.target.value))} />
               <Input label="Quantidade" type="number" value={form.quantidadeInversores} onChange={e => set('quantidadeInversores', Number(e.target.value))} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
-              <Btn onClick={() => updateDim.mutate({ propostaId, ...form })} disabled={updateDim.isLoading}>
+              <Btn onClick={() => updateDim.mutate({ propostaId, ...form, potenciaInversorWp: Math.round(form.potenciaInversorWp * 1000) })} disabled={updateDim.isLoading}>
                 {updateDim.isLoading ? '⏳ Salvando...' : '✔ Salvar Alterações'}
               </Btn>
             </div>
