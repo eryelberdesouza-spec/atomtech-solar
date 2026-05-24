@@ -11,6 +11,7 @@ import { FluxoCaixaPage } from './pages/FluxoCaixaPage'
 import { DREPage } from './pages/DREPage'
 import { PessoasPage } from './pages/pessoas/PessoasPage'
 import { ConfiguracoesPage } from './pages/config/ConfiguracoesPage'
+import { PropostasPage } from './pages/PropostasPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   // Aceita token de qualquer das duas plataformas
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/dre" element={<DREPage />} />
               <Route path="/pessoas" element={<PessoasPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
+              <Route path="/propostas" element={<PropostasPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

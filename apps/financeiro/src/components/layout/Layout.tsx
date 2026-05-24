@@ -8,6 +8,7 @@ const NAV = [
   { path: '/fluxo-caixa', label: 'Fluxo de Caixa',icon: '⇌', color: '#F59E0B', desc: 'Projeção de caixa' },
   { path: '/dre',         label: 'DRE',           icon: '◫', color: '#34D399', desc: 'Resultado do exercício' },
   { path: '/pessoas',      label: 'Pessoas',       icon: '◉', color: '#A78BFA', desc: 'Clientes e Fornecedores' },
+  { path: '/propostas',    label: 'Propostas',     icon: '◑', color: '#F59E0B', desc: 'Importar propostas aceitas' },
   { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#6B9E87', desc: 'Contas, Plano, Custos' },
 ]
 

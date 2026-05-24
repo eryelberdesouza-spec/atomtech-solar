@@ -19,6 +19,11 @@ import {
   finTransferencia,
   empresa,
   usuario,
+  proposta,
+  cliente,
+  condicaoComercial,
+  parcelaPagamento,
+  precificacao,
 } from '../db/schema'
 
 // ─── CONTAS BANCÁRIAS ─────────────────────────────────────────────────────────
@@ -1008,6 +1013,206 @@ const fluxoCaixaRouter = router({
     }),
 })
 
+// ─── INTEGRAÇÃO COM PROPOSTAS ────────────────────────────────────────────────
+
+function addDias(base: string, dias: number, tipo: 'corridos' | 'uteis'): string {
+  const d = new Date(base + 'T12:00:00')
+  if (tipo === 'corridos' || dias === 0) {
+    d.setDate(d.getDate() + dias)
+  } else {
+    let added = 0
+    while (added < dias) {
+      d.setDate(d.getDate() + 1)
+      const dow = d.getDay()
+      if (dow !== 0 && dow !== 6) added++
+    }
+  }
+  return d.toISOString().slice(0, 10)
+}
+
+const propostaFinRouter = router({
+
+  // Lista propostas aceitas — com flag se já foram importadas
+  listar: protectedProcedure.query(async ({ ctx }) => {
+    const empId = ctx.usuario.empresaId
+    const rows = await ctx.db.execute(sql`
+      SELECT
+        p.id, p.numero, p.tipo_proposta AS tipoProposta,
+        p.titulo_servico AS tituloServico,
+        p.status, p.data_emissao AS dataEmissao,
+        c.id AS clienteId, c.nome AS clienteNome, c.cpf_cnpj AS clienteCpfCnpj,
+        c.email AS clienteEmail, c.telefone AS clienteTelefone,
+        prec.preco_final AS valorTotal,
+        ft.id AS tituloFinId, ft.descricao AS tituloFinDescricao
+      FROM proposta p
+      INNER JOIN cliente c ON c.id = p.cliente_id
+      LEFT JOIN precificacao prec ON prec.proposta_id = p.id
+      LEFT JOIN fin_titulo ft ON ft.proposta_id = p.id AND ft.empresa_id = ${empId}
+      WHERE p.empresa_id = ${empId}
+        AND p.status = 'aceita'
+        AND (p.is_template IS NULL OR p.is_template = 0)
+      ORDER BY p.data_emissao DESC
+    `) as any[]
+    const data = Array.isArray(rows) ? rows : (rows as any).rows ?? []
+    return data.map((r: any) => ({
+      id:                  Number(r.id),
+      numero:              String(r.numero ?? ''),
+      tipoProposta:        String(r.tipoProposta ?? ''),
+      tituloServico:       r.tituloServico ? String(r.tituloServico) : null,
+      status:              String(r.status ?? ''),
+      dataEmissao:         r.dataEmissao ? String(r.dataEmissao).slice(0, 10) : null,
+      clienteId:           Number(r.clienteId),
+      clienteNome:         String(r.clienteNome ?? ''),
+      clienteCpfCnpj:      r.clienteCpfCnpj ? String(r.clienteCpfCnpj) : null,
+      clienteEmail:        r.clienteEmail ? String(r.clienteEmail) : null,
+      clienteTelefone:     r.clienteTelefone ? String(r.clienteTelefone) : null,
+      valorTotal:          r.valorTotal ? Number(r.valorTotal) : null,
+      importada:           !!r.tituloFinId,
+      tituloFinId:         r.tituloFinId ? Number(r.tituloFinId) : null,
+      tituloFinDescricao:  r.tituloFinDescricao ? String(r.tituloFinDescricao) : null,
+    }))
+  }),
+
+  // Retorna condições comerciais + parcelas de uma proposta
+  condicoes: protectedProcedure
+    .input(z.object({ propostaId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      // verifica que a proposta pertence à empresa
+      const [prop] = await ctx.db.select().from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, empId))).limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const condicoes = await ctx.db.select().from(condicaoComercial)
+        .where(eq(condicaoComercial.propostaId, input.propostaId))
+        .orderBy(asc(condicaoComercial.id))
+
+      const result = []
+      for (const c of condicoes) {
+        const parcelas = await ctx.db.select().from(parcelaPagamento)
+          .where(eq(parcelaPagamento.condicaoId, c.id))
+          .orderBy(asc(parcelaPagamento.numeroParcela))
+        result.push({ ...c, parcelas })
+      }
+      return result
+    }),
+
+  // Importa proposta aceita como título a receber no financeiro
+  importar: protectedProcedure
+    .input(z.object({
+      propostaId:    z.number().int().positive(),
+      condicaoId:    z.number().int().positive(),
+      planoContasId: z.number().int().positive().optional(),
+      centroCustoId: z.number().int().optional(),
+      contaId:       z.number().int().optional(),
+      observacoes:   z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // 1. Verifica proposta
+      const [prop] = await ctx.db.select({
+        id: proposta.id, numero: proposta.numero,
+        tipoProposta: proposta.tipoProposta,
+        tituloServico: proposta.tituloServico,
+        dataEmissao: proposta.dataEmissao,
+        status: proposta.status,
+        clienteId: proposta.clienteId,
+        empresaId: proposta.empresaId,
+      }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, empId)))
+        .limit(1)
+
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+      if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser importadas' })
+
+      // 2. Verifica duplicata
+      const [dup] = await ctx.db.select({ id: finTitulo.id }).from(finTitulo)
+        .where(and(eq(finTitulo.propostaId, input.propostaId), eq(finTitulo.empresaId, empId)))
+        .limit(1)
+      if (dup) throw new TRPCError({ code: 'CONFLICT', message: 'Esta proposta já foi importada para o financeiro' })
+
+      // 3. Busca cliente
+      const [cli] = await ctx.db.select().from(cliente)
+        .where(eq(cliente.id, prop.clienteId)).limit(1)
+      if (!cli) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+
+      // 4. Busca ou cria finPessoa pelo CPF/CNPJ
+      let pessoaId: number | null = null
+      if (cli.cpfCnpj) {
+        const [pessoaExist] = await ctx.db.select({ id: finPessoa.id }).from(finPessoa)
+          .where(and(eq(finPessoa.empresaId, empId), eq(finPessoa.cpfCnpj, cli.cpfCnpj)))
+          .limit(1)
+        if (pessoaExist) {
+          pessoaId = pessoaExist.id
+        }
+      }
+      if (!pessoaId) {
+        // Cria nova finPessoa a partir do cliente
+        const ins = await ctx.db.insert(finPessoa).values({
+          empresaId:   empId,
+          nome:        cli.nome,
+          cpfCnpj:     cli.cpfCnpj ?? null,
+          email:       cli.email ?? null,
+          telefone:    cli.telefone ?? null,
+          tipoPessoa:  cli.cpfCnpj && cli.cpfCnpj.replace(/\D/g, '').length <= 11 ? 'FISICA' : 'JURIDICA',
+          isCliente:   true,
+          isFornecedor: false,
+        })
+        pessoaId = Number((ins as any).insertId ?? (ins[0] as any)?.insertId ?? 0)
+      }
+
+      // 5. Busca parcelas da condição escolhida
+      const [cond] = await ctx.db.select().from(condicaoComercial)
+        .where(eq(condicaoComercial.id, input.condicaoId)).limit(1)
+      if (!cond) throw new TRPCError({ code: 'NOT_FOUND', message: 'Condição comercial não encontrada' })
+
+      const parcelas = await ctx.db.select().from(parcelaPagamento)
+        .where(eq(parcelaPagamento.condicaoId, input.condicaoId))
+        .orderBy(asc(parcelaPagamento.numeroParcela))
+
+      // 6. Cria finTitulo
+      const descricao = prop.tipoProposta === 'servico_geral'
+        ? `${prop.tituloServico ?? 'Serviço'} — ${cli.nome} (${prop.numero})`
+        : `Sistema Fotovoltaico — ${cli.nome} (${prop.numero})`
+
+      const tituloIns = await ctx.db.insert(finTitulo).values({
+        empresaId:     empId,
+        tipo:          'RECEBER',
+        descricao,
+        documento:     prop.numero,
+        pessoaId:      pessoaId || null,
+        planoContasId: input.planoContasId ?? null,
+        centroCustoId: input.centroCustoId ?? null,
+        propostaId:    prop.id,
+        valorOriginal: String(parcelas.reduce((s, p) => s + Number(p.valor), 0)),
+        emissao:       prop.dataEmissao ?? new Date().toISOString().slice(0, 10),
+        observacoes:   input.observacoes ?? null,
+        ativo:         true,
+      })
+      const tituloId = Number((tituloIns as any).insertId ?? (tituloIns[0] as any)?.insertId ?? 0)
+
+      // 7. Cria finParcelas
+      const baseDate = prop.dataEmissao
+        ? String(prop.dataEmissao).slice(0, 10)
+        : new Date().toISOString().slice(0, 10)
+
+      for (const p of parcelas) {
+        const venc = addDias(baseDate, Number(p.prazoDias ?? 0), p.tipoPrazo as 'corridos' | 'uteis')
+        await ctx.db.insert(finParcela).values({
+          tituloId,
+          numero:     Number(p.numeroParcela),
+          valor:      String(p.valor),
+          vencimento: venc,
+          status:     'ABERTA',
+          contaId:    input.contaId ?? null,
+        })
+      }
+
+      return { ok: true, tituloId, pessoaId }
+    }),
+})
+
 // ─── DRE — Demonstrativo de Resultado do Exercício ───────────────────────────
 
 const dreRouter = router({
@@ -1156,4 +1361,5 @@ export const finRouter = router({
   transferencia: transferenciaRouter,
   fluxoCaixa:    fluxoCaixaRouter,
   dre:           dreRouter,
+  proposta:      propostaFinRouter,
 })
