@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { LancamentosPage } from './pages/LancamentosPage'
 import { FluxoCaixaPage } from './pages/FluxoCaixaPage'
+import { DREPage } from './pages/DREPage'
 import { PessoasPage } from './pages/pessoas/PessoasPage'
 import { ConfiguracoesPage } from './pages/config/ConfiguracoesPage'
 
@@ -38,6 +39,7 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/lancamentos" element={<LancamentosPage />} />
               <Route path="/fluxo-caixa" element={<FluxoCaixaPage />} />
+              <Route path="/dre" element={<DREPage />} />
               <Route path="/pessoas" element={<PessoasPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
             </Route>

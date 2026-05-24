@@ -1008,6 +1008,140 @@ const fluxoCaixaRouter = router({
     }),
 })
 
+// ─── DRE — Demonstrativo de Resultado do Exercício ───────────────────────────
+
+const dreRouter = router({
+  get: protectedProcedure
+    .input(z.object({
+      de:     z.string(),  // 'YYYY-MM-DD'
+      ate:    z.string(),  // 'YYYY-MM-DD'
+      regime: z.enum(['CAIXA', 'COMPETENCIA']).default('CAIXA'),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // ── Agregação por conta do plano de contas ─────────────────────────────
+      // Regime caixa: usa dataPagamento + status=PAGA
+      // Regime competência: usa vencimento + status PAGA ou ABERTA
+      const rows = await ctx.db.execute(sql`
+        SELECT
+          pc.tipo          AS tipo,
+          pc.id            AS conta_id,
+          pc.codigo        AS conta_codigo,
+          pc.nome          AS conta_nome,
+          SUM(
+            CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
+              THEN COALESCE(p.valor_pago, p.valor)
+              ELSE p.valor
+            END
+          )                AS total,
+          COUNT(*)         AS qtd
+        FROM fin_parcela p
+        INNER JOIN fin_titulo t    ON t.id = p.titulo_id
+        INNER JOIN fin_plano_contas pc ON pc.id = t.plano_contas_id
+        WHERE
+          t.empresa_id = ${empId}
+          AND t.ativo = 1
+          AND pc.ativo = 1
+          AND (
+            CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
+              THEN p.status = 'PAGA'
+                AND p.data_pagamento BETWEEN ${input.de} AND ${input.ate}
+              ELSE p.status IN ('PAGA','ABERTA')
+                AND p.vencimento BETWEEN ${input.de} AND ${input.ate}
+            END
+          )
+        GROUP BY pc.tipo, pc.id, pc.codigo, pc.nome
+        ORDER BY pc.tipo, pc.codigo
+      `) as any[]
+
+      // ── Evolução mensal (mesmo período, agrupado por mês) ─────────────────
+      const mesesRaw = await ctx.db.execute(sql`
+        SELECT
+          pc.tipo AS tipo,
+          DATE_FORMAT(
+            CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
+              THEN p.data_pagamento
+              ELSE p.vencimento
+            END, '%Y-%m'
+          ) AS mes,
+          SUM(
+            CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
+              THEN COALESCE(p.valor_pago, p.valor)
+              ELSE p.valor
+            END
+          ) AS total
+        FROM fin_parcela p
+        INNER JOIN fin_titulo t    ON t.id = p.titulo_id
+        INNER JOIN fin_plano_contas pc ON pc.id = t.plano_contas_id
+        WHERE
+          t.empresa_id = ${empId}
+          AND t.ativo = 1
+          AND pc.ativo = 1
+          AND pc.tipo IN ('RECEITA','DESPESA')
+          AND (
+            CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
+              THEN p.status = 'PAGA'
+                AND p.data_pagamento BETWEEN ${input.de} AND ${input.ate}
+              ELSE p.status IN ('PAGA','ABERTA')
+                AND p.vencimento BETWEEN ${input.de} AND ${input.ate}
+            END
+          )
+        GROUP BY pc.tipo, mes
+        ORDER BY mes
+      `) as any[]
+
+      // ── Monta estrutura de resposta ────────────────────────────────────────
+      const data = Array.isArray(rows) ? rows : (rows as any).rows ?? []
+      const meses = Array.isArray(mesesRaw) ? mesesRaw : (mesesRaw as any).rows ?? []
+
+      type Conta = { id: number; codigo: string; nome: string; total: number; qtd: number }
+      const receitas:   Conta[] = []
+      const despesas:   Conta[] = []
+      const financeiro: Conta[] = []
+
+      for (const r of data) {
+        const conta: Conta = {
+          id:     Number(r.conta_id),
+          codigo: String(r.conta_codigo ?? ''),
+          nome:   String(r.conta_nome ?? ''),
+          total:  Number(r.total ?? 0),
+          qtd:    Number(r.qtd ?? 0),
+        }
+        if (r.tipo === 'RECEITA')    receitas.push(conta)
+        else if (r.tipo === 'DESPESA')   despesas.push(conta)
+        else if (r.tipo === 'FINANCEIRO') financeiro.push(conta)
+      }
+
+      const totalReceitas   = receitas.reduce((s, c) => s + c.total, 0)
+      const totalDespesas   = despesas.reduce((s, c) => s + c.total, 0)
+      const totalFinanceiro = financeiro.reduce((s, c) => s + c.total, 0)
+      const resultado       = totalReceitas - totalDespesas + totalFinanceiro
+      const margem          = totalReceitas > 0 ? (resultado / totalReceitas) * 100 : 0
+
+      // Consolidar meses: { mes, receitas, despesas, resultado }
+      const mesMap: Record<string, { mes: string; receitas: number; despesas: number }> = {}
+      for (const m of meses) {
+        const k = String(m.mes)
+        if (!mesMap[k]) mesMap[k] = { mes: k, receitas: 0, despesas: 0 }
+        if (m.tipo === 'RECEITA')  mesMap[k].receitas  += Number(m.total ?? 0)
+        if (m.tipo === 'DESPESA')  mesMap[k].despesas  += Number(m.total ?? 0)
+      }
+      const evolucao = Object.values(mesMap)
+        .sort((a, b) => a.mes.localeCompare(b.mes))
+        .map(m => ({ ...m, resultado: m.receitas - m.despesas }))
+
+      return {
+        receitas:   { total: totalReceitas,   contas: receitas },
+        despesas:   { total: totalDespesas,   contas: despesas },
+        financeiro: { total: totalFinanceiro, contas: financeiro },
+        resultado,
+        margem,
+        evolucao,
+      }
+    }),
+})
+
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────
 
 export const finRouter = router({
@@ -1021,4 +1155,5 @@ export const finRouter = router({
   parcela:       parcelaRouter,
   transferencia: transferenciaRouter,
   fluxoCaixa:    fluxoCaixaRouter,
+  dre:           dreRouter,
 })
