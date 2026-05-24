@@ -89,56 +89,93 @@ const CSS = `
     break-after: page;
   }
 
-  /* ─── CAPA (layout split: sidebar navy + área branca) ─────────── */
-  .capa { background: #fff; flex-direction: row !important; align-items: stretch; }
-  .capa-sidebar {
-    width: 188px; flex-shrink: 0;
-    background: #0E2040;
-    display: flex; flex-direction: column; align-items: center;
-    padding: 44px 22px; gap: 0;
+  /* ─── CAPA — full-bleed dark cover ───────────────────────────── */
+  .capa {
+    width: 210mm; height: 297mm;
+    position: relative; overflow: hidden;
+    background: #06150f;
+    display: block;
+    page-break-after: always; break-after: page;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .capa-main {
-    flex: 1; background: #fff;
-    display: flex; flex-direction: column; overflow: hidden;
+  .capa-bg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover; z-index: 1;
   }
-  .capa-main-top { height: 6px; background: #F5A623; flex-shrink: 0; }
-  .capa-main-body { flex: 1; padding: 64px 52px; display: flex; flex-direction: column; justify-content: center; }
-  .capa-main-bottom { height: 4px; background: #0E2040; flex-shrink: 0; }
-  .capa-pretitle {
-    font-family: Calibri, Candara, sans-serif;
+  .capa-overlay {
+    position: absolute; inset: 0; z-index: 2;
+    background: linear-gradient(90deg,
+      rgba(3,18,13,0.96) 0%, rgba(4,28,20,0.92) 28%,
+      rgba(4,28,20,0.68) 46%, rgba(4,28,20,0.18) 63%,
+      rgba(4,28,20,0.00) 100%
+    );
+  }
+  .capa-topinfo {
+    position: absolute; z-index: 3;
+    top: 18mm; right: 17mm;
+    text-align: right; font-size: 7.5px; line-height: 1.35;
+    color: rgba(255,255,255,0.62); letter-spacing: 0.4px;
+    font-family: 'Montserrat', Calibri, sans-serif;
+  }
+  .capa-content {
+    position: relative; z-index: 3;
+    height: 100%; width: 54%;
+    padding: 22mm 18mm 20mm 18mm;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: 'Montserrat', 'Segoe UI', Calibri, sans-serif;
+    color: #fff;
+  }
+  .capa-logo { width: 48mm; height: auto; object-fit: contain; }
+  .capa-logo-text {
+    font-size: 20px; font-weight: 900; color: #fff;
+    letter-spacing: 2px; line-height: 1.1;
+  }
+  .capa-logo-sub {
     font-size: 9px; font-weight: 400;
-    color: #F5A623; letter-spacing: 5px; text-transform: uppercase; margin-bottom: 22px;
+    color: rgba(255,255,255,0.5); letter-spacing: 5px; text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .capa-eyebrow {
+    font-size: 9px; letter-spacing: 5px; text-transform: uppercase;
+    color: #f2c23b; font-weight: 600; margin-bottom: 9mm;
   }
   .capa-title {
-    font-family: Calibri, Candara, sans-serif;
-    font-size: 46px; font-weight: 700;
-    color: #0E2040; line-height: 1.05; margin-bottom: 4px;
+    font-size: 32px; line-height: 1.05; font-weight: 800;
+    text-transform: uppercase; color: #fff;
+    margin: 0 0 8mm 0; max-width: 96mm;
   }
-  .capa-title-sub {
-    font-family: Calibri, Candara, sans-serif;
-    font-size: 20px; font-weight: 300; letter-spacing: 3px;
-    color: #0E2040; text-transform: uppercase; margin-bottom: 28px;
+  .capa-accent {
+    width: 18mm; height: 1.5mm;
+    background: #f2c23b !important;
+    margin-bottom: 9mm; border-radius: 99px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .capa-divider { width: 56px; height: 3px; background: #F5A623; margin-bottom: 32px; border-radius: 2px; }
-  .capa-cliente-label {
-    font-family: Calibri, Candara, sans-serif;
-    font-size: 9px; font-weight: 300;
-    color: #aaa; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px;
+  .capa-prepared {
+    font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase;
+    color: rgba(255,255,255,0.58); margin-bottom: 4mm;
   }
-  .capa-cliente-nome {
-    font-family: Calibri, Candara, sans-serif;
-    font-size: 30px; font-weight: 600;
-    color: #0E2040; line-height: 1.15; margin-bottom: 28px;
+  .capa-cliente {
+    font-size: 19px; line-height: 1.14; font-weight: 800;
+    text-transform: uppercase; max-width: 102mm; margin-bottom: 12mm; color: #fff;
   }
-  .capa-meta { display: flex; gap: 32px; }
+  .capa-meta {
+    display: grid; grid-template-columns: repeat(3, auto);
+    gap: 10mm; align-items: start; max-width: 105mm;
+  }
   .capa-meta-label {
-    font-size: 8px; font-weight: 300;
-    color: #bbb; letter-spacing: 2px; text-transform: uppercase;
+    font-size: 7.5px; letter-spacing: 1.6px; text-transform: uppercase;
+    color: rgba(255,255,255,0.48); margin-bottom: 2mm;
   }
-  .capa-meta-value {
-    font-family: Calibri, Candara, sans-serif;
-    font-size: 13px; font-weight: 400; color: #0E2040; margin-top: 3px;
+  .capa-meta-value { font-size: 10px; font-weight: 700; color: #fff; }
+  .capa-footer {
+    display: flex; gap: 3mm; align-items: center;
+    color: rgba(255,255,255,0.62); font-size: 7.5px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .capa-footer-bar {
+    width: 1.2mm; height: 8mm;
+    background: #f2c23b !important; border-radius: 99px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 
   /* ─── HEADER INTERNO ─────────────────────────────────────────── */
@@ -344,67 +381,69 @@ function gerarHTML(data: any): string {
     (blocos ?? []).find((b: any) => b.tipoBloco === tipo)?.textoOverride ?? null
 
   // ── CAPA ─────────────────────────────────────────────────────────────────
-  const capa = tem('capa') ? `<div class="page capa">
+  const tituloCapa = prop?.tipoProposta === 'fotovoltaico'
+    ? 'Energia<br>Solar'
+    : prop?.tipoProposta === 'servico'
+      ? 'Proposta de<br>Serviços'
+      : 'Proposta<br>Comercial'
 
-    <!-- ─ SIDEBAR ESQUERDA (navy) ─ -->
-    <div class="capa-sidebar" style="background:#0E2040 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+  const bgUrl = 'https://atomtech-solar-web.vercel.app/assets/covers/ENG-01.png'
 
-      <!-- Logo -->
-      <div style="margin-bottom:auto;text-align:center;">
-        ${logoUrl
-          ? `<img src="${logoUrl}" style="width:138px;max-height:90px;object-fit:contain;" alt="Logo"/>`
-          : `<div style="font-size:21px;font-weight:900;color:#fff;letter-spacing:2px;text-align:center;line-height:1.1;">ATOM<br><span style="color:#F5A623;">TECH</span></div>
-             <div style="font-size:8px;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:8px;text-align:center;">Energia Solar</div>`
-        }
-      </div>
+  const capa = tem('capa') ? `<div class="capa">
 
-      <!-- Ícone solar (outline apenas, pouca tinta) -->
-      <div style="margin:auto 0;text-align:center;">
-        <svg width="108" height="108" viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="54" cy="54" r="30" stroke="#F5A623" stroke-width="1.8" opacity="0.65"/>
-          <line x1="54" y1="10" x2="54" y2="20" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="54" y1="88" x2="54" y2="98" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="10" y1="54" x2="20" y2="54" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="88" y1="54" x2="98" y2="54" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="23" y1="23" x2="30" y2="30" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="78" y1="78" x2="85" y2="85" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="85" y1="23" x2="78" y2="30" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <line x1="30" y1="78" x2="23" y2="85" stroke="#F5A623" stroke-width="1.5" opacity="0.45"/>
-          <rect x="34" y="42" width="40" height="26" rx="2" stroke="#F5A623" stroke-width="1.5" opacity="0.55" fill="none"/>
-          <line x1="34" y1="51" x2="74" y2="51" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
-          <line x1="34" y1="60" x2="74" y2="60" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
-          <line x1="47" y1="42" x2="47" y2="68" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
-          <line x1="61" y1="42" x2="61" y2="68" stroke="#F5A623" stroke-width="0.8" opacity="0.4"/>
-          <line x1="54" y1="68" x2="54" y2="78" stroke="#F5A623" stroke-width="1.2" opacity="0.5"/>
-          <line x1="44" y1="78" x2="64" y2="78" stroke="#F5A623" stroke-width="1.2" opacity="0.5"/>
-        </svg>
-      </div>
+    <!-- Foto de fundo (desaparece com onerror se não existir) -->
+    <img class="capa-bg" src="${bgUrl}" alt="" onerror="this.style.display='none'"/>
 
-      <!-- Contato empresa -->
-      <div style="margin-top:auto;text-align:center;color:rgba(255,255,255,0.32);font-family:Calibri,Candara,sans-serif;font-size:8px;line-height:1.9;">
-        ${emp?.cidade ?? 'Brasília'}/DF<br>
-        ${emp?.email ?? 'contato@atomtech.tec.br'}<br>
-        ${emp?.telefone ?? '(61) 3978-1738'}
-      </div>
+    <!-- Gradiente escuro da esquerda -->
+    <div class="capa-overlay"></div>
+
+    <!-- Número + cidade — canto superior direito -->
+    <div class="capa-topinfo">
+      ${emp?.cidade ?? 'Brasília'}/DF<br>
+      ${numero}
     </div>
 
-    <!-- ─ ÁREA BRANCA (direita) ─ -->
-    <div class="capa-main">
-      <div class="capa-main-top" style="background:#F5A623 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
-      <div class="capa-main-body">
-        <div class="capa-pretitle">Proposta Comercial</div>
-        <div class="capa-title">ENERGIA<br>SOLAR</div>
-        <div class="capa-title-sub">para você</div>
-        <div class="capa-divider" style="background:#F5A623 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
-        <div class="capa-cliente-label">Preparado exclusivamente para</div>
-        <div class="capa-cliente-nome">${cli?.nome ?? ''}</div>
+    <!-- Conteúdo principal (coluna esquerda) -->
+    <div class="capa-content">
+
+      <!-- Logo -->
+      <header>
+        ${logoUrl
+          ? `<img class="capa-logo" src="${logoUrl}" alt="Logo"/>`
+          : `<div class="capa-logo-text"><span style="color:#f2c23b;">ATOM</span>TECH</div>
+             <div class="capa-logo-sub">Energia Solar</div>`
+        }
+      </header>
+
+      <!-- Bloco central -->
+      <main>
+        <div class="capa-eyebrow">Proposta Comercial</div>
+        <h1 class="capa-title">${tituloCapa}</h1>
+        <div class="capa-accent"></div>
+        <div class="capa-prepared">Preparado exclusivamente para</div>
+        <div class="capa-cliente">${cli?.nome ?? ''}</div>
         <div class="capa-meta">
-          <div><div class="capa-meta-label">Data</div><div class="capa-meta-value">${formatDate(prop?.dataEmissao)}</div></div>
-          <div><div class="capa-meta-label">Validade</div><div class="capa-meta-value">${prop?.dataValidade ? formatDate(prop.dataValidade) : '5 dias'}</div></div>
-          <div><div class="capa-meta-label">Proposta</div><div class="capa-meta-value">${numero}</div></div>
+          <div>
+            <div class="capa-meta-label">Data</div>
+            <div class="capa-meta-value">${formatDate(prop?.dataEmissao)}</div>
+          </div>
+          <div>
+            <div class="capa-meta-label">Válida até</div>
+            <div class="capa-meta-value">${prop?.dataValidade ? formatDate(prop.dataValidade) : '5 dias'}</div>
+          </div>
+          <div>
+            <div class="capa-meta-label">Proposta</div>
+            <div class="capa-meta-value">${numero}</div>
+          </div>
         </div>
-      </div>
-      <div class="capa-main-bottom" style="background:#0E2040 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+      </main>
+
+      <!-- Rodapé da capa -->
+      <footer class="capa-footer">
+        <div class="capa-footer-bar"></div>
+        <div>Engenharia &bull; Energia &bull; Tecnologia</div>
+      </footer>
+
     </div>
 
   </div>` : ''
@@ -626,6 +665,8 @@ function gerarHTML(data: any): string {
 <head>
   <meta charset="UTF-8">
   <title>Proposta ${numero} \u2014 ${emp?.nome ?? 'Atom Tech'}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=block">
   <style>${CSS}</style>
 </head>
 <body>
