@@ -1282,6 +1282,8 @@ export function PropostaDetailPage() {
   const [gerandoContrato, setGerandoContrato] = useState(false)
   const [showClonar, setShowClonar]         = useState(false)
   const [showAltCliente, setShowAltCliente] = useState(false)
+  const [showCapaModal, setShowCapaModal]   = useState(false)
+  const [capaImgSelecionada, setCapaImgSelecionada] = useState('')
 
   const propostaId = Number(id)
   const { data, isLoading } = trpc.proposta.byId.useQuery({ id: propostaId }, { enabled: !!propostaId })
@@ -1319,12 +1321,20 @@ export function PropostaDetailPage() {
       return
     }
 
+    // Define capa padrão pelo tipo e abre modal de seleção
+    const tipoProposta = (data as any).proposta?.tipoProposta ?? 'fotovoltaico'
+    setCapaImgSelecionada(tipoProposta === 'fotovoltaico' ? 'SOLAR-01' : 'ENG-01')
+    setShowCapaModal(true)
+  }
+
+  const handleGerarPdfComCapa = (capaImg: string) => {
+    setShowCapaModal(false)
     setGerandoPdf(true)
     setTimeout(() => {
       try {
         const textos: Record<string, any> = {}
         if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
-        const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData }
+        const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData, capaImg }
         if ((data as any).proposta?.tipoProposta === 'servico_geral') {
           abrirPdfServicoNoNavegador(dadosPdf)
         } else {
@@ -1453,6 +1463,16 @@ export function PropostaDetailPage() {
         )}
       </div>
 
+      {/* ── MODAL: SELECIONAR CAPA DO PDF ───────────────────────── */}
+      {showCapaModal && (
+        <ModalSelecionarCapa
+          capaAtual={capaImgSelecionada}
+          onChange={setCapaImgSelecionada}
+          onConfirm={() => handleGerarPdfComCapa(capaImgSelecionada)}
+          onClose={() => setShowCapaModal(false)}
+        />
+      )}
+
       {/* ── MODAL: CLONAR PROPOSTA ───────────────────────────────── */}
       {showClonar && (
         <ModalSelecionarCliente
@@ -1484,6 +1504,129 @@ export function PropostaDetailPage() {
           onClose={() => setShowAltCliente(false)}
         />
       )}
+    </div>
+  )
+}
+
+// ─── MODAL: SELECIONAR CAPA DO PDF ───────────────────────────────────────────
+const CAPAS_DISPONIVEIS = [
+  { id: 'SOLAR-01',  label: 'Solar 01',        categoria: 'Solar' },
+  { id: 'SOLAR-02',  label: 'Solar 02',        categoria: 'Solar' },
+  { id: 'ENG-01',    label: 'Engenharia 01',   categoria: 'Engenharia' },
+  { id: 'ENG-02',    label: 'Engenharia 02',   categoria: 'Engenharia' },
+  { id: 'CFTV-01',   label: 'CFTV 01',         categoria: 'CFTV' },
+  { id: 'CFTV-02',   label: 'CFTV 02',         categoria: 'CFTV' },
+  { id: 'EV-01',     label: 'Elétrico 01',     categoria: 'Elétrico' },
+  { id: 'EV-02',     label: 'Elétrico 02',     categoria: 'Elétrico' },
+  { id: 'INSTIT-01', label: 'Institucional',   categoria: 'Institucional' },
+]
+
+function ModalSelecionarCapa({
+  capaAtual, onChange, onConfirm, onClose,
+}: {
+  capaAtual: string
+  onChange: (id: string) => void
+  onConfirm: () => void
+  onClose: () => void
+}) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: C.darkCard, borderRadius: 16,
+        border: `1px solid ${C.darkBorder}`,
+        padding: '28px 28px 24px',
+        width: 680, maxWidth: '95vw', maxHeight: '90vh',
+        overflow: 'auto',
+      }}>
+        {/* Cabeçalho */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+          <div>
+            <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>
+              Escolha a Capa do PDF
+            </h2>
+            <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>
+              Selecione a imagem de fundo que melhor representa esta proposta
+            </p>
+          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: C.textMuted,
+            fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4,
+          }}>✕</button>
+        </div>
+
+        {/* Grid de capas */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24,
+        }}>
+          {CAPAS_DISPONIVEIS.map(capa => {
+            const selected = capaAtual === capa.id
+            return (
+              <div
+                key={capa.id}
+                onClick={() => onChange(capa.id)}
+                style={{
+                  borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
+                  border: `2px solid ${selected ? C.solar : C.darkBorder}`,
+                  boxShadow: selected ? `0 0 0 2px ${C.solar}40` : 'none',
+                  transition: 'all 0.15s',
+                  background: C.dark,
+                }}
+              >
+                {/* Thumbnail da capa */}
+                <div style={{ position: 'relative', height: 120, overflow: 'hidden', background: '#06150f' }}>
+                  <img
+                    src={`/assets/covers/${capa.id}.png`}
+                    alt={capa.label}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                  {/* Overlay gradiente igual à capa real */}
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(90deg, rgba(3,18,13,0.85) 0%, rgba(4,28,20,0.5) 60%, transparent 100%)',
+                  }} />
+                  {/* Check de seleção */}
+                  {selected && (
+                    <div style={{
+                      position: 'absolute', top: 8, right: 8,
+                      width: 22, height: 22, borderRadius: '50%',
+                      background: C.solar, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 12, color: '#fff', fontWeight: 700,
+                    }}>✓</div>
+                  )}
+                </div>
+                {/* Label */}
+                <div style={{
+                  padding: '8px 10px',
+                  background: selected ? C.solar + '18' : 'transparent',
+                  borderTop: `1px solid ${selected ? C.solar + '40' : C.darkBorder}`,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: selected ? C.solar : C.text }}>{capa.label}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>{capa.categoria}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Ações */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{
+            background: 'none', border: `1px solid ${C.darkBorder}`, borderRadius: 8,
+            padding: '9px 20px', color: C.textMuted, fontSize: 13, cursor: 'pointer',
+          }}>Cancelar</button>
+          <button onClick={onConfirm} disabled={!capaAtual} style={{
+            background: capaAtual ? C.solar : C.darkBorder,
+            border: 'none', borderRadius: 8,
+            padding: '9px 24px', color: capaAtual ? '#0E2040' : C.textMuted,
+            fontSize: 13, fontWeight: 700, cursor: capaAtual ? 'pointer' : 'not-allowed',
+          }}>↯ Gerar PDF</button>
+        </div>
+      </div>
     </div>
   )
 }

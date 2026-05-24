@@ -105,37 +105,44 @@ const CSS_SERVICO = `
   ul { padding-left: 20px; margin: 8px 0 12px; }
   li { font-size: 13.5px; font-weight: 300; color: #444; line-height: 1.9; margin-bottom: 4px; }
 
-  /* ─── CAPA: página inteira, quebra obrigatória depois ───────────── */
+  /* ─── CAPA — full-bleed dark cover ───────────────────────────── */
   .capa {
-    width: 210mm;
-    height: 297mm;
-    overflow: hidden;
-    background: linear-gradient(160deg, #0A1628 0%, #0E2040 55%, #102A50 100%);
-    display: flex; flex-direction: column;
+    width: 210mm; height: 297mm;
+    position: relative; overflow: hidden;
+    background: #06150f; display: block;
     page-break-after: always; break-after: page;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .capa-top {
-    padding: 30px 40px 0;
-    display: flex; justify-content: space-between; align-items: flex-start;
+  .capa-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+  .capa-overlay {
+    position: absolute; inset: 0; z-index: 2;
+    background: linear-gradient(90deg,
+      rgba(3,18,13,0.96) 0%, rgba(4,28,20,0.92) 28%,
+      rgba(4,28,20,0.68) 46%, rgba(4,28,20,0.18) 63%,
+      rgba(4,28,20,0.00) 100%);
   }
-  .capa-body {
-    flex: 1; padding: 0 40px 48px;
-    display: flex; flex-direction: column; justify-content: center;
+  .capa-topinfo {
+    position: absolute; z-index: 3; top: 18mm; right: 17mm;
+    text-align: right; font-size: 7.5px; line-height: 1.35;
+    color: rgba(255,255,255,0.62); letter-spacing: 0.4px;
+    font-family: 'Montserrat', Calibri, sans-serif;
   }
-  .capa-pretitle {
-    font-size: 10px; font-weight: 500; color: #F5A623;
-    letter-spacing: 5px; text-transform: uppercase; margin-bottom: 18px;
+  .capa-content {
+    position: relative; z-index: 3; height: 100%; width: 54%;
+    padding: 22mm 18mm 20mm 18mm;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: 'Montserrat', 'Segoe UI', Calibri, sans-serif; color: #fff;
   }
-  .capa-title { font-size: 40px; font-weight: 700; color: #FFFFFF; line-height: 1.1; margin-bottom: 8px; }
-  .capa-divider { width: 60px; height: 3px; background: #F5A623; margin: 22px 0; border-radius: 2px; }
-  .capa-cliente-label {
-    font-size: 10px; font-weight: 300;
-    color: rgba(255,255,255,0.7); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px;
-  }
-  .capa-cliente-nome { font-size: 30px; font-weight: 600; color: #fff; line-height: 1.2; }
-  .capa-meta { display: flex; gap: 36px; margin-top: 28px; }
-  .capa-meta-label { font-size: 10px; font-weight: 300; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; }
-  .capa-meta-value { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.95); margin-top: 4px; }
+  .capa-eyebrow { font-size: 9px; letter-spacing: 5px; text-transform: uppercase; color: #f2c23b; font-weight: 600; margin-bottom: 9mm; }
+  .capa-title { font-size: 32px; line-height: 1.05; font-weight: 800; text-transform: uppercase; color: #fff; margin: 0 0 8mm 0; max-width: 96mm; }
+  .capa-accent { width: 18mm; height: 1.5mm; background: #f2c23b !important; margin-bottom: 9mm; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .capa-prepared { font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.58); margin-bottom: 4mm; }
+  .capa-cliente { font-size: 19px; line-height: 1.14; font-weight: 800; text-transform: uppercase; max-width: 102mm; margin-bottom: 12mm; color: #fff; }
+  .capa-meta { display: grid; grid-template-columns: repeat(3, auto); gap: 10mm; align-items: start; max-width: 105mm; }
+  .capa-meta-label { font-size: 7.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.48); margin-bottom: 2mm; }
+  .capa-meta-value { font-size: 10px; font-weight: 700; color: #fff; }
+  .capa-footer-row { display: flex; gap: 3mm; align-items: center; color: rgba(255,255,255,0.62); font-size: 7.5px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .capa-footer-bar { width: 1.2mm; height: 8mm; background: #f2c23b !important; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   /* ─── TABELA DE DOCUMENTO: thead/tfoot repetem em cada página impressa */
   .doc-table {
@@ -302,43 +309,54 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   const F = (n: string) => footerServico(n, empresa)
 
   // ── CAPA ─────────────────────────────────────────────────────────
+  const capaImgServico  = (data as any).capaImg as string | undefined
+  const bgUrlServico    = capaImgServico
+    ? `${window.location.origin}/assets/covers/${capaImgServico}.png`
+    : null
+
   let capaHtml = ''
   if (blocoAtivo(blocos, 'capa')) {
     capaHtml = `
     <div class="capa">
-      <div class="capa-top">
-        <div>
-          ${logoUrl
-            ? `<img src="${logoUrl}" style="height:72px;max-width:200px;object-fit:contain;" alt="Logo"/>`
-            : `<div style="font-size:24px;font-weight:800;color:#fff;letter-spacing:2px">${nomeEmpresa}</div>
-               <div style="font-size:9px;font-weight:400;color:#F5A623;letter-spacing:5px;text-transform:uppercase;margin-top:4px">Proposta de Serviços</div>`
-          }
-        </div>
-        <div style="text-align:right;line-height:1.7">
-          ${empresa?.cidade ? `<div style="font-size:10px;color:rgba(255,255,255,0.5)">${empresa.cidade}/${empresa.estado ?? ''}</div>` : ''}
-          <div style="font-size:9px;color:rgba(255,255,255,0.3)">${numero}</div>
-        </div>
+      ${bgUrlServico ? `<img class="capa-bg" src="${bgUrlServico}" alt="" onerror="this.style.display='none'"/>` : ''}
+      <div class="capa-overlay"></div>
+      <div class="capa-topinfo">
+        ${empresa?.cidade ? `${empresa.cidade}/${empresa.estado ?? 'DF'}` : 'Brasília/DF'}<br>
+        ${numero}
       </div>
-      <div class="capa-body">
-        <div class="capa-pretitle">Proposta Comercial</div>
-        <div class="capa-title">${tituloServico}</div>
-        <div class="capa-divider"></div>
-        <div class="capa-cliente-label">Preparado exclusivamente para</div>
-        <div class="capa-cliente-nome">${nomeCliente}</div>
-        <div class="capa-meta">
-          <div>
-            <div class="capa-meta-label">Data</div>
-            <div class="capa-meta-value">${dataEmissao}</div>
+      <div class="capa-content">
+        <header>
+          ${logoUrl
+            ? `<img src="${logoUrl}" style="width:48mm;height:auto;object-fit:contain;" alt="Logo"/>`
+            : `<div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:2px;line-height:1.1;"><span style="color:#f2c23b;">${nomeEmpresa.split(' ')[0]}</span>${nomeEmpresa.split(' ').slice(1).join(' ')}</div>
+               <div style="font-size:9px;font-weight:400;color:rgba(255,255,255,0.5);letter-spacing:5px;text-transform:uppercase;margin-top:4px;">Engenharia &amp; Tecnologia</div>`
+          }
+        </header>
+        <main>
+          <div class="capa-eyebrow">Proposta Comercial</div>
+          <h1 class="capa-title">${tituloServico}</h1>
+          <div class="capa-accent"></div>
+          <div class="capa-prepared">Preparado exclusivamente para</div>
+          <div class="capa-cliente">${nomeCliente}</div>
+          <div class="capa-meta">
+            <div>
+              <div class="capa-meta-label">Data</div>
+              <div class="capa-meta-value">${dataEmissao}</div>
+            </div>
+            ${dataValidade ? `<div>
+              <div class="capa-meta-label">Válida até</div>
+              <div class="capa-meta-value">${dataValidade}</div>
+            </div>` : ''}
+            <div>
+              <div class="capa-meta-label">Proposta</div>
+              <div class="capa-meta-value">${numero}</div>
+            </div>
           </div>
-          ${dataValidade ? `<div>
-            <div class="capa-meta-label">Válida até</div>
-            <div class="capa-meta-value">${dataValidade}</div>
-          </div>` : ''}
-          <div>
-            <div class="capa-meta-label">Proposta</div>
-            <div class="capa-meta-value">${numero}</div>
-          </div>
-        </div>
+        </main>
+        <footer class="capa-footer-row">
+          <div class="capa-footer-bar"></div>
+          <div>Engenharia &bull; Energia &bull; Tecnologia</div>
+        </footer>
       </div>
     </div>`
   }

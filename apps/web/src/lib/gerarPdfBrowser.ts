@@ -383,16 +383,19 @@ function gerarHTML(data: any): string {
   // ── CAPA ─────────────────────────────────────────────────────────────────
   const tituloCapa = prop?.tipoProposta === 'fotovoltaico'
     ? 'Energia<br>Solar'
-    : prop?.tipoProposta === 'servico'
+    : prop?.tipoProposta === 'servico_geral'
       ? 'Proposta de<br>Serviços'
       : 'Proposta<br>Comercial'
 
-  const bgUrl = 'https://atomtech-solar-web.vercel.app/assets/covers/ENG-01.png'
+  const capaImg  = (data as any).capaImg as string | undefined
+  const bgUrl    = capaImg
+    ? `${window.location.origin}/assets/covers/${capaImg}.png`
+    : null
 
   const capa = tem('capa') ? `<div class="capa">
 
     <!-- Foto de fundo (desaparece com onerror se não existir) -->
-    <img class="capa-bg" src="${bgUrl}" alt="" onerror="this.style.display='none'"/>
+    ${bgUrl ? `<img class="capa-bg" src="${bgUrl}" alt="" onerror="this.style.display='none'"/>` : ''}
 
     <!-- Gradiente escuro da esquerda -->
     <div class="capa-overlay"></div>
