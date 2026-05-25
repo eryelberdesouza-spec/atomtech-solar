@@ -1317,7 +1317,7 @@ export function PropostaDetailPage() {
   const criarOSMutation = (trpc as any).os.criar.useMutation({
     onSuccess: (res: any) => {
       utils.proposta.byId.invalidate({ id: propostaId })
-      ;(trpc as any).os.list.invalidate({ propostaId: propostaId })
+      ;(utils as any).os.list.invalidate({ propostaId: propostaId })
       if (window.confirm(`OS ${res.numero} criada com sucesso!\n\nDeseja abrir a Ordem de Serviço agora?`)) {
         navigate(`/ordens-servico/${res.id}`)
       }
