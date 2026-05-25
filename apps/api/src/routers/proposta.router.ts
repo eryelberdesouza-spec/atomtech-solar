@@ -835,23 +835,44 @@ export const propostaRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Usa pool mysql2 diretamente — Drizzle tem bugs com boolean/date em .set() e .execute()
       const pool = getRawPool()
-      const [rows]: any = await pool.execute(
-        'SELECT id, status FROM proposta WHERE id = ? AND empresa_id = ? LIMIT 1',
+
+      // 1. Verifica proposta
+      const [selRows]: any = await pool.execute(
+        'SELECT id, status, contrato_formalizado FROM proposta WHERE id = ? AND empresa_id = ? LIMIT 1',
         [input.id, ctx.usuario.empresaId]
       )
-      const prop = (rows as any[])[0]
-      if (!prop) throw new TRPCError({ code: 'NOT_FOUND' })
+      const prop = (selRows as any[])[0]
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: `Proposta ${input.id} não encontrada para empresa ${ctx.usuario.empresaId}` })
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser formalizadas.' })
 
+      // Se já formalizado, apenas retorna o estado atual
+      if (Number(prop.contrato_formalizado) === 1) {
+        const [vRows]: any = await pool.execute(
+          'SELECT data_formalizacao FROM proposta WHERE id = ? LIMIT 1', [input.id]
+        )
+        const vRow = (vRows as any[])[0]
+        const df = vRow?.data_formalizacao ? String(vRow.data_formalizacao).slice(0, 10) : null
+        return { ok: true, dataFormalizacao: df }
+      }
+
+      // 2. Executa UPDATE
       const today = new Date().toISOString().slice(0, 10)
-      const [upd]: any = await pool.execute(
+      await pool.execute(
         'UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = ? WHERE id = ? AND empresa_id = ?',
         [today, input.id, ctx.usuario.empresaId]
       )
-      if ((upd as any).affectedRows === 0) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Falha ao atualizar o contrato. Tente novamente.' })
+
+      // 3. Verifica resultado real no BD
+      const [vfRows]: any = await pool.execute(
+        'SELECT contrato_formalizado, data_formalizacao FROM proposta WHERE id = ? LIMIT 1',
+        [input.id]
+      )
+      const vfRow = (vfRows as any[])[0]
+      if (Number(vfRow?.contrato_formalizado) !== 1) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'BD não confirmou a formalização. Tente novamente.' })
       }
-      return { ok: true }
+      const dataFormalizacao = vfRow?.data_formalizacao ? String(vfRow.data_formalizacao).slice(0, 10) : today
+      return { ok: true, dataFormalizacao }
     }),
 
   // Atualiza blocos (ativar/desativar/reordenar)

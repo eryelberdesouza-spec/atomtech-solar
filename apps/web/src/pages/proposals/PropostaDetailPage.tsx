@@ -1287,6 +1287,16 @@ export function PropostaDetailPage() {
   const [capaImgSelecionada, setCapaImgSelecionada] = useState('')
 
   const propostaId = Number(id)
+
+  // Persiste estado de formalização no sessionStorage para sobreviver navegação
+  const ssKey = `atomtech_formalizado_${propostaId}`
+  const [formalizadoLocal, setFormalizadoLocal] = useState<boolean | null>(() => {
+    try { return sessionStorage.getItem(ssKey) === '1' ? true : null } catch { return null }
+  })
+  const [dataFormalizacaoLocal, setDataFormalizacaoLocal] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(`${ssKey}_dt`) || null } catch { return null }
+  })
+
   const { data, isLoading } = trpc.proposta.byId.useQuery({ id: propostaId }, { enabled: !!propostaId })
   const { data: empresa }    = trpc.empresa.get.useQuery()
   const { data: textosData } = trpc.textoInstitucional.list.useQuery()
@@ -1294,17 +1304,22 @@ export function PropostaDetailPage() {
     { id: data?.proposta?.clienteId },
     { enabled: !!data?.proposta?.clienteId }
   )
+  const utils = trpc.useUtils()
   const updateStatus = trpc.proposta.updateStatus.useMutation()
+  const [formalizando, setFormalizando] = useState(false)
   const formalizarMutation = (trpc as any).proposta.formalizar.useMutation({
-    onSuccess: () => {
+    onSuccess: (res: any) => {
+      const df: string = res?.dataFormalizacao ?? new Date().toISOString().slice(0, 10)
+      try {
+        sessionStorage.setItem(ssKey, '1')
+        sessionStorage.setItem(`${ssKey}_dt`, df)
+      } catch {}
       setFormalizadoLocal(true)
+      setDataFormalizacaoLocal(df)
       utils.proposta.byId.invalidate({ id: propostaId })
     },
     onError: (e: any) => alert('Erro ao formalizar: ' + (e?.message ?? 'Tente novamente')),
   })
-  const [formalizando, setFormalizando] = useState(false)
-  const [formalizadoLocal, setFormalizadoLocal] = useState<boolean | null>(null)
-  const utils = trpc.useUtils()
 
   const clonarMutation = (trpc as any).proposta.clonar.useMutation({
     onSuccess: (res: any) => { navigate(`/propostas/${res.propostaId}`) },
@@ -1418,11 +1433,11 @@ export function PropostaDetailPage() {
             <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: 14, fontWeight: 800 }}>{proposta.numero}</span>
             <Badge status={proposta.status} />
             <span style={{ fontSize: 11, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 7px' }}>v{proposta.versao}</span>
-            {(formalizadoLocal ?? proposta.contratoFormalizado) ? (
+            {(formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1) ? (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
                 background: '#10B98120', color: '#10B981', border: '1px solid #10B98140',
-              }}>✔ Contrato Formalizado {proposta.dataFormalizacao ? `· ${formatDate(proposta.dataFormalizacao)}` : ''}</span>
+              }}>✔ Contrato Formalizado {(dataFormalizacaoLocal || proposta.dataFormalizacao) ? `· ${formatDate(dataFormalizacaoLocal || proposta.dataFormalizacao)}` : ''}</span>
             ) : proposta.status === 'aceita' ? (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
@@ -1459,7 +1474,7 @@ export function PropostaDetailPage() {
             style={{ borderColor: C.green + '60', color: C.green }}>
             {gerandoContrato ? '⏳ Gerando...' : '📄 Gerar Contrato'}
           </Btn>
-          {proposta.status === 'aceita' && !(formalizadoLocal ?? proposta.contratoFormalizado) && (
+          {proposta.status === 'aceita' && !(formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1) && (
             <Btn size="sm" variant="ghost" onClick={handleFormalizar} disabled={formalizando}
               style={{ borderColor: '#10B98160', color: '#10B981', fontWeight: 700 }}>
               {formalizando ? '⏳...' : '✔ Formalizar Contrato'}
