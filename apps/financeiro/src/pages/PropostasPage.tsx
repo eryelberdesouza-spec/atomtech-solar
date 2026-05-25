@@ -2,7 +2,7 @@
 // Propostas — importação de propostas aceitas como títulos a receber
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { trpc } from '../lib/trpc'
 import { PageWrapper, C, Spinner, Alert, Btn } from '../components/ui'
 import { fmtBRLFull } from '../lib/masks'
@@ -72,11 +72,14 @@ function ModalImportar({
     onError: (e: any) => setErro(e.message ?? 'Erro ao importar'),
   })
 
-  // Seleciona automaticamente a primeira condição ao carregar
   const condicoesData: any[] = condicoes ?? []
-  if (condicoesData.length > 0 && condicaoId === null) {
-    setCondicaoId(condicoesData[0].id)
-  }
+
+  // Seleciona automaticamente a primeira condição ao carregar
+  useEffect(() => {
+    if (condicoesData.length > 0 && condicaoId === null) {
+      setCondicaoId(condicoesData[0].id)
+    }
+  }, [condicoesData.length])
 
   const planosReceita = (planos ?? []).filter((p: any) => p.tipo === 'RECEITA')
   const condSelecionada = condicoesData.find((c: any) => c.id === condicaoId)
@@ -273,8 +276,9 @@ export function PropostasPage() {
 
   function handleSucesso() {
     setPropostaModal(null)
+    setAba('importadas')
     setSucesso('Proposta importada com sucesso! Título a receber gerado.')
-    setTimeout(() => setSucesso(''), 4000)
+    setTimeout(() => setSucesso(''), 5000)
   }
 
   const tabStyle = (ativo: boolean) => ({
