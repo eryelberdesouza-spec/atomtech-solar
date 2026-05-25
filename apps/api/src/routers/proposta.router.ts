@@ -835,7 +835,7 @@ export const propostaRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Usa pool mysql2 diretamente — Drizzle tem bugs com boolean/date em .set() e .execute()
       const pool = getRawPool()
-      const [[rows]]: any = await pool.execute(
+      const [rows]: any = await pool.execute(
         'SELECT id, status FROM proposta WHERE id = ? AND empresa_id = ? LIMIT 1',
         [input.id, ctx.usuario.empresaId]
       )
