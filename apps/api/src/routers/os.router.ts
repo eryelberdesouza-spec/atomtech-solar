@@ -105,6 +105,10 @@ export const osRouter = router({
         params.push(input.propostaId)
       }
 
+      // LIMIT/OFFSET hardcoded na string — mysql2 pool.execute() não aceita ? para LIMIT
+      const lim = Number(input.porPagina)
+      const off = Number(offset)
+
       const [rows]: any = await pool.execute(
         `SELECT
            os.id, os.numero, os.status, os.titulo,
@@ -120,16 +124,16 @@ export const osRouter = router({
            p.tipo_proposta         AS tipoProposta,
            p.titulo_servico        AS tituloServico,
            c.nome                  AS clienteNome,
-           (SELECT COUNT(*) FROM os_marco m WHERE m.ordem_servico_id = os.id)            AS totalMarcos,
-           (SELECT COUNT(*) FROM os_marco m WHERE m.ordem_servico_id = os.id AND m.concluido = 1) AS marcosFeitos,
-           (SELECT COUNT(*) FROM os_agendamento a WHERE a.ordem_servico_id = os.id)      AS totalAgendamentos
+           (SELECT COUNT(*) FROM os_marco m1 WHERE m1.ordem_servico_id = os.id)                        AS totalMarcos,
+           (SELECT COUNT(*) FROM os_marco m2 WHERE m2.ordem_servico_id = os.id AND m2.concluido = 1)   AS marcosFeitos,
+           (SELECT COUNT(*) FROM os_agendamento ag WHERE ag.ordem_servico_id = os.id)                  AS totalAgendamentos
          FROM ordem_servico os
          LEFT JOIN proposta p ON p.id = os.proposta_id
          LEFT JOIN cliente  c ON c.id = p.cliente_id
          WHERE ${where}
          ORDER BY os.created_at DESC
-         LIMIT ? OFFSET ?`,
-        [...params, input.porPagina, offset],
+         LIMIT ${lim} OFFSET ${off}`,
+        params,
       )
 
       const [countRows]: any = await pool.execute(
