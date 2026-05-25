@@ -840,12 +840,12 @@ export const propostaRouter = router({
         .limit(1)
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND' })
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser formalizadas.' })
-      const hoje = new Date().toISOString().slice(0, 10)
-      await ctx.db
-        .update(proposta)
-        .set({ contratoFormalizado: true, dataFormalizacao: hoje as any })
-        .where(eq(proposta.id, input.id))
-        .execute()
+      // Usa SQL direto para evitar problemas de mapeamento do Drizzle com campos novos
+      await ctx.db.execute(sql`
+        UPDATE proposta
+        SET contrato_formalizado = 1, data_formalizacao = CURDATE()
+        WHERE id = ${input.id} AND empresa_id = ${ctx.usuario.empresaId}
+      `)
       return { ok: true }
     }),
 
