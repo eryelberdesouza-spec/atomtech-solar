@@ -15,18 +15,25 @@ import mysql from 'mysql2/promise'
 import * as schema from '../db/schema'
 
 // Conexão compartilhada — singleton
-let _db: ReturnType<typeof drizzle> | null = null
+let _db:   ReturnType<typeof drizzle> | null = null
+let _pool: ReturnType<typeof mysql.createPool> | null = null
 
 function getDb() {
   if (!_db) {
-    const pool = mysql.createPool({
+    _pool = mysql.createPool({
       uri: process.env.DATABASE_URL ?? 'mysql://root:@localhost:3306/atomtech_solar',
       waitForConnections: true,
       connectionLimit: 10,
     })
-    _db = drizzle(pool, { schema, mode: 'default' })
+    _db = drizzle(_pool, { schema, mode: 'default' })
   }
   return _db
+}
+
+/** Pool mysql2 bruto — para queries que o Drizzle não gera corretamente */
+export function getRawPool() {
+  getDb() // garante inicialização
+  return _pool!
 }
 
 export type Usuario = {

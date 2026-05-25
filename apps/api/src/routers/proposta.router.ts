@@ -6,7 +6,7 @@
 import { z } from 'zod'
 import { eq, and, desc, like, not, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
-import { router, protectedProcedure } from './trpc'
+import { router, protectedProcedure, getRawPool } from './trpc'
 import {
   proposta,
   dimensionamento,
@@ -833,26 +833,24 @@ export const propostaRouter = router({
   formalizar: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      // Verifica via raw SQL para evitar problemas de mapeamento Drizzle com campos novos
-      const checkResult = await ctx.db.execute(sql`
-        SELECT id, status FROM proposta
-        WHERE id = ${input.id} AND empresa_id = ${ctx.usuario.empresaId}
-        LIMIT 1
-      `) as any
-      const checkRows: any[] = Array.isArray(checkResult) && Array.isArray(checkResult[0])
-        ? checkResult[0]
-        : Array.isArray(checkResult) ? checkResult : []
-      const prop = checkRows[0]
+      // Usa pool mysql2 diretamente — Drizzle tem bugs com boolean/date em .set() e .execute()
+      const pool = getRawPool()
+      const [[rows]]: any = await pool.execute(
+        'SELECT id, status FROM proposta WHERE id = ? AND empresa_id = ? LIMIT 1',
+        [input.id, ctx.usuario.empresaId]
+      )
+      const prop = (rows as any[])[0]
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND' })
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser formalizadas.' })
-      // Usa Drizzle update com sql raw values para forçar os tipos corretos
-      await ctx.db
-        .update(proposta)
-        .set({
-          contratoFormalizado: sql`1` as any,
-          dataFormalizacao:    sql`CURDATE()` as any,
-        })
-        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, ctx.usuario.empresaId)))
+
+      const today = new Date().toISOString().slice(0, 10)
+      const [upd]: any = await pool.execute(
+        'UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = ? WHERE id = ? AND empresa_id = ?',
+        [today, input.id, ctx.usuario.empresaId]
+      )
+      if ((upd as any).affectedRows === 0) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Falha ao atualizar o contrato. Tente novamente.' })
+      }
       return { ok: true }
     }),
 
