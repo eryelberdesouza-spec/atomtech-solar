@@ -296,7 +296,7 @@ export function PropostasPage() {
         borderBottom: `1px solid ${C.border}`,
       }}>
         <button style={tabStyle(aba === 'pendentes')} onClick={() => setAba('pendentes')}>
-          Pendentes de Importação
+          Contratos Formalizados
           {pendentes.length > 0 && (
             <span style={{
               marginLeft: 8, padding: '1px 7px', borderRadius: 10, fontSize: 10,
@@ -327,7 +327,7 @@ export function PropostasPage() {
           color: C.textMuted, fontSize: 14,
         }}>
           {aba === 'pendentes'
-            ? 'Nenhuma proposta aceita aguardando importação.'
+            ? 'Nenhuma proposta com contrato formalizado aguardando importação.'
             : 'Nenhuma proposta importada ainda.'}
         </div>
       ) : (
@@ -366,7 +366,12 @@ export function PropostasPage() {
                   {p.valorTotal ? fmtBRLFull(p.valorTotal) : '—'}
                 </div>
                 <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-                  {fmtData(p.dataEmissao)}
+                  Emitida: {fmtData(p.dataEmissao)}
+                  {p.dataFormalizacao && (
+                    <span style={{ marginLeft: 10, color: '#10B981' }}>
+                      ✔ Formalizado: {fmtData(p.dataFormalizacao)}
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -1050,7 +1050,7 @@ function addDias(base: string, dias: number, tipo: 'corridos' | 'uteis'): string
 
 const propostaFinRouter = router({
 
-  // Lista propostas aceitas — com flag se já foram importadas
+  // Lista propostas com contrato formalizado — com flag se já foram importadas
   listar: protectedProcedure.query(async ({ ctx }) => {
     const empId = ctx.usuario.empresaId
     const rows = await ctx.db.execute(sql`
@@ -1058,6 +1058,8 @@ const propostaFinRouter = router({
         p.id, p.numero, p.tipo_proposta AS tipoProposta,
         p.titulo_servico AS tituloServico,
         p.status, p.data_emissao AS dataEmissao,
+        p.contrato_formalizado AS contratoFormalizado,
+        p.data_formalizacao AS dataFormalizacao,
         c.id AS clienteId, c.nome AS clienteNome, c.cpf_cnpj AS clienteCpfCnpj,
         c.email AS clienteEmail, c.telefone AS clienteTelefone,
         prec.preco_final AS valorTotal,
@@ -1068,8 +1070,9 @@ const propostaFinRouter = router({
       LEFT JOIN fin_titulo ft ON ft.proposta_id = p.id AND ft.empresa_id = ${empId}
       WHERE p.empresa_id = ${empId}
         AND p.status = 'aceita'
+        AND p.contrato_formalizado = 1
         AND (p.is_template IS NULL OR p.is_template = 0)
-      ORDER BY p.data_emissao DESC
+      ORDER BY p.data_formalizacao DESC, p.data_emissao DESC
     `) as any[]
     const data = Array.isArray(rows) ? rows : (rows as any).rows ?? []
     return data.map((r: any) => ({
@@ -1079,6 +1082,7 @@ const propostaFinRouter = router({
       tituloServico:       r.tituloServico ? String(r.tituloServico) : null,
       status:              String(r.status ?? ''),
       dataEmissao:         r.dataEmissao ? String(r.dataEmissao).slice(0, 10) : null,
+      dataFormalizacao:    r.dataFormalizacao ? String(r.dataFormalizacao).slice(0, 10) : null,
       clienteId:           Number(r.clienteId),
       clienteNome:         String(r.clienteNome ?? ''),
       clienteCpfCnpj:      r.clienteCpfCnpj ? String(r.clienteCpfCnpj) : null,
@@ -1137,12 +1141,14 @@ const propostaFinRouter = router({
         status: proposta.status,
         clienteId: proposta.clienteId,
         empresaId: proposta.empresaId,
+        contratoFormalizado: proposta.contratoFormalizado,
       }).from(proposta)
         .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, empId)))
         .limit(1)
 
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser importadas' })
+      if (!prop.contratoFormalizado) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O contrato precisa ser formalizado antes de importar para o financeiro' })
 
       // 2. Verifica duplicata
       const [dup] = await ctx.db.select({ id: finTitulo.id }).from(finTitulo)

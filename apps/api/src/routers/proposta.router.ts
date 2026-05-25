@@ -829,6 +829,26 @@ export const propostaRouter = router({
       return { ok: true }
     }),
 
+  // Formaliza o contrato — pré-requisito para envio ao financeiro
+  formalizar: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db
+        .select({ id: proposta.id, status: proposta.status })
+        .from(proposta)
+        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser formalizadas.' })
+      const hoje = new Date().toISOString().slice(0, 10)
+      await ctx.db
+        .update(proposta)
+        .set({ contratoFormalizado: true, dataFormalizacao: hoje as any })
+        .where(eq(proposta.id, input.id))
+        .execute()
+      return { ok: true }
+    }),
+
   // Atualiza blocos (ativar/desativar/reordenar)
   updateBlocos: protectedProcedure
     .input(z.object({

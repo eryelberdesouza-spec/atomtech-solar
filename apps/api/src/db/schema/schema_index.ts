@@ -253,6 +253,8 @@ export const proposta = mysqlTable('proposta', {
   tituloServico: varchar('titulo_servico', { length: 200 }),
   prazoExecucao: varchar('prazo_execucao', { length: 300 }),
   observacoesInternas: text('observacoes_internas'),
+  contratoFormalizado: boolean('contrato_formalizado').default(false).notNull(),
+  dataFormalizacao:    date('data_formalizacao'),
   createdBy: int('created_by').references(() => usuario.id),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp('updated_at'),

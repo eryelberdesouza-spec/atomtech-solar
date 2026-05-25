@@ -12,6 +12,7 @@ import {
 import { abrirPdfNoNavegador } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador } from '../../lib/gerarPdfServicoBrowser'
 import { abrirContratoNoNavegador } from '../../lib/gerarContratoBrowser'
+import { abrirContratoServicoNoNavegador } from '../../lib/gerarContratoServicoBrowser'
 
 const TABS_SOLAR = [
   { id: 'dimensionamento', label: 'Dimensionamento' },
@@ -1294,6 +1295,11 @@ export function PropostaDetailPage() {
     { enabled: !!data?.proposta?.clienteId }
   )
   const updateStatus = trpc.proposta.updateStatus.useMutation()
+  const formalizarMutation = (trpc as any).proposta.formalizar.useMutation({
+    onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }) },
+    onError: (e: any) => alert('Erro ao formalizar: ' + (e?.message ?? 'Tente novamente')),
+  })
+  const [formalizando, setFormalizando] = useState(false)
   const utils = trpc.useUtils()
 
   const clonarMutation = (trpc as any).proposta.clonar.useMutation({
@@ -1353,12 +1359,22 @@ export function PropostaDetailPage() {
     setTimeout(() => {
       try {
         const dadosContrato = { ...data, empresa: { ...(data as any).empresa, ...empresa }, cliente: clienteData }
-        abrirContratoNoNavegador(dadosContrato)
+        if ((data as any).proposta?.tipoProposta === 'servico_geral') {
+          abrirContratoServicoNoNavegador(dadosContrato)
+        } else {
+          abrirContratoNoNavegador(dadosContrato)
+        }
       } catch (e) {
         alert('Erro ao gerar contrato. Verifique se popups estão permitidos neste site.')
         console.error(e)
       } finally { setGerandoContrato(false) }
     }, 100)
+  }
+
+  const handleFormalizar = () => {
+    if (!window.confirm('Confirmar formalização do contrato?\n\nAo formalizar, esta proposta ficará disponível para envio ao financeiro. Esta ação não pode ser desfeita.')) return
+    setFormalizando(true)
+    formalizarMutation.mutate({ id: propostaId }, { onSettled: () => setFormalizando(false) })
   }
 
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spinner size={36} /></div>
@@ -1398,6 +1414,17 @@ export function PropostaDetailPage() {
             <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: 14, fontWeight: 800 }}>{proposta.numero}</span>
             <Badge status={proposta.status} />
             <span style={{ fontSize: 11, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 7px' }}>v{proposta.versao}</span>
+            {proposta.contratoFormalizado ? (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: '#10B98120', color: '#10B981', border: '1px solid #10B98140',
+              }}>✔ Contrato Formalizado {proposta.dataFormalizacao ? `· ${formatDate(proposta.dataFormalizacao)}` : ''}</span>
+            ) : proposta.status === 'aceita' ? (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40',
+              }}>⏳ Aguardando Formalização</span>
+            ) : null}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {clienteData && (
@@ -1424,10 +1451,14 @@ export function PropostaDetailPage() {
             style={{ color: C.textMuted, borderColor: C.darkBorder }}>👤 Alt. Cliente</Btn>
           <Btn variant="ghost" size="sm" onClick={() => setShowClonar(true)}
             style={{ color: C.accent, borderColor: C.accent + '50' }}>⎘ Clonar</Btn>
-          {!isServico && (
-            <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
-              style={{ borderColor: C.green + '60', color: C.green }}>
-              {gerandoContrato ? '⏳ Gerando...' : '📄 Gerar Contrato'}
+          <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
+            style={{ borderColor: C.green + '60', color: C.green }}>
+            {gerandoContrato ? '⏳ Gerando...' : '📄 Gerar Contrato'}
+          </Btn>
+          {proposta.status === 'aceita' && !proposta.contratoFormalizado && (
+            <Btn size="sm" variant="ghost" onClick={handleFormalizar} disabled={formalizando}
+              style={{ borderColor: '#10B98160', color: '#10B981', fontWeight: 700 }}>
+              {formalizando ? '⏳...' : '✔ Formalizar Contrato'}
             </Btn>
           )}
           <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
