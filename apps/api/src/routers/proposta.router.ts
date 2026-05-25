@@ -833,19 +833,26 @@ export const propostaRouter = router({
   formalizar: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      const [prop] = await ctx.db
-        .select({ id: proposta.id, status: proposta.status })
-        .from(proposta)
-        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, ctx.usuario.empresaId)))
-        .limit(1)
+      // Verifica via raw SQL para evitar problemas de mapeamento Drizzle com campos novos
+      const checkResult = await ctx.db.execute(sql`
+        SELECT id, status FROM proposta
+        WHERE id = ${input.id} AND empresa_id = ${ctx.usuario.empresaId}
+        LIMIT 1
+      `) as any
+      const checkRows: any[] = Array.isArray(checkResult) && Array.isArray(checkResult[0])
+        ? checkResult[0]
+        : Array.isArray(checkResult) ? checkResult : []
+      const prop = checkRows[0]
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND' })
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser formalizadas.' })
-      // Usa SQL direto para evitar problemas de mapeamento do Drizzle com campos novos
-      await ctx.db.execute(sql`
-        UPDATE proposta
-        SET contrato_formalizado = 1, data_formalizacao = CURDATE()
-        WHERE id = ${input.id} AND empresa_id = ${ctx.usuario.empresaId}
-      `)
+      // Usa Drizzle update com sql raw values para forçar os tipos corretos
+      await ctx.db
+        .update(proposta)
+        .set({
+          contratoFormalizado: sql`1` as any,
+          dataFormalizacao:    sql`CURDATE()` as any,
+        })
+        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, ctx.usuario.empresaId)))
       return { ok: true }
     }),
 

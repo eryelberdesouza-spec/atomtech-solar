@@ -1135,23 +1135,23 @@ const propostaFinRouter = router({
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
 
-      // 1. Verifica proposta
-      const [prop] = await ctx.db.select({
-        id: proposta.id, numero: proposta.numero,
-        tipoProposta: proposta.tipoProposta,
-        tituloServico: proposta.tituloServico,
-        dataEmissao: proposta.dataEmissao,
-        status: proposta.status,
-        clienteId: proposta.clienteId,
-        empresaId: proposta.empresaId,
-        contratoFormalizado: proposta.contratoFormalizado,
-      }).from(proposta)
-        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, empId)))
-        .limit(1)
+      // 1. Verifica proposta via raw SQL para evitar problema de mapeamento Drizzle com boolean
+      const propResult = await ctx.db.execute(sql`
+        SELECT id, numero, tipo_proposta AS tipoProposta, titulo_servico AS tituloServico,
+               data_emissao AS dataEmissao, status, cliente_id AS clienteId, empresa_id AS empresaId,
+               contrato_formalizado AS contratoFormalizado
+        FROM proposta
+        WHERE id = ${input.propostaId} AND empresa_id = ${empId}
+        LIMIT 1
+      `) as any
+      const propRows: any[] = Array.isArray(propResult) && Array.isArray(propResult[0])
+        ? propResult[0]
+        : Array.isArray(propResult) ? propResult : []
+      const prop = propRows[0]
 
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas propostas aceitas podem ser importadas' })
-      if (!prop.contratoFormalizado) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O contrato precisa ser formalizado antes de importar para o financeiro' })
+      if (Number(prop.contratoFormalizado) !== 1) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O contrato precisa ser formalizado antes de importar para o financeiro' })
 
       // 2. Verifica duplicata
       const [dup] = await ctx.db.select({ id: finTitulo.id }).from(finTitulo)

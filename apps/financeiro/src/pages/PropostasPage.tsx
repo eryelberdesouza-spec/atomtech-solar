@@ -226,7 +226,7 @@ function ModalImportar({
               />
             </div>
 
-            {erro && <Alert type="error">{erro}</Alert>}
+            {erro && <Alert type="danger">{erro}</Alert>}
 
             {/* Nota */}
             <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.6 }}>
@@ -319,12 +319,12 @@ export function PropostasPage() {
         </button>
       </div>
 
-      {sucesso && <Alert type="success" style={{ marginBottom: 16 }}>{sucesso}</Alert>}
+      {sucesso && <Alert type="success">{sucesso}</Alert>}
 
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 48 }}><Spinner /></div>
       ) : error ? (
-        <Alert type="error">Erro ao carregar propostas: {(error as any)?.message}</Alert>
+        <Alert type="danger">Erro ao carregar propostas: {(error as any)?.message}</Alert>
       ) : lista.length === 0 ? (
         <div style={{
           textAlign: 'center', padding: '48px 24px',
