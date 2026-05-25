@@ -1053,7 +1053,7 @@ const propostaFinRouter = router({
   // Lista propostas com contrato formalizado — com flag se já foram importadas
   listar: protectedProcedure.query(async ({ ctx }) => {
     const empId = ctx.usuario.empresaId
-    const rows = await ctx.db.execute(sql`
+    const result = await ctx.db.execute(sql`
       SELECT
         p.id, p.numero, p.tipo_proposta AS tipoProposta,
         p.titulo_servico AS tituloServico,
@@ -1073,8 +1073,11 @@ const propostaFinRouter = router({
         AND p.contrato_formalizado = 1
         AND (p.is_template IS NULL OR p.is_template = 0)
       ORDER BY p.data_formalizacao DESC, p.data_emissao DESC
-    `) as any[]
-    const data = Array.isArray(rows) ? rows : (rows as any).rows ?? []
+    `) as any
+    // mysql2 retorna [rows, fields] — extrai só as linhas
+    const data: any[] = Array.isArray(result) && Array.isArray(result[0])
+      ? result[0]
+      : Array.isArray(result) ? result : (result as any).rows ?? []
     return data.map((r: any) => ({
       id:                  Number(r.id),
       numero:              String(r.numero ?? ''),

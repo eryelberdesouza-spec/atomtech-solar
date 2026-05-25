@@ -1296,10 +1296,14 @@ export function PropostaDetailPage() {
   )
   const updateStatus = trpc.proposta.updateStatus.useMutation()
   const formalizarMutation = (trpc as any).proposta.formalizar.useMutation({
-    onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }) },
+    onSuccess: () => {
+      setFormalizadoLocal(true)
+      utils.proposta.byId.invalidate({ id: propostaId })
+    },
     onError: (e: any) => alert('Erro ao formalizar: ' + (e?.message ?? 'Tente novamente')),
   })
   const [formalizando, setFormalizando] = useState(false)
+  const [formalizadoLocal, setFormalizadoLocal] = useState<boolean | null>(null)
   const utils = trpc.useUtils()
 
   const clonarMutation = (trpc as any).proposta.clonar.useMutation({
@@ -1414,7 +1418,7 @@ export function PropostaDetailPage() {
             <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: 14, fontWeight: 800 }}>{proposta.numero}</span>
             <Badge status={proposta.status} />
             <span style={{ fontSize: 11, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 7px' }}>v{proposta.versao}</span>
-            {proposta.contratoFormalizado ? (
+            {(formalizadoLocal ?? proposta.contratoFormalizado) ? (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
                 background: '#10B98120', color: '#10B981', border: '1px solid #10B98140',
@@ -1455,7 +1459,7 @@ export function PropostaDetailPage() {
             style={{ borderColor: C.green + '60', color: C.green }}>
             {gerandoContrato ? '⏳ Gerando...' : '📄 Gerar Contrato'}
           </Btn>
-          {proposta.status === 'aceita' && !proposta.contratoFormalizado && (
+          {proposta.status === 'aceita' && !(formalizadoLocal ?? proposta.contratoFormalizado) && (
             <Btn size="sm" variant="ghost" onClick={handleFormalizar} disabled={formalizando}
               style={{ borderColor: '#10B98160', color: '#10B981', fontWeight: 700 }}>
               {formalizando ? '⏳...' : '✔ Formalizar Contrato'}
