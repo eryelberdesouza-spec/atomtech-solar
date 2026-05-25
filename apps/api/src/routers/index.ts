@@ -12,6 +12,7 @@ import { textoRouter }       from './texto.router'
 import { equipamentoRouter }  from './equipamento.router'
 import { modeloBlocoRouter }  from './modeloBloco.router'
 import { finRouter }          from './fin.router'
+import { osRouter }           from './os.router'
 
 export const appRouter = router({
   auth:               authRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   equipamento:        equipamentoRouter,
   modeloBloco:        modeloBlocoRouter,
   fin:                finRouter,
+  os:                 osRouter,
 })
 
 export type AppRouter = typeof appRouter

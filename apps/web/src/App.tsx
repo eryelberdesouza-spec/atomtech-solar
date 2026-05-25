@@ -15,6 +15,8 @@ import { ClienteDetailPage } from './pages/clients/ClienteDetailPage'
 import { FaturasPage } from './pages/invoices/FaturasPage'
 import { NovaFaturaPage } from './pages/invoices/NovaFaturaPage'
 import { ConfiguracoesPage } from './pages/settings/ConfiguracoesPage'
+import { OrdensServicoPage } from './pages/operacional/OrdensServicoPage'
+import { OrdemServicoDetailPage } from './pages/operacional/OrdemServicoDetailPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('atomtech_token')
@@ -48,6 +50,8 @@ export default function App() {
               <Route path="/clientes/:id" element={<ClienteDetailPage />} />
               <Route path="/faturas" element={<FaturasPage />} />
               <Route path="/faturas/nova" element={<NovaFaturaPage />} />
+              <Route path="/ordens-servico" element={<OrdensServicoPage />} />
+              <Route path="/ordens-servico/:id" element={<OrdemServicoDetailPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

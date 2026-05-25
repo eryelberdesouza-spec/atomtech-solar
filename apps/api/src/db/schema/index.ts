@@ -493,6 +493,56 @@ export const itemServicoProposta = mysqlTable('item_servico_proposta', {
   ordem: int('ordem').default(0).notNull(),
 })
 
+// ─── ORDEM DE SERVIÇO ────────────────────────────────────────────────────────
+
+export const ordemServico = mysqlTable('ordem_servico', {
+  id:                  int('id').primaryKey().autoincrement(),
+  empresaId:           int('empresa_id').notNull(),
+  propostaId:          int('proposta_id').notNull(),
+  numero:              varchar('numero', { length: 20 }).notNull().unique(),
+  status:              mysqlEnum('status', ['aberta', 'em_execucao', 'concluida', 'cancelada']).default('aberta').notNull(),
+  titulo:              varchar('titulo', { length: 200 }),
+  descricao:           text('descricao'),
+  tecnicoResponsavel:  varchar('tecnico_responsavel', { length: 100 }),
+  dataPrevistaInicio:  date('data_prevista_inicio'),
+  dataPrevistaFim:     date('data_prevista_fim'),
+  dataInicio:          date('data_inicio'),
+  dataConclusao:       date('data_conclusao'),
+  temAgendamento:      boolean('tem_agendamento').default(true).notNull(),
+  observacoes:         text('observacoes'),
+  createdAt:           timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt:           timestamp('updated_at'),
+})
+
+export const osAgendamento = mysqlTable('os_agendamento', {
+  id:              int('id').primaryKey().autoincrement(),
+  ordemServicoId:  int('ordem_servico_id').notNull(),
+  empresaId:       int('empresa_id').notNull(),
+  dataAgendada:    date('data_agendada').notNull(),
+  horaInicio:      varchar('hora_inicio', { length: 5 }),
+  horaFim:         varchar('hora_fim', { length: 5 }),
+  tipo:            mysqlEnum('tipo', ['vistoria', 'instalacao', 'manutencao', 'revisao', 'entrega']).default('instalacao').notNull(),
+  tecnico:         varchar('tecnico', { length: 100 }),
+  endereco:        text('endereco'),
+  observacoes:     text('observacoes'),
+  status:          mysqlEnum('status', ['agendado', 'confirmado', 'realizado', 'cancelado']).default('agendado').notNull(),
+  createdAt:       timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
+
+export const osMarco = mysqlTable('os_marco', {
+  id:              int('id').primaryKey().autoincrement(),
+  ordemServicoId:  int('ordem_servico_id').notNull(),
+  titulo:          varchar('titulo', { length: 200 }).notNull(),
+  descricao:       text('descricao'),
+  ordem:           int('ordem').default(0).notNull(),
+  dataPrevista:    date('data_prevista'),
+  dataRealizada:   date('data_realizada'),
+  concluido:       boolean('concluido').default(false).notNull(),
+  responsavel:     varchar('responsavel', { length: 100 }),
+  observacoes:     text('observacoes'),
+  createdAt:       timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
+
 // ─── FINANCEIRO ──────────────────────────────────────────────────────────────
 export * from './fin_schema'
 

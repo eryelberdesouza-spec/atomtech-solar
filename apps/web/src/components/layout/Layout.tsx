@@ -13,11 +13,12 @@ const IconLogout = () => (
 )
 
 const NAV = [
-  { path: '/dashboard',    label: 'Dashboard',     icon: '◈', color: '#F5A623', desc: 'Visão geral'       },
-  { path: '/propostas',    label: 'Propostas',     icon: '◧', color: '#58A6FF', desc: 'Gestão comercial'  },
-  { path: '/clientes',     label: 'Clientes',      icon: '◉', color: '#3EBB7A', desc: 'Base de clientes'  },
-  { path: '/faturas',      label: 'Faturas',       icon: '◈', color: '#BC8CFF', desc: 'Contas de energia' },
-  { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#8B949E', desc: 'Sistema'           },
+  { path: '/dashboard',      label: 'Dashboard',    icon: '◈', color: '#F5A623', desc: 'Visão geral'       },
+  { path: '/propostas',      label: 'Propostas',    icon: '◧', color: '#58A6FF', desc: 'Gestão comercial'  },
+  { path: '/clientes',       label: 'Clientes',     icon: '◉', color: '#3EBB7A', desc: 'Base de clientes'  },
+  { path: '/faturas',        label: 'Faturas',      icon: '◈', color: '#BC8CFF', desc: 'Contas de energia' },
+  { path: '/ordens-servico', label: 'Operacional',  icon: '⚙', color: '#FB923C', desc: 'Ordens de serviço' },
+  { path: '/configuracoes',  label: 'Configurações',icon: '◎', color: '#8B949E', desc: 'Sistema'           },
 ]
 
 function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean }) {

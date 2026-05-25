@@ -1306,6 +1306,26 @@ export function PropostaDetailPage() {
   )
   const utils = trpc.useUtils()
   const updateStatus = trpc.proposta.updateStatus.useMutation()
+  // OS vinculada à proposta
+  const { data: osData } = (trpc as any).os.list.useQuery(
+    { propostaId: propostaId, porPagina: 1 },
+    { enabled: !!propostaId, staleTime: 0 },
+  )
+  const osExistente: any = osData?.data?.[0] ?? null
+
+  const [gerandoOS, setGerandoOS] = useState(false)
+  const criarOSMutation = (trpc as any).os.criar.useMutation({
+    onSuccess: (res: any) => {
+      utils.proposta.byId.invalidate({ id: propostaId })
+      ;(trpc as any).os.list.invalidate({ propostaId: propostaId })
+      if (window.confirm(`OS ${res.numero} criada com sucesso!\n\nDeseja abrir a Ordem de Serviço agora?`)) {
+        navigate(`/ordens-servico/${res.id}`)
+      }
+    },
+    onError: (e: any) => alert('Erro ao criar OS: ' + (e?.message ?? 'Tente novamente')),
+    onSettled: () => setGerandoOS(false),
+  })
+
   const [formalizando, setFormalizando] = useState(false)
   const formalizarMutation = (trpc as any).proposta.formalizar.useMutation({
     onSuccess: (res: any) => {
@@ -1396,6 +1416,12 @@ export function PropostaDetailPage() {
     formalizarMutation.mutate({ id: propostaId }, { onSettled: () => setFormalizando(false) })
   }
 
+  const handleGerarOS = () => {
+    if (!window.confirm('Gerar Ordem de Serviço para esta proposta?\n\nSerão criados automaticamente 5 marcos padrão de execução.')) return
+    setGerandoOS(true)
+    criarOSMutation.mutate({ propostaId })
+  }
+
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spinner size={36} /></div>
   if (!data) return <EmptyState icon="☹" title="Proposta não encontrada" />
 
@@ -1444,6 +1470,15 @@ export function PropostaDetailPage() {
                 background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40',
               }}>⏳ Aguardando Formalização</span>
             ) : null}
+            {osExistente && (
+              <span
+                onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
+                style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                  background: '#FB923C20', color: '#FB923C', border: '1px solid #FB923C40',
+                  cursor: 'pointer',
+                }}>⚙ {osExistente.numero}</span>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {clienteData && (
@@ -1479,6 +1514,20 @@ export function PropostaDetailPage() {
               style={{ borderColor: '#10B98160', color: '#10B981', fontWeight: 700 }}>
               {formalizando ? '⏳...' : '✔ Formalizar Contrato'}
             </Btn>
+          )}
+          {(formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1) && (
+            osExistente ? (
+              <Btn size="sm" variant="ghost"
+                onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
+                style={{ borderColor: '#FB923C60', color: '#FB923C', fontWeight: 700 }}>
+                ⚙ Ver OS {osExistente.numero}
+              </Btn>
+            ) : (
+              <Btn size="sm" variant="ghost" onClick={handleGerarOS} disabled={gerandoOS}
+                style={{ borderColor: '#FB923C60', color: '#FB923C', fontWeight: 700 }}>
+                {gerandoOS ? '⏳...' : '⚙ Gerar OS'}
+              </Btn>
+            )
           )}
           <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
             {gerandoPdf ? '⏳ Gerando...' : '↯ Exportar PDF'}
