@@ -402,24 +402,33 @@ function ModalComprovante({
   onClose,
 }: {
   tituloId:     number
-  parcelaAtual: any   // dados da linha clicada (para PAGAR)
+  parcelaAtual: any
   onClose:      () => void
 }) {
-  const [obs, setObs] = useState('')
+  const [ag, setAg] = useState({
+    dataAgendada:    '',
+    horaAgendada:    '',
+    tecnico:         '',
+    enderecoServico: '',
+    observacoes:     '',
+  })
+  const [comAgendamento, setComAgendamento] = useState(false)
 
-  const { data: byId, isLoading: l1 } = (trpc as any).fin.titulo.byId.useQuery({ tituloId })
+  const { data: byId,    isLoading: l1 } = (trpc as any).fin.titulo.byId.useQuery({ tituloId })
   const { data: empresa, isLoading: l2 } = (trpc as any).fin.empresa.minha.useQuery()
 
   const isLoading = l1 || l2
+  const tipo      = parcelaAtual?.tipo ?? byId?.titulo?.tipo ?? 'PAGAR'
+  const titleLabel = tipo === 'PAGAR' ? 'Solicitação de Pagamento' : 'Cobrança / Recebimento'
 
   function imprimir() {
     if (!byId || !empresa) return
     gerarComprovantePdf({
-      tipo:          byId.titulo.tipo,
+      tipo:     byId.titulo.tipo,
       empresa,
-      titulo:        byId.titulo,
-      parcelas:      byId.parcelas,
-      parcelaAtual:  byId.titulo.tipo === 'PAGAR' ? {
+      titulo:   byId.titulo,
+      parcelas: byId.parcelas,
+      parcelaAtual: byId.titulo.tipo === 'PAGAR' ? {
         id:            parcelaAtual.parcelaId,
         numero:        parcelaAtual.numero,
         valor:         parcelaAtual.valor,
@@ -428,19 +437,28 @@ function ModalComprovante({
         dataPagamento: parcelaAtual.dataPagamento,
         valorPago:     parcelaAtual.valorPago,
       } : undefined,
-      observacoesExtra: obs,
+      agendamento: comAgendamento ? ag : null,
     })
   }
 
-  const tipo = parcelaAtual?.tipo ?? byId?.titulo?.tipo ?? 'PAGAR'
-  const titleLabel = tipo === 'PAGAR' ? 'Comprovante de Pagamento' : 'Comprovante de Recebimento'
+  const labelInput: React.CSSProperties = {
+    fontSize: 10, fontWeight: 700, color: '#64748B',
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    display: 'block', marginBottom: 4,
+  }
+  const inp: React.CSSProperties = {
+    width: '100%', padding: '7px 10px',
+    background: '#0D1C17', border: '1px solid #1E3A2E',
+    borderRadius: 7, color: '#E2E8F0', fontSize: 13,
+    fontFamily: 'inherit', outline: 'none',
+  }
 
   return (
     <Modal
       open={true}
       onClose={onClose}
       title={`🖨 ${titleLabel}`}
-      width={560}
+      width={600}
       footer={
         <>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
@@ -455,7 +473,7 @@ function ModalComprovante({
       ) : (
         <>
           {/* Resumo */}
-          <div style={{ background: C.bg, borderRadius: 8, border: '1px solid ' + C.border, padding: '12px 14px', marginBottom: 20 }}>
+          <div style={{ background: C.bg, borderRadius: 8, border: '1px solid ' + C.border, padding: '12px 14px', marginBottom: 16 }}>
             <p style={{ margin: 0, color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               {titleLabel}
             </p>
@@ -471,17 +489,59 @@ function ModalComprovante({
             </p>
           </div>
 
-          {/* Observações extras para o comprovante */}
-          <Textarea
-            label="Observações para incluir no comprovante (opcional)"
-            value={obs}
-            onChange={e => setObs(e.target.value)}
-            placeholder="Ex: Referente ao serviço executado em 05/2026, conforme proposta..."
-            style={{ minHeight: 80 }}
-          />
-          <p style={{ color: C.textMuted, fontSize: 11, margin: '6px 0 0' }}>
-            As observações serão impressas no comprovante. Deixe em branco para usar as observações do lançamento.
-          </p>
+          {/* Toggle agendamento */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px', borderRadius: 8,
+            background: comAgendamento ? '#10B98114' : C.bgMid,
+            border: '1px solid ' + (comAgendamento ? '#10B98140' : C.border),
+            marginBottom: 14, cursor: 'pointer',
+          }} onClick={() => setComAgendamento(!comAgendamento)}>
+            <div style={{
+              width: 18, height: 18, borderRadius: 4,
+              border: '2px solid ' + (comAgendamento ? '#10B981' : C.border),
+              background: comAgendamento ? '#10B981' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              {comAgendamento && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Incluir dados de agendamento</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Data, horário, técnico e local de execução</div>
+            </div>
+          </div>
+
+          {/* Campos de agendamento */}
+          {comAgendamento && (
+            <div style={{ background: '#0A1F18', border: '1px solid #1E3A2E', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+                Dados do Agendamento
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={labelInput}>Data agendada</label>
+                  <input type="date" style={inp} value={ag.dataAgendada} onChange={e => setAg({ ...ag, dataAgendada: e.target.value })} />
+                </div>
+                <div>
+                  <label style={labelInput}>Horário</label>
+                  <input type="time" style={inp} value={ag.horaAgendada} onChange={e => setAg({ ...ag, horaAgendada: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <label style={labelInput}>Técnico responsável</label>
+                <input type="text" style={inp} value={ag.tecnico} placeholder="Nome do técnico ou equipe" onChange={e => setAg({ ...ag, tecnico: e.target.value })} />
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <label style={labelInput}>Endereço / local de execução</label>
+                <input type="text" style={inp} value={ag.enderecoServico} placeholder="Rua, número, bairro — Cidade" onChange={e => setAg({ ...ag, enderecoServico: e.target.value })} />
+              </div>
+              <div>
+                <label style={labelInput}>Observações do agendamento</label>
+                <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} value={ag.observacoes} placeholder="Instruções, contato no local, equipamentos necessários..." onChange={e => setAg({ ...ag, observacoes: e.target.value })} />
+              </div>
+            </div>
+          )}
         </>
       )}
     </Modal>
