@@ -2,6 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../ui/NovaPropostaDropdown'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const IconLogout = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -78,14 +79,19 @@ function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const { data: empresa } = (trpc as any).empresa.get.useQuery()
 
   const current   = NAV.find(n => location.pathname.startsWith(n.path))
   const pageTitle = current?.label ?? 'Atom Tech'
   const pageColor = current?.color ?? '#F5A623'
+
+  // Fecha sidebar mobile ao trocar de rota
+  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
   function logout() {
     localStorage.removeItem('atomtech_token')
@@ -115,14 +121,29 @@ export function Layout() {
       fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
     }}>
 
+      {/* ── OVERLAY MOBILE ───────────────────────────────────── */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: '#00000070',
+            zIndex: 40,
+          }}
+        />
+      )}
+
       {/* ── SIDEBAR ──────────────────────────────────────────── */}
       <aside style={{
-        width: collapsed ? 68 : 240,
+        width: isMobile ? 240 : (collapsed ? 68 : 240),
         background: 'linear-gradient(180deg, #111D2E 0%, #0D1828 100%)',
         borderRight: '1px solid #1E3050',
         display: 'flex', flexDirection: 'column',
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-        flexShrink: 0, zIndex: 10,
+        transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), width 0.25s cubic-bezier(0.4,0,0.2,1)',
+        flexShrink: 0, zIndex: 50,
+        ...(isMobile ? {
+          position: 'fixed', top: 0, left: 0, bottom: 0,
+          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        } : {}),
       }}>
 
         {/* Logo */}
@@ -269,23 +290,28 @@ export function Layout() {
             </button>
           )}
 
-          {/* Botão recolher/expandir */}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            style={{
-              width: '100%', padding: '8px', borderRadius: 8,
-              border: '1px solid #1E3050', background: 'transparent',
-              color: '#3A5070', cursor: 'pointer', fontSize: 12,
-              transition: 'all 0.15s', fontFamily: 'inherit',
-            }}
-          >
-            {collapsed ? '→' : '← Recolher'}
-          </button>
+          {/* Botão recolher/expandir — apenas desktop */}
+          {!isMobile && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              style={{
+                width: '100%', padding: '8px', borderRadius: 8,
+                border: '1px solid #1E3050', background: 'transparent',
+                color: '#3A5070', cursor: 'pointer', fontSize: 12,
+                transition: 'all 0.15s', fontFamily: 'inherit',
+              }}
+            >
+              {collapsed ? '→' : '← Recolher'}
+            </button>
+          )}
         </div>
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        marginLeft: isMobile ? 0 : undefined,
+      }}>
 
         {/* TopBar */}
         <div style={{
@@ -293,25 +319,40 @@ export function Layout() {
           borderBottom: '1px solid #1E3050',
           display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 28px', flexShrink: 0,
+          padding: isMobile ? '0 14px' : '0 28px', flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12 }}>
+            {/* Hambúrguer — só mobile */}
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(v => !v)}
+                style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  background: 'transparent', border: '1px solid #1E3050',
+                  color: '#8A9BB5', cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, lineHeight: 1,
+                }}
+              >☰</button>
+            )}
             <div style={{
-              width: 4, height: 20, borderRadius: 2,
+              width: 4, height: 20, borderRadius: 2, flexShrink: 0,
               background: 'linear-gradient(180deg, ' + pageColor + ', ' + pageColor + '88)',
             }} />
-            <div>
-              <h1 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ color: '#E2EAF5', fontSize: isMobile ? 14 : 16, fontWeight: 700, margin: 0, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {pageTitle}
               </h1>
-              <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>
-                Atom Tech · Sistema de Propostas Fotovoltaicas
-              </div>
+              {!isMobile && (
+                <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>
+                  Atom Tech · Sistema de Propostas Fotovoltaicas
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <NovaPropostaDropdown />
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
+            {!isMobile && <NovaPropostaDropdown />}
 
             {/* Avatar com dropdown de usuário */}
             <div ref={userMenuRef} style={{ position: 'relative' }}>

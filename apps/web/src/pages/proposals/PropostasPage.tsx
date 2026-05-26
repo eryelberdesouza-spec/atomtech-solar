@@ -4,6 +4,7 @@ import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Btn, Badge, PageWrapper, Spinner, C } from '../../components/ui'
 import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 type StatusFiltro = 'todos' | 'rascunho' | 'enviada' | 'aceita' | 'recusada' | 'expirada'
 
@@ -26,6 +27,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export function PropostasPage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [filtro, setFiltro] = useState<StatusFiltro>('todos')
   const [busca, setBusca]   = useState('')
 
@@ -44,20 +46,20 @@ export function PropostasPage() {
   })
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1100 }}>
+    <div style={{ padding: isMobile ? '16px 14px' : '24px 32px', maxWidth: 1100 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <h2 style={{ color: '#E2EAF5', fontSize: 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
-          <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
+          <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
+          <p style={{ color: '#4A6080', fontSize: 12, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
         </div>
         <NovaPropostaDropdown />
       </div>
 
       {/* Stats */}
       {!isLoading && lista.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
           {STATUS_FILTROS.slice(1).map(s => (
             <button
               key={s.id}
@@ -81,13 +83,14 @@ export function PropostasPage() {
       )}
 
       {/* Busca */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
         <input
           value={busca}
           onChange={e => setBusca(e.target.value)}
           placeholder="Buscar por número ou cliente..."
           style={{
-            width: 360, padding: '9px 14px', borderRadius: 9,
+            width: '100%', maxWidth: isMobile ? '100%' : 360,
+            padding: '9px 14px', borderRadius: 9, boxSizing: 'border-box',
             background: '#111D2E', border: '1px solid #1E3050',
             color: '#E2EAF5', fontSize: 13, outline: 'none',
           }}
@@ -117,15 +120,17 @@ export function PropostasPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {/* Cabeçalho da tabela */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: '140px 1fr 120px 100px 36px',
-            padding: '6px 20px', gap: 12,
-          }}>
-            {['Nº Proposta', 'Cliente', 'Status', 'Data', ''].map(h => (
-              <span key={h} style={{ fontSize: 10, color: '#3A5070', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</span>
-            ))}
-          </div>
+          {/* Cabeçalho da tabela — só desktop */}
+          {!isMobile && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '140px 1fr 120px 100px 36px',
+              padding: '6px 20px', gap: 12,
+            }}>
+              {['Nº Proposta', 'Cliente', 'Status', 'Data', ''].map(h => (
+                <span key={h} style={{ fontSize: 10, color: '#3A5070', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</span>
+              ))}
+            </div>
+          )}
 
           {filtradas.map(p => {
             const cor = STATUS_COLOR[p.status] ?? '#8B949E'
@@ -134,11 +139,12 @@ export function PropostasPage() {
                 key={p.id}
                 onClick={() => navigate(`/propostas/${p.id}`)}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '140px 1fr 120px 100px 36px',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '13px 20px',
+                  display: isMobile ? 'flex' : 'grid',
+                  flexDirection: isMobile ? 'column' : undefined,
+                  gridTemplateColumns: isMobile ? undefined : '140px 1fr 120px 100px 36px',
+                  alignItems: isMobile ? 'flex-start' : 'center',
+                  gap: isMobile ? 6 : 12,
+                  padding: isMobile ? '12px 14px' : '13px 20px',
                   background: '#111D2E',
                   border: '1px solid #1E3050',
                   borderLeft: `3px solid ${cor}`,
@@ -146,32 +152,49 @@ export function PropostasPage() {
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLDivElement).style.background = '#152030';
-                  (e.currentTarget as HTMLDivElement).style.borderColor = cor + '60';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLDivElement).style.background = '#111D2E';
-                  (e.currentTarget as HTMLDivElement).style.borderColor = '#1E3050';
-                  (e.currentTarget as HTMLDivElement).style.borderLeftColor = cor;
-                }}
               >
-                <div>
-                  <span style={{ color: '#F5A623', fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{p.numero}</span>
-                  <div style={{ marginTop: 3 }}>
-                    {p.tipoProposta === 'servico_geral'
-                      ? <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#2D9C4E20', color: '#2D9C4E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Serviço</span>
-                      : <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#F5A62320', color: '#F5A623', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Solar</span>
-                    }
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: '#C8D8EC', fontSize: 13, fontWeight: 600 }}>{p.clienteNome}</div>
-                  {(p.tituloServico || p.clienteEstado) && <div style={{ color: '#3A5070', fontSize: 11, marginTop: 1 }}>{p.tituloServico || p.clienteEstado}</div>}
-                </div>
-                <Badge status={p.status} />
-                <span style={{ color: '#4A6080', fontSize: 12 }}>{formatDate(p.dataEmissao)}</span>
-                <span style={{ color: '#3A5070', fontSize: 18 }}>›</span>
+                {/* Linha superior mobile: número + badge + data */}
+                {isMobile ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: '#F5A623', fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }}>{p.numero}</span>
+                        {p.tipoProposta === 'servico_geral'
+                          ? <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#2D9C4E20', color: '#2D9C4E', textTransform: 'uppercase' }}>Serviço</span>
+                          : <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#F5A62320', color: '#F5A623', textTransform: 'uppercase' }}>Solar</span>
+                        }
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Badge status={p.status} />
+                        <span style={{ color: '#3A5070', fontSize: 18 }}>›</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 600 }}>{p.clienteNome}</div>
+                    <div style={{ color: '#4A6080', fontSize: 11 }}>
+                      {formatDate(p.dataEmissao)}
+                      {p.tituloServico && ` · ${p.tituloServico}`}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <span style={{ color: '#F5A623', fontFamily: 'monospace', fontSize: 12, fontWeight: 700 }}>{p.numero}</span>
+                      <div style={{ marginTop: 3 }}>
+                        {p.tipoProposta === 'servico_geral'
+                          ? <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#2D9C4E20', color: '#2D9C4E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Serviço</span>
+                          : <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#F5A62320', color: '#F5A623', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Solar</span>
+                        }
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#C8D8EC', fontSize: 13, fontWeight: 600 }}>{p.clienteNome}</div>
+                      {(p.tituloServico || p.clienteEstado) && <div style={{ color: '#3A5070', fontSize: 11, marginTop: 1 }}>{p.tituloServico || p.clienteEstado}</div>}
+                    </div>
+                    <Badge status={p.status} />
+                    <span style={{ color: '#4A6080', fontSize: 12 }}>{formatDate(p.dataEmissao)}</span>
+                    <span style={{ color: '#3A5070', fontSize: 18 }}>›</span>
+                  </>
+                )}
               </div>
             )
           })}
