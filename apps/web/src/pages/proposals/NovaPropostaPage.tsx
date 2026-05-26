@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatCurrency } from '../../lib/utils'
 import { Btn, Input, Select, Card, Spinner, C, PageWrapper } from '../../components/ui'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 // ─── AUTOCOMPLETE DE CLIENTE ────────────────────────────────────────
 function ClienteAutocomplete({ clientes, value, onChange }: {
@@ -160,6 +161,7 @@ function estimarCustosInstalacao(qtdModulos: number, qtdInversores: number) {
 
 export function NovaPropostaPage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(FORM_INICIAL)
   const [mostrarParcelamento, setMostrarParcela] = useState(false)
@@ -232,7 +234,7 @@ export function NovaPropostaPage() {
         <h2 style={{ color: C.text, fontSize: 16, fontWeight: 600, margin: 0 }}>Nova Proposta</h2>
       </div>
 
-      <Card style={{ padding: '28px 32px', maxWidth: 820 }}>
+      <Card style={{ padding: isMobile ? '18px 16px' : '28px 32px', maxWidth: isMobile ? '100%' : 820 }}>
         <StepBar />
 
         {/* ── STEP 1 ── */}
@@ -241,7 +243,7 @@ export function NovaPropostaPage() {
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Selecione o Cliente</h3>
             <ClienteAutocomplete clientes={clientes?.data ?? []} value={form.clienteId} onChange={id => set('clienteId', id)} />
             {form.clienteId && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
                 <Input label="Data de Emissão"  type="date" value={form.dataEmissao}  onChange={(e: any) => set('dataEmissao',  e.target.value)} />
                 <Input label="Data de Validade" type="date" value={form.dataValidade} onChange={(e: any) => set('dataValidade', e.target.value)} />
               </div>
@@ -281,7 +283,7 @@ export function NovaPropostaPage() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
               <Select label="Topologia"       options={TOPOLOGIA_OPTIONS} value={form.topologia}   onChange={(e: any) => set('topologia',   e.target.value)} />
               <Select label="Tipo de Telhado" options={TELHADO_OPTIONS}   value={form.tipoTelhado} onChange={(e: any) => set('tipoTelhado', e.target.value)} />
               <Input label="Desvio Azimutal (°)" type="number" value={form.desvioAzimutal}  onChange={(e: any) => set('desvioAzimutal',  Number(e.target.value))} suffix="°" />
@@ -300,7 +302,7 @@ export function NovaPropostaPage() {
             {sizingPreview && !loadingSizing && (
               <div style={{ background: `${C.green}10`, borderRadius: 10, padding: '14px 18px', border: `1px solid ${C.green}30` }}>
                 <p style={{ color: C.green, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 10px' }}>Preview do Dimensionamento</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 10 }}>
                   {[{ label: 'Potência Final', value: `${Number((sizingPreview as any).potenciaFinalKwp).toFixed(2)} kWp`, color: C.solar }, { label: 'Geração Anual', value: `${Number((sizingPreview as any).geracaoAnualKwh).toLocaleString('pt-BR')} kWh`, color: C.green }, { label: 'Área Estimada', value: `${Number((sizingPreview as any).areaEstimadaM2).toFixed(0)} m²`, color: C.text }, { label: '% Compensação', value: `${Number((sizingPreview as any).percentualCompensacao).toFixed(0)}%`, color: C.accent }].map((k: any) => (
                     <div key={k.label} style={{ textAlign: 'center' }}>
                       <p style={{ color: C.textDim, fontSize: 10, textTransform: 'uppercase', margin: '0 0 2px' }}>{k.label}</p>
@@ -322,7 +324,7 @@ export function NovaPropostaPage() {
                 onSelect={m => setForm(f => ({ ...f, fabricanteModulo: m.fabricante, modeloModulo: m.modelo, potenciaModuloWp: m.potenciaWp ?? f.potenciaModuloWp }))}
               />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 110px 110px', gap: 12, marginBottom: 16 }}>
                 <Input label="Fabricante"    value={form.fabricanteModulo}        onChange={(e: any) => set('fabricanteModulo',       e.target.value)} placeholder="Ex: JA Solar" />
                 <Input label="Modelo"        value={form.modeloModulo}            onChange={(e: any) => set('modeloModulo',           e.target.value)} placeholder="Ex: JAM72S30-620" />
                 <Input label="Potência (Wp)" type="number" value={form.potenciaModuloWp || ''}        onChange={(e: any) => set('potenciaModuloWp',       Number(e.target.value))} placeholder="620" />
@@ -341,7 +343,7 @@ export function NovaPropostaPage() {
                 onSelect={inv => setForm(f => ({ ...f, fabricanteInversor: inv.fabricante, modeloInversor: inv.modelo, potenciaInversorKw: inv.potenciaW ? (form.topologia === 'microinversor' ? inv.potenciaW : inv.potenciaW / 1000) : f.potenciaInversorKw }))}
               />
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 110px 110px', gap: 12 }}>
                 <Input label="Fabricante" value={form.fabricanteInversor} onChange={(e: any) => set('fabricanteInversor', e.target.value)} placeholder="Ex: Sungrow" />
                 <Input label="Modelo"     value={form.modeloInversor}     onChange={(e: any) => set('modeloInversor',     e.target.value)} placeholder="Ex: SG5.0RT" />
                 <Input label={form.topologia === 'microinversor' ? 'Potência (Wp)' : 'Potência (kW)'} type="number" value={form.potenciaInversorKw || ''} onChange={(e: any) => set('potenciaInversorKw', Number(e.target.value))} placeholder={form.topologia === 'microinversor' ? '2000' : '12'} />
@@ -370,7 +372,7 @@ export function NovaPropostaPage() {
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Precificação e Condições</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
               <div>
                 <Input label="Custo do Kit Fotovoltaico (R$) *" type="number" value={form.custoKitFotovoltaico || ''} onChange={(e: any) => set('custoKitFotovoltaico', Number(e.target.value))} placeholder="Ex: 18500" />
                 <p style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>Custo dos equipamentos (kit). Instalação e projeto são calculados automaticamente.</p>
@@ -419,7 +421,7 @@ export function NovaPropostaPage() {
               {mostrarParcelamento && (
                 <div style={{ padding: '0 16px 16px' }}>
                   {form.marcoParcelas.map((p: any, i: number) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 90px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 55px 55px' : '1fr 60px 60px 90px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                       <input value={p.descricao} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], descricao: e.target.value }; set('marcoParcelas', n) }} style={{ padding: '6px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><input type="number" min={1} max={100} value={p.percentual} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], percentual: Number(e.target.value) }; set('marcoParcelas', n) }} style={{ width: '100%', padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} /><span style={{ color: C.textDim, fontSize: 10 }}>%</span></div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><input type="number" min={0} value={p.prazoDias} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], prazoDias: Number(e.target.value) }; set('marcoParcelas', n) }} style={{ width: '100%', padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} /><span style={{ color: C.textDim, fontSize: 10 }}>d</span></div>

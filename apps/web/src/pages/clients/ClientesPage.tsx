@@ -11,6 +11,7 @@ import {
   PageWrapper, SectionHeader, EmptyState, Spinner, C,
 } from '../../components/ui'
 import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const AVATAR_COLORS: Record<string, string> = {
   A:'#F59E0B', B:'#3B82F6', C:'#10B981', D:'#8B5CF6', E:'#EF4444',
@@ -45,6 +46,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
   const [form, setForm] = useState<ClienteForm>(inicial)
   const [cepLoading, setCepLoading] = useState(false)
   const [cepErro, setCepErro] = useState('')
+  const isMobile = useIsMobile()
   const set = (k: keyof ClienteForm, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const buscarCep = async (cep: string) => {
@@ -84,7 +86,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
-      <div style={{ background: C.darkCard, borderRadius: 16, border: `1px solid ${C.darkBorder}`, width: 720, maxHeight: '92vh', overflow: 'auto', padding: 28, boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
+      <div style={{ background: C.darkCard, borderRadius: isMobile ? 12 : 16, border: `1px solid ${C.darkBorder}`, width: isMobile ? '96vw' : 720, maxHeight: '92vh', overflow: 'auto', padding: isMobile ? 18 : 28, boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: `${C.solar}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>👤</div>
@@ -101,7 +103,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
             <Select label="Tipo de Pessoa" value={form.tipoPessoa} onChange={e => set('tipoPessoa', e.target.value as any)}
               options={[{ value: 'fisica', label: 'Pessoa Física' }, { value: 'juridica', label: 'Pessoa Jurídica' }]} />
             <Input label="CPF / CNPJ" value={form.cpfCnpj} onChange={e => set('cpfCnpj', e.target.value)} placeholder="000.000.000-00" />
@@ -110,14 +112,14 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
           {form.tipoPessoa === 'juridica' && (
             <Input label="Nome do Responsável" value={form.nomeResponsavel} onChange={e => set('nomeResponsavel', e.target.value)} />
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
             <Input label="Telefone *" value={form.telefone} onChange={e => set('telefone', e.target.value)} placeholder="(61) 9xxxx-xxxx" />
             <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
           </div>
 
           <div style={{ paddingTop: 8 }}>
             {sectionLabel('Endereço')}
-            <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr 80px', gap: 10, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '150px 1fr 80px', gap: 10, marginBottom: 10 }}>
               <div>
                 <label style={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>CEP *</label>
                 <input
@@ -135,7 +137,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
               <Input label="Logradouro" value={form.endereco} onChange={e => set('endereco', e.target.value)} />
               <Input label="Número" value={form.numero} onChange={e => set('numero', e.target.value)} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 100px', gap: 10 }}>
               <Input label="Bairro" value={form.bairro} onChange={e => set('bairro', e.target.value)} />
               <Input label="Cidade" value={form.cidade} onChange={e => set('cidade', e.target.value)} />
               <Select label="Estado" value={form.estado} onChange={e => set('estado', e.target.value)}
@@ -173,6 +175,7 @@ export function ClientesPage() {
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const isMobile = useIsMobile()
 
   const { data, isLoading, refetch } = trpc.cliente.list.useQuery({ busca: busca || undefined, porPagina: 50 })
   const createMutation = trpc.cliente.create.useMutation({ onSuccess: () => { setShowModal(false); refetch() } })
@@ -183,24 +186,24 @@ export function ClientesPage() {
 
   return (
     <PageWrapper>
-      <SectionHeader title="Clientes" action={<Btn onClick={() => setShowModal(true)}>+ Novo Cliente</Btn>} />
+      <SectionHeader title="Clientes" action={<Btn onClick={() => setShowModal(true)}>+ Novo</Btn>} />
 
       {lista.length > 0 && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {[
             { label: 'Total', value: lista.length, color: C.accent },
-            { label: 'Pessoas Físicas', value: pf, color: C.solar },
-            { label: 'Pessoas Jurídicas', value: pj, color: C.green },
+            { label: 'Físicas', value: pf, color: C.solar },
+            { label: 'Jurídicas', value: pj, color: C.green },
           ].map(s => (
-            <div key={s.label} style={{ background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 10, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ color: s.color, fontSize: 18, fontWeight: 800, fontFamily: 'monospace' }}>{s.value}</span>
+            <div key={s.label} style={{ background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: s.color, fontSize: 16, fontWeight: 800, fontFamily: 'monospace' }}>{s.value}</span>
               <span style={{ color: C.textDim, fontSize: 12 }}>{s.label}</span>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ marginBottom: 18, maxWidth: 440, position: 'relative' }}>
+      <div style={{ marginBottom: 14, maxWidth: isMobile ? '100%' : 440, position: 'relative' }}>
         <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.textMuted, fontSize: 14, pointerEvents: 'none' }}>🔍</span>
         <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
           style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: 10, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
@@ -220,23 +223,22 @@ export function ClientesPage() {
             const cor = avatarColor(c.nome)
             const isPJ = c.tipoPessoa === 'juridica'
             return (
-              <Card key={c.id} hover style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }} onClick={() => navigate(`/clientes/${c.id}`)}>
-                <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: `${cor}18`, border: `2px solid ${cor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: cor }}>
+              <Card key={c.id} hover style={{ padding: isMobile ? '12px 14px' : '14px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16 }} onClick={() => navigate(`/clientes/${c.id}`)}>
+                <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: 11, flexShrink: 0, background: `${cor}18`, border: `2px solid ${cor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 14 : 16, fontWeight: 800, color: cor }}>
                   {c.nome.charAt(0).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                    <p style={{ color: C.text, fontSize: 14, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</p>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isPJ ? C.accent : C.solar, background: isPJ ? `${C.accent}15` : `${C.solar}15`, border: `1px solid ${isPJ ? C.accent : C.solar}30`, borderRadius: 5, padding: '2px 6px' }}>{isPJ ? 'PJ' : 'PF'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+                    <p style={{ color: C.text, fontSize: isMobile ? 13 : 14, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</p>
+                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isPJ ? C.accent : C.solar, background: isPJ ? `${C.accent}15` : `${C.solar}15`, border: `1px solid ${isPJ ? C.accent : C.solar}30`, borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>{isPJ ? 'PJ' : 'PF'}</span>
                   </div>
-                  <p style={{ color: C.textDim, fontSize: 11, margin: 0, display: 'flex', gap: 8 }}>
-                    {c.cpfCnpj && <span>{c.cpfCnpj}</span>}
+                  <p style={{ color: C.textDim, fontSize: 11, margin: 0, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {c.telefone && <span>{c.telefone}</span>}
                     {c.cidade && c.estado && <span>📍 {c.cidade}/{c.estado}</span>}
-                    {c.email && <span style={{ color: C.textMuted }}>✉ {c.email}</span>}
+                    {!isMobile && c.email && <span style={{ color: C.textMuted }}>✉ {c.email}</span>}
                   </p>
                 </div>
-                {c.distribuidora && <span style={{ color: C.textMuted, fontSize: 11, background: `${C.darkBorder}60`, borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap', flexShrink: 0 }}>⚡ {c.distribuidora}</span>}
-                {c.telefone && <span style={{ color: C.textDim, fontSize: 12, flexShrink: 0 }}>{c.telefone}</span>}
+                {!isMobile && c.distribuidora && <span style={{ color: C.textMuted, fontSize: 11, background: `${C.darkBorder}60`, borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap', flexShrink: 0 }}>⚡ {c.distribuidora}</span>}
                 <span style={{ color: C.textDim, fontSize: 16 }}>›</span>
               </Card>
             )
@@ -278,6 +280,7 @@ export function ClienteDetailPage() {
   const navigate = useNavigate()
   const [showEdit, setShowEdit] = useState(false)
   const [updateErro, setUpdateErro] = useState('')
+  const isMobile = useIsMobile()
 
   const clienteId = Number(id)
   const { data: cliente, isLoading, refetch } = trpc.cliente.byId.useQuery({ id: clienteId }, { enabled: !!clienteId })
@@ -305,42 +308,42 @@ export function ClienteDetailPage() {
 
   return (
     <PageWrapper>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <button onClick={() => navigate('/clientes')} style={{ background: `${C.darkBorder}40`, border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: `${cor}18`, border: `2px solid ${cor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: cor }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+          <button onClick={() => navigate('/clientes')} style={{ background: `${C.darkBorder}40`, border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
+          <div style={{ width: isMobile ? 40 : 52, height: isMobile ? 40 : 52, borderRadius: 13, flexShrink: 0, background: `${cor}18`, border: `2px solid ${cor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 18 : 22, fontWeight: 800, color: cor }}>
             {cliente.nome.charAt(0).toUpperCase()}
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <h1 style={{ color: C.text, fontSize: 18, fontWeight: 700, margin: 0 }}>{cliente.nome}</h1>
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isPJ ? C.accent : C.solar, background: isPJ ? `${C.accent}15` : `${C.solar}15`, border: `1px solid ${isPJ ? C.accent : C.solar}30`, borderRadius: 5, padding: '2px 7px' }}>{isPJ ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3, flexWrap: 'wrap' }}>
+              <h1 style={{ color: C.text, fontSize: isMobile ? 15 : 18, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cliente.nome}</h1>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isPJ ? C.accent : C.solar, background: isPJ ? `${C.accent}15` : `${C.solar}15`, border: `1px solid ${isPJ ? C.accent : C.solar}30`, borderRadius: 5, padding: '2px 7px', flexShrink: 0 }}>{isPJ ? 'PJ' : 'PF'}</span>
             </div>
-            <p style={{ color: C.textDim, fontSize: 12, margin: 0 }}>{[cliente.distribuidora, cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : null].filter(Boolean).join(' · ')}</p>
+            {!isMobile && <p style={{ color: C.textDim, fontSize: 12, margin: 0 }}>{[cliente.distribuidora, cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : null].filter(Boolean).join(' · ')}</p>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Btn variant="ghost" size="sm" onClick={() => setShowEdit(true)}>✏ Editar</Btn>
-          <NovaPropostaDropdown size="sm" />
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 8 }}>
+          <Btn variant="ghost" size="sm" onClick={() => setShowEdit(true)}>{isMobile ? '✏' : '✏ Editar'}</Btn>
+          {!isMobile && <NovaPropostaDropdown size="sm" />}
         </div>
       </div>
 
       {totalFaturas > 0 && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           {[
             { label: 'Faturas', value: String(totalFaturas), color: C.accent },
-            { label: 'Consumo Total', value: `${consumoTotal.toLocaleString('pt-BR')} kWh`, color: C.solar },
+            { label: 'Consumo', value: `${consumoTotal.toLocaleString('pt-BR')} kWh`, color: C.solar },
             { label: 'Total Pago', value: `R$ ${valorTotal.toFixed(2).replace('.', ',')}`, color: C.green },
           ].map(s => (
-            <div key={s.label} style={{ background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 10, padding: '10px 16px', flex: 1 }}>
-              <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 4px' }}>{s.label}</p>
-              <p style={{ color: s.color, fontSize: 15, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{s.value}</p>
+            <div key={s.label} style={{ background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 10, padding: '8px 14px', flex: 1, minWidth: 100 }}>
+              <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }}>{s.label}</p>
+              <p style={{ color: s.color, fontSize: isMobile ? 13 : 15, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{s.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '320px 1fr', gap: 14 }}>
         <Card style={{ padding: '16px 20px' }}>
           <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 14px' }}>Dados Cadastrais</p>
           {[

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import {
   formatCurrency, formatKwh, formatKwp,
   formatPayback, formatDate, formatPct,
@@ -58,6 +59,7 @@ function KpiCard({ label, value, color, icon, large }: { label: string; value: s
 
 function TabDimensionamento({ dim, equips, propostaId }: any) {
   const utils = trpc.useUtils()
+  const isMobile = useIsMobile()
   const updateDim = trpc.proposta.updateDimensionamento.useMutation({
     onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setEditando(false) },
     onError: (e) => alert('Erro: ' + e.message),
@@ -115,11 +117,11 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* KPIs principais */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 12 }}>
         {kpisPrincipais.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
       {/* KPIs secundários */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 10 }}>
         {kpisSecundarios.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
 
@@ -1277,6 +1279,7 @@ function PrazoExecucaoBar({ proposta, propostaId }: { proposta: any; propostaId:
 export function PropostaDetailPage() {
   const { id }    = useParams()
   const navigate  = useNavigate()
+  const isMobile  = useIsMobile()
   const [tabSolar, setTabSolar]         = useState('dimensionamento')
   const [tabServico, setTabServico]     = useState('itens')
   const [gerandoPdf, setGerandoPdf] = useState(false)
@@ -1285,6 +1288,8 @@ export function PropostaDetailPage() {
   const [showAltCliente, setShowAltCliente] = useState(false)
   const [showCapaModal, setShowCapaModal]   = useState(false)
   const [capaImgSelecionada, setCapaImgSelecionada] = useState('')
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
 
   const propostaId = Number(id)
 
@@ -1444,107 +1449,157 @@ export function PropostaDetailPage() {
   }
   const next = nextStatus[proposta.status] ?? nextStatus.rascunho
 
+  const isFormalizado = formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ── HEADER ──────────────────────────────────────────────────── */}
-      <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.darkBorder}`, background: C.darkMid, display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ padding: isMobile ? '10px 14px' : '14px 24px', borderBottom: `1px solid ${C.darkBorder}`, background: C.darkMid, display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 10 : 16, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
         <button onClick={() => navigate('/propostas')} style={{
-          padding: '6px 14px', borderRadius: 8, border: `1px solid ${C.darkBorder}`,
+          padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.darkBorder}`,
           background: `${C.darkBorder}30`, color: C.textMuted, cursor: 'pointer', fontSize: 12,
-          display: 'flex', alignItems: 'center', gap: 4,
-        }}>← Voltar</button>
+          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+        }}>←{!isMobile && ' Voltar'}</button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: 14, fontWeight: 800 }}>{proposta.numero}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+            <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: isMobile ? 13 : 14, fontWeight: 800 }}>{proposta.numero}</span>
             <Badge status={proposta.status} />
-            <span style={{ fontSize: 11, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 7px' }}>v{proposta.versao}</span>
-            {(formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1) ? (
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                background: '#10B98120', color: '#10B981', border: '1px solid #10B98140',
-              }}>✔ Contrato Formalizado {(dataFormalizacaoLocal || proposta.dataFormalizacao) ? `· ${formatDate(dataFormalizacaoLocal || proposta.dataFormalizacao)}` : ''}</span>
+            {!isMobile && <span style={{ fontSize: 11, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 7px' }}>v{proposta.versao}</span>}
+            {isFormalizado ? (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}>
+                ✔ Formalizado{!isMobile && (dataFormalizacaoLocal || proposta.dataFormalizacao) ? ` · ${formatDate(dataFormalizacaoLocal || proposta.dataFormalizacao)}` : ''}
+              </span>
             ) : proposta.status === 'aceita' ? (
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40',
-              }}>⏳ Aguardando Formalização</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40' }}>⏳ Aguardando</span>
             ) : null}
             {osExistente && (
-              <span
-                onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
-                style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                  background: '#FB923C20', color: '#FB923C', border: '1px solid #FB923C40',
-                  cursor: 'pointer',
-                }}>⚙ {osExistente.numero}</span>
+              <span onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
+                style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#FB923C20', color: '#FB923C', border: '1px solid #FB923C40', cursor: 'pointer' }}>
+                ⚙ {osExistente.numero}
+              </span>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {clienteData && (
-              <span style={{ color: C.text, fontSize: 14, fontWeight: 700 }}>{clienteData.nome}</span>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {clienteData && <span style={{ color: C.text, fontSize: isMobile ? 13 : 14, fontWeight: 700 }}>{clienteData.nome}</span>}
             {isServico && proposta.tituloServico && (
-              <span style={{ color: C.textDim, fontSize: 12, background: `${C.green}15`, borderRadius: 5, padding: '1px 8px', border: `1px solid ${C.green}30` }}>🔧 {proposta.tituloServico}</span>
+              <span style={{ color: C.textDim, fontSize: 11, background: `${C.green}15`, borderRadius: 5, padding: '1px 8px', border: `1px solid ${C.green}30` }}>🔧 {proposta.tituloServico}</span>
             )}
-            <span style={{ color: C.textDim, fontSize: 12 }}>
-              Emissão: {formatDate(proposta.dataEmissao)}
-              {proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}
-            </span>
+            {!isMobile && <span style={{ color: C.textDim, fontSize: 12 }}>Emissão: {formatDate(proposta.dataEmissao)}{proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}</span>}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          {proposta.status !== 'aceita' && (
-            <Btn variant="ghost" size="sm" onClick={() => handleStatus(next.status)}
-              style={{ color: next.color, borderColor: next.color + '50' }}>{next.label}</Btn>
-          )}
-          <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')}
-            style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
-          <Btn variant="ghost" size="sm" onClick={() => setShowAltCliente(true)}
-            style={{ color: C.textMuted, borderColor: C.darkBorder }}>👤 Alt. Cliente</Btn>
-          <Btn variant="ghost" size="sm" onClick={() => setShowClonar(true)}
-            style={{ color: C.accent, borderColor: C.accent + '50' }}>⎘ Clonar</Btn>
-          <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
-            style={{ borderColor: C.green + '60', color: C.green }}>
-            {gerandoContrato ? '⏳ Gerando...' : '📄 Gerar Contrato'}
-          </Btn>
-          {proposta.status === 'aceita' && !(formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1) && (
-            <Btn size="sm" variant="ghost" onClick={handleFormalizar} disabled={formalizando}
-              style={{ borderColor: '#10B98160', color: '#10B981', fontWeight: 700 }}>
-              {formalizando ? '⏳...' : '✔ Formalizar Contrato'}
+        {/* Desktop: botões em linha */}
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {proposta.status !== 'aceita' && (
+              <Btn variant="ghost" size="sm" onClick={() => handleStatus(next.status)}
+                style={{ color: next.color, borderColor: next.color + '50' }}>{next.label}</Btn>
+            )}
+            <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')}
+              style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
+            <Btn variant="ghost" size="sm" onClick={() => setShowAltCliente(true)}
+              style={{ color: C.textMuted, borderColor: C.darkBorder }}>👤 Alt. Cliente</Btn>
+            <Btn variant="ghost" size="sm" onClick={() => setShowClonar(true)}
+              style={{ color: C.accent, borderColor: C.accent + '50' }}>⎘ Clonar</Btn>
+            <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
+              style={{ borderColor: C.green + '60', color: C.green }}>
+              {gerandoContrato ? '⏳...' : '📄 Gerar Contrato'}
             </Btn>
-          )}
-          {(formalizadoLocal || proposta.contratoFormalizado || Number(proposta.contratoFormalizado) === 1) && (
-            osExistente ? (
-              <Btn size="sm" variant="ghost"
-                onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
-                style={{ borderColor: '#FB923C60', color: '#FB923C', fontWeight: 700 }}>
-                ⚙ Ver OS {osExistente.numero}
+            {proposta.status === 'aceita' && !isFormalizado && (
+              <Btn size="sm" variant="ghost" onClick={handleFormalizar} disabled={formalizando}
+                style={{ borderColor: '#10B98160', color: '#10B981', fontWeight: 700 }}>
+                {formalizando ? '⏳...' : '✔ Formalizar'}
               </Btn>
-            ) : (
-              <Btn size="sm" variant="ghost" onClick={handleGerarOS} disabled={gerandoOS}
-                style={{ borderColor: '#FB923C60', color: '#FB923C', fontWeight: 700 }}>
-                {gerandoOS ? '⏳...' : '⚙ Gerar OS'}
-              </Btn>
-            )
-          )}
-          <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
-            {gerandoPdf ? '⏳ Gerando...' : '↯ Exportar PDF'}
-          </Btn>
-        </div>
+            )}
+            {isFormalizado && (
+              osExistente ? (
+                <Btn size="sm" variant="ghost" onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
+                  style={{ borderColor: '#FB923C60', color: '#FB923C', fontWeight: 700 }}>
+                  ⚙ Ver OS {osExistente.numero}
+                </Btn>
+              ) : (
+                <Btn size="sm" variant="ghost" onClick={handleGerarOS} disabled={gerandoOS}
+                  style={{ borderColor: '#FB923C60', color: '#FB923C', fontWeight: 700 }}>
+                  {gerandoOS ? '⏳...' : '⚙ Gerar OS'}
+                </Btn>
+              )
+            )}
+            <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
+              {gerandoPdf ? '⏳...' : '↯ PDF'}
+            </Btn>
+          </div>
+        )}
+
+        {/* Mobile: apenas PDF + menu "⋯" */}
+        {isMobile && (
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, position: 'relative' }} ref={mobileMenuRef}>
+            <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
+              {gerandoPdf ? '⏳' : '↯ PDF'}
+            </Btn>
+            <button
+              onClick={() => setShowMobileMenu(v => !v)}
+              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.darkBorder}`, background: `${C.darkBorder}30`, color: C.text, cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>
+              ⋯
+            </button>
+            {showMobileMenu && (
+              <div style={{ position: 'absolute', top: '110%', right: 0, background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 200, minWidth: 220, overflow: 'hidden' }}>
+                {proposta.status !== 'aceita' && (
+                  <button onClick={() => { handleStatus(next.status); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: next.color, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    {next.label}
+                  </button>
+                )}
+                <button onClick={() => { handleStatus('recusada'); setShowMobileMenu(false) }}
+                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.danger, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                  ✕ Recusar Proposta
+                </button>
+                <button onClick={() => { handleGerarContrato(); setShowMobileMenu(false) }}
+                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.green, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                  📄 Gerar Contrato
+                </button>
+                {proposta.status === 'aceita' && !isFormalizado && (
+                  <button onClick={() => { handleFormalizar(); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#10B981', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    ✔ Formalizar Contrato
+                  </button>
+                )}
+                {isFormalizado && !osExistente && (
+                  <button onClick={() => { handleGerarOS(); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FB923C', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    ⚙ Gerar OS
+                  </button>
+                )}
+                {isFormalizado && osExistente && (
+                  <button onClick={() => { navigate(`/ordens-servico/${osExistente.id}`); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FB923C', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    ⚙ Ver OS {osExistente.numero}
+                  </button>
+                )}
+                <button onClick={() => { setShowClonar(true); setShowMobileMenu(false) }}
+                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.accent, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                  ⎘ Clonar Proposta
+                </button>
+                <button onClick={() => { setShowAltCliente(true); setShowMobileMenu(false) }}
+                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>
+                  👤 Alterar Cliente
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── PRAZO DE EXECUÇÃO ──────────────────────────────────────── */}
       <PrazoExecucaoBar proposta={proposta} propostaId={propostaId} />
 
       {/* ── ABAS ────────────────────────────────────────────────────── */}
-      <div style={{ background: C.darkMid, padding: '0 24px', borderBottom: `1px solid ${C.darkBorder}` }}>
+      <div style={{ background: C.darkMid, padding: isMobile ? '0 14px' : '0 24px', borderBottom: `1px solid ${C.darkBorder}`, overflowX: 'auto' }}>
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
       </div>
 
       {/* ── CONTEÚDO ────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 14px' : '22px 24px' }}>
         {isServico ? (
           <>
             {tab === 'itens'    && <TabItensServico itens={itensServico ?? []} propostaId={propostaId} tituloServico={proposta.tituloServico} />}
