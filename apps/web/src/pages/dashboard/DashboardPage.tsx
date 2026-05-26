@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return '—'
@@ -94,6 +95,7 @@ function FunilBar({ label, count, valor, total, color, icon }: { label: string; 
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const { data: raw, isLoading } = (trpc as any).proposta.list.useQuery({ page: 1, pageSize: 100 })
   const { data: empresa } = (trpc as any).empresa.get.useQuery()
   const propostas: any[] = raw?.data ?? []
@@ -134,26 +136,26 @@ export function DashboardPage() {
   )
 
   return (
-    <div style={{ padding: '28px 32px' }}>
+    <div style={{ padding: isMobile ? '16px 14px' : '28px 32px' }}>
 
       {/* Greeting */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ color: '#E2EAF5', fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Bom dia! ☀️</h2>
-        <p style={{ color: '#4A6080', fontSize: 14, margin: 0 }}>
+      <div style={{ marginBottom: isMobile ? 16 : 28 }}>
+        <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 18 : 22, fontWeight: 800, margin: '0 0 4px' }}>Bom dia! ☀️</h2>
+        <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>
           {(empresa as any)?.nome ?? 'Atom Tech'} · Aqui está o resumo de hoje
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+      {/* KPI Cards — 2 colunas no mobile */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 28 }}>
         <KpiCard label="Volume Total Orçado"  value={stats.total}              valor={stats.valorTotal}     sub="todas as propostas"    icon="💰" color="#F5A623" />
         <KpiCard label="Aguardando Resposta"  value={stats.aguardando}         valor={stats.valorAguardando} sub="propostas enviadas"    icon="📤" color="#58A6FF" />
         <KpiCard label="Propostas Aceitas"    value={stats.aceitas}            valor={stats.valorAceitas}   sub="volume aprovado"       icon="✅" color="#3EBB7A" />
         <KpiCard label="Taxa de Conversão"    value={stats.conversao + '%'}                                 sub={`${stats.aceitas} de ${stats.total} propostas`} icon="📊" color="#BC8CFF" />
       </div>
 
-      {/* Main Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+      {/* Main Row — coluna única no mobile */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: 20 }}>
 
         {/* Tabela propostas */}
         <div style={{ background: 'linear-gradient(135deg, #111D2E, #0E1A2A)', borderRadius: 14, border: '1px solid #1E3050', overflow: 'hidden' }}>

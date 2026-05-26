@@ -77,13 +77,13 @@ function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean 
 }
 
 export function Layout() {
+  const isMobile = useIsMobile()
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
   const { data: empresa } = (trpc as any).empresa.get.useQuery()
 
   const current   = NAV.find(n => location.pathname.startsWith(n.path))
