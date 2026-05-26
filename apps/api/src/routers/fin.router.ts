@@ -391,16 +391,17 @@ const tituloRouter = router({
           vencimento:    finParcela.vencimento,
           status:        finParcela.status,
           dataPagamento: finParcela.dataPagamento,
-          valorPago:     finParcela.valorPago,
-          juros:         finParcela.juros,
-          multa:         finParcela.multa,
-          desconto:      finParcela.desconto,
-          contaId:       finParcela.contaId,
-          tituloId:      finTitulo.id,
-          tipo:          finTitulo.tipo,
-          descricao:     finTitulo.descricao,
-          documento:     finTitulo.documento,
-          valorOriginal: finTitulo.valorOriginal,
+          valorPago:      finParcela.valorPago,
+          juros:          finParcela.juros,
+          multa:          finParcela.multa,
+          desconto:       finParcela.desconto,
+          formaPagamento: finParcela.formaPagamento,
+          contaId:        finParcela.contaId,
+          tituloId:       finTitulo.id,
+          tipo:           finTitulo.tipo,
+          descricao:      finTitulo.descricao,
+          documento:      finTitulo.documento,
+          valorOriginal:  finTitulo.valorOriginal,
           emissao:       finTitulo.emissao,
           observacoes:   finTitulo.observacoes,
           pessoaId:      finTitulo.pessoaId,
@@ -684,13 +685,14 @@ const tituloRouter = router({
 const parcelaRouter = router({
   baixar: protectedProcedure
     .input(z.object({
-      parcelaId:     z.number(),
-      contaId:       z.number(),
-      dataPagamento: z.string(),  // YYYY-MM-DD
-      valorPago:     z.number().positive(),
-      juros:         z.number().min(0).default(0),
-      multa:         z.number().min(0).default(0),
-      desconto:      z.number().min(0).default(0),
+      parcelaId:      z.number(),
+      contaId:        z.number(),
+      dataPagamento:  z.string(),  // YYYY-MM-DD
+      valorPago:      z.number().positive(),
+      juros:          z.number().min(0).default(0),
+      multa:          z.number().min(0).default(0),
+      desconto:       z.number().min(0).default(0),
+      formaPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
@@ -710,13 +712,14 @@ const parcelaRouter = router({
       await ctx.db
         .update(finParcela)
         .set({
-          status:        'PAGA',
-          contaId:       input.contaId,
-          dataPagamento: input.dataPagamento as any,
-          valorPago:     input.valorPago.toFixed(2),
-          juros:         input.juros.toFixed(2),
-          multa:         input.multa.toFixed(2),
-          desconto:      input.desconto.toFixed(2),
+          status:         'PAGA',
+          contaId:        input.contaId,
+          dataPagamento:  input.dataPagamento as any,
+          valorPago:      input.valorPago.toFixed(2),
+          juros:          input.juros.toFixed(2),
+          multa:          input.multa.toFixed(2),
+          desconto:       input.desconto.toFixed(2),
+          formaPagamento: input.formaPagamento ?? null,
         })
         .where(eq(finParcela.id, input.parcelaId))
 
@@ -741,13 +744,14 @@ const parcelaRouter = router({
       await ctx.db
         .update(finParcela)
         .set({
-          status:        'ABERTA',
-          contaId:       null,
-          dataPagamento: null,
-          valorPago:     null,
-          juros:         '0',
-          multa:         '0',
-          desconto:      '0',
+          status:         'ABERTA',
+          contaId:        null,
+          dataPagamento:  null,
+          valorPago:      null,
+          juros:          '0',
+          multa:          '0',
+          desconto:       '0',
+          formaPagamento: null,
         })
         .where(eq(finParcela.id, input.parcelaId))
 

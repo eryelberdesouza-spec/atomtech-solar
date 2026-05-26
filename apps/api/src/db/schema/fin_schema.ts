@@ -125,6 +125,7 @@ export const finParcela = mysqlTable('fin_parcela', {
   juros:          decimal('juros', { precision: 12, scale: 2 }).default('0'),
   multa:          decimal('multa', { precision: 12, scale: 2 }).default('0'),
   desconto:       decimal('desconto', { precision: 12, scale: 2 }).default('0'),
+  formaPagamento: varchar('forma_pagamento', { length: 50 }),
   createdAt:      timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (t) => ({
   idxTitulo:     index('idx_fin_parcela_titulo').on(t.tituloId),

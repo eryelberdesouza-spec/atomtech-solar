@@ -391,6 +391,22 @@ app.get('/run-migration-os', async (_, res) => {
   }
 })
 
+// ── Migração: forma_pagamento em fin_parcela ─────────────────────────────────
+app.get('/run-migration-fin-forma-pagamento', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      ALTER TABLE fin_parcela
+      ADD COLUMN IF NOT EXISTS forma_pagamento VARCHAR(50) NULL AFTER desconto
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Coluna forma_pagamento adicionada a fin_parcela' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {

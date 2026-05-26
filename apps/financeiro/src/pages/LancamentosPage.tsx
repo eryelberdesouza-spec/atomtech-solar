@@ -46,6 +46,38 @@ function gerarParcelas(qtd: number, valor: number, primeiroVenc: string) {
   })
 }
 
+const FORMAS_PAGAMENTO = [
+  { value: '',        label: '— Selecione —'          },
+  { value: 'dinheiro',  label: '💵 Dinheiro'            },
+  { value: 'pix',       label: '⚡ PIX'                 },
+  { value: 'ted_doc',   label: '🏦 TED / DOC'           },
+  { value: 'boleto',    label: '📋 Boleto'              },
+  { value: 'debito',    label: '💳 Cartão de Débito'    },
+  { value: 'credito',   label: '💳 Cartão de Crédito'  },
+  { value: 'cheque',    label: '📄 Cheque'              },
+]
+
+const LABELS_FORMA: Record<string, string> = {
+  dinheiro: '💵 Dinheiro',
+  pix:      '⚡ PIX',
+  ted_doc:  '🏦 TED/DOC',
+  boleto:   '📋 Boleto',
+  debito:   '💳 Débito',
+  credito:  '💳 Crédito',
+  cheque:   '📄 Cheque',
+}
+
+function agendamentoKey(parcelaId: number) { return `atomtech_agendamento_${parcelaId}` }
+function salvarAgLocal(parcelaId: number, dados: any) {
+  try { localStorage.setItem(agendamentoKey(parcelaId), JSON.stringify(dados)) } catch {}
+}
+function carregarAgLocal(parcelaId: number) {
+  try {
+    const s = localStorage.getItem(agendamentoKey(parcelaId))
+    return s ? JSON.parse(s) : null
+  } catch { return null }
+}
+
 // ─── MODAL EDITAR LANÇAMENTO ──────────────────────────────────────────────────
 
 function ModalEditarLancamento({
@@ -405,14 +437,18 @@ function ModalComprovante({
   parcelaAtual: any
   onClose:      () => void
 }) {
+  const parcelaId = parcelaAtual?.parcelaId
+
+  const agSalvo = parcelaId ? carregarAgLocal(parcelaId) : null
   const [ag, setAg] = useState({
-    dataAgendada:    '',
-    horaAgendada:    '',
-    tecnico:         '',
-    enderecoServico: '',
-    observacoes:     '',
+    dataAgendada:    agSalvo?.dataAgendada    ?? '',
+    horaAgendada:    agSalvo?.horaAgendada    ?? '',
+    tecnico:         agSalvo?.tecnico         ?? '',
+    enderecoServico: agSalvo?.enderecoServico ?? '',
+    observacoes:     agSalvo?.observacoes     ?? '',
   })
-  const [comAgendamento, setComAgendamento] = useState(false)
+  const [comAgendamento, setComAgendamento] = useState(!!(agSalvo && Object.values(agSalvo).some(v => v)))
+  const [salvou, setSalvou] = useState(false)
 
   const { data: byId,    isLoading: l1 } = (trpc as any).fin.titulo.byId.useQuery({ tituloId })
   const { data: empresa, isLoading: l2 } = (trpc as any).fin.empresa.minha.useQuery()
@@ -421,8 +457,16 @@ function ModalComprovante({
   const tipo      = parcelaAtual?.tipo ?? byId?.titulo?.tipo ?? 'PAGAR'
   const titleLabel = tipo === 'PAGAR' ? 'Solicitação de Pagamento' : 'Cobrança / Recebimento'
 
+  function salvarDados() {
+    if (!parcelaId) return
+    salvarAgLocal(parcelaId, comAgendamento ? ag : null)
+    setSalvou(true)
+    setTimeout(() => setSalvou(false), 2000)
+  }
+
   function imprimir() {
     if (!byId || !empresa) return
+    if (parcelaId) salvarAgLocal(parcelaId, comAgendamento ? ag : null)
     gerarComprovantePdf({
       tipo:     byId.titulo.tipo,
       empresa,
@@ -461,9 +505,16 @@ function ModalComprovante({
       width={600}
       footer={
         <>
-          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn variant="ghost" onClick={onClose}>Fechar</Btn>
+          <Btn
+            variant="ghost"
+            onClick={salvarDados}
+            style={{ borderColor: C.info + '60', color: salvou ? C.success : C.info }}
+          >
+            {salvou ? '✓ Dados salvos!' : '💾 Salvar Dados'}
+          </Btn>
           <Btn disabled={isLoading} onClick={imprimir}>
-            {isLoading ? 'Carregando...' : '🖨 Gerar / Imprimir PDF'}
+            {isLoading ? 'Carregando...' : '🖨 Gerar PDF'}
           </Btn>
         </>
       }
@@ -487,6 +538,7 @@ function ModalComprovante({
                 <> &nbsp;·&nbsp; Parcela {parcelaAtual.numero} — {fmtData(parcelaAtual.vencimento)} — {fmtBRLFull(Number(parcelaAtual.valor))}</>
               )}
             </p>
+            {agSalvo && <p style={{ margin: '6px 0 0', color: C.success, fontSize: 11 }}>✓ Dados de agendamento salvos localmente</p>}
           </div>
 
           {/* Toggle agendamento */}
@@ -508,7 +560,7 @@ function ModalComprovante({
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Incluir dados de agendamento</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Data, horário, técnico e local de execução</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Data, horário, técnico e local de execução — use 💾 para salvar</div>
             </div>
           </div>
 
@@ -789,11 +841,29 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             documento: r.documento
               ? <span style={{ color: C.textMuted, fontSize: 12 }}>{r.documento}</span>
               : <span style={{ color: C.textDim }}>—</span>,
-            valor: (
-              <span style={{ fontWeight: 700, color: tipo === 'PAGAR' ? C.debit : C.credit }}>
-                {fmtBRLFull(Number(r.valor))}
-              </span>
-            ),
+            valor: (() => {
+              const valorOrig = Number(r.valor)
+              const valorPago = r.valorPago != null ? Number(r.valorPago) : null
+              const hasDif    = valorPago != null && Math.abs(valorPago - valorOrig) > 0.009
+              return (
+                <div>
+                  <span style={{ fontWeight: 700, color: tipo === 'PAGAR' ? C.debit : C.credit }}>
+                    {fmtBRLFull(r.status === 'PAGA' && valorPago != null ? valorPago : valorOrig)}
+                  </span>
+                  {hasDif && r.status === 'PAGA' && (
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>
+                      <span style={{ textDecoration: 'line-through', marginRight: 4 }}>{fmtBRLFull(valorOrig)}</span>
+                      <span style={{ color: valorPago! < valorOrig ? C.debit : C.warning }}>
+                        {valorPago! < valorOrig ? '▼' : '▲'} {fmtBRLFull(Math.abs(valorPago! - valorOrig))}
+                      </span>
+                    </div>
+                  )}
+                  {r.formaPagamento && r.status === 'PAGA' && (
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>{LABELS_FORMA[r.formaPagamento] ?? r.formaPagamento}</div>
+                  )}
+                </div>
+              )
+            })(),
             status: <StatusBadge s={r.statusDisplay} />,
             acoes: (
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
@@ -912,17 +982,20 @@ function ModalNovoLancamento({
   onSuccess:     () => void
 }) {
   const [form, setForm] = useState({
-    descricao:          '',
-    documento:          '',
-    pessoaId:           '',
-    planoContasId:      '',
-    centroCustoId:      '',
-    valorOriginal:      '',
-    emissao:            hoje(),
-    observacoes:        '',
-    qtdParcelas:        '1',
-    primeiroVencimento: '',
+    descricao:     '',
+    documento:     '',
+    pessoaId:      '',
+    planoContasId: '',
+    centroCustoId: '',
+    valorOriginal: '',
+    emissao:       hoje(),
+    observacoes:   '',
+    qtdParcelas:   '1',
   })
+  // Parcelas com datas editáveis
+  const [parcelas, setParcelas] = useState<{ numero: number; valor: number; vencimento: string }[]>([
+    { numero: 1, valor: 0, vencimento: '' }
+  ])
   const [erro, setErro] = useState('')
 
   const create = (trpc as any).fin.titulo.create.useMutation({
@@ -936,7 +1009,6 @@ function ModalNovoLancamento({
   const pessoasFiltradas = pessoas.filter((p: any) =>
     tipo === 'PAGAR' ? p.isFornecedor : p.isCliente
   )
-
   const planosFiltrados = planosContas.filter((p: any) =>
     p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO'
   )
@@ -944,16 +1016,27 @@ function ModalNovoLancamento({
   const qtd   = Math.max(1, parseInt(form.qtdParcelas) || 1)
   const valor = parseMoeda(form.valorOriginal)
 
-  const previewParcelas = useMemo(() => {
-    if (qtd <= 1 || valor <= 0 || !form.primeiroVencimento) return []
-    return gerarParcelas(qtd, valor, form.primeiroVencimento)
-  }, [qtd, valor, form.primeiroVencimento])
+  // Regenera parcelas quando qtd ou valor muda, preservando datas já editadas
+  useMemo(() => {
+    if (valor <= 0) { setParcelas([{ numero: 1, valor: 0, vencimento: '' }]); return }
+    const valorBase = Math.floor(valor * 100 / qtd) / 100
+    let acumulado = 0
+    setParcelas(prev => Array.from({ length: qtd }, (_, i) => {
+      const isLast = i === qtd - 1
+      const v = isLast ? Math.round((valor - acumulado) * 100) / 100 : valorBase
+      acumulado += v
+      // Preserva vencimento já digitado pelo usuário
+      const vencExistente = prev[i]?.vencimento ?? ''
+      return { numero: i + 1, valor: v, vencimento: vencExistente }
+    }))
+  }, [qtd, valor])
 
   function submit() {
     setErro('')
     if (!form.descricao.trim()) return setErro('Descrição é obrigatória')
     if (valor <= 0)             return setErro('Valor deve ser maior que zero')
-    if (!form.primeiroVencimento) return setErro('Informe a data do primeiro vencimento')
+    const semVenc = parcelas.findIndex(p => !p.vencimento)
+    if (semVenc >= 0) return setErro(`Informe o vencimento da parcela ${semVenc + 1}`)
 
     create.mutate({
       tipo,
@@ -965,16 +1048,30 @@ function ModalNovoLancamento({
       valorOriginal: valor,
       emissao:       form.emissao,
       observacoes:   form.observacoes.trim() || undefined,
-      parcelas:      gerarParcelas(qtd, valor, form.primeiroVencimento),
+      parcelas:      parcelas.map(p => ({ numero: p.numero, valor: p.valor, vencimento: p.vencimento })),
     })
   }
+
+  // Preenche datas automaticamente pelo 1º vencimento
+  function onPrimeiroVencimento(data: string) {
+    setParcelas(prev => prev.map((p, i) => {
+      if (i === 0) return { ...p, vencimento: data }
+      // Só preenche automaticamente se a data estava vazia
+      if (p.vencimento) return p
+      const d = new Date(data + 'T12:00:00')
+      d.setMonth(d.getMonth() + i)
+      return { ...p, vencimento: d.toISOString().slice(0, 10) }
+    }))
+  }
+
+  const totalParcelas = parcelas.reduce((s, p) => s + p.valor, 0)
 
   return (
     <Modal
       open={true}
       onClose={onClose}
       title={`Nova Conta a ${label}`}
-      width={620}
+      width={640}
       footer={
         <>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
@@ -1021,42 +1118,67 @@ function ModalNovoLancamento({
 
       <FormRow>
         <Input label="Data de Emissão *" type="date" value={form.emissao} onChange={e => f('emissao', e.target.value)} />
-        <Input label="1º Vencimento *" type="date" value={form.primeiroVencimento} onChange={e => f('primeiroVencimento', e.target.value)} />
-      </FormRow>
-
-      <FormRow>
         <Input
           label="Número de Parcelas"
-          type="number"
-          min="1" max="60"
+          type="number" min="1" max="60"
           value={form.qtdParcelas}
           onChange={e => f('qtdParcelas', e.target.value)}
-          hint="1 = à vista. 2+ = parcelado mensalmente."
+          hint="1 = à vista. 2+ = parcelado."
         />
-        <div />
       </FormRow>
 
-      {/* Preview de parcelas */}
-      {previewParcelas.length > 0 && (
-        <div style={{
-          background: C.bg, borderRadius: 8, border: '1px solid ' + C.border,
-          padding: '12px 14px', marginBottom: 16, maxHeight: 200, overflowY: 'auto',
-        }}>
-          <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Parcelas geradas
-          </p>
-          {previewParcelas.map(p => (
-            <div key={p.numero} style={{
-              display: 'flex', justifyContent: 'space-between',
-              fontSize: 12, color: C.text, padding: '4px 0',
-              borderBottom: '1px solid ' + C.border + '40',
-            }}>
-              <span style={{ color: C.textMuted }}>Parcela {p.numero} — {fmtData(p.vencimento)}</span>
-              <span style={{ fontWeight: 600, color: tipo === 'PAGAR' ? C.debit : C.credit }}>
+      {/* Parcelas com datas editáveis */}
+      {valor > 0 && (
+        <div style={{ background: C.bg, borderRadius: 8, border: '1px solid ' + C.border, padding: '12px 14px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Vencimentos das Parcelas
+            </p>
+            {parcelas.length > 1 && (
+              <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>
+                Preencha o 1º e os demais serão sugeridos ▶
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr', gap: 8, marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>#</div>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Vencimento *</div>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>Valor</div>
+          </div>
+
+          {parcelas.map((p, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ color: C.textMuted, fontSize: 12, fontWeight: 700, textAlign: 'center' }}>{p.numero}</div>
+              <input
+                type="date"
+                value={p.vencimento}
+                onChange={e => {
+                  const newDate = e.target.value
+                  if (i === 0) {
+                    onPrimeiroVencimento(newDate)
+                  } else {
+                    setParcelas(prev => prev.map((x, j) => j === i ? { ...x, vencimento: newDate } : x))
+                  }
+                }}
+                style={{
+                  width: '100%', padding: '7px 10px', borderRadius: 7,
+                  background: C.bgMid, border: '1px solid ' + (p.vencimento ? C.border : C.danger + '60'),
+                  color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const,
+                }}
+              />
+              <div style={{ textAlign: 'right', fontWeight: 600, color: tipo === 'PAGAR' ? C.debit : C.credit, fontSize: 13 }}>
                 {fmtBRLFull(p.valor)}
-              </span>
+              </div>
             </div>
           ))}
+
+          {parcelas.length > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid ' + C.border + '60', paddingTop: 8, marginTop: 6 }}>
+              <span style={{ color: C.textMuted, fontSize: 12 }}>Total {parcelas.length} parcelas</span>
+              <span style={{ color: tipo === 'PAGAR' ? C.debit : C.credit, fontWeight: 700 }}>{fmtBRLFull(totalParcelas)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -1078,13 +1200,17 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
   onClose:   () => void
   onSuccess: () => void
 }) {
+  const valorOriginal = Number(parcela.valor) || 0
+
   const [form, setForm] = useState({
-    contaId:       '',
-    dataPagamento: hoje(),
-    valorPago:     maskMoeda(Number(parcela.valor) || 0),
-    juros:         '',
-    multa:         '',
-    desconto:      '',
+    contaId:        '',
+    dataPagamento:  hoje(),
+    valorPago:      maskMoeda(valorOriginal),
+    juros:          '',
+    multa:          '',
+    desconto:       '',
+    formaPagamento: '',
+    taxaOperadora:  '',
   })
   const [erro, setErro] = useState('')
 
@@ -1095,6 +1221,33 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
 
   const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }))
 
+  // Auto-calcula desconto quando taxa da operadora muda (cartão crédito)
+  function onTaxaChange(taxa: string) {
+    const t = parseFloat(taxa.replace(',', '.')) || 0
+    const desc = t > 0 ? valorOriginal * t / 100 : 0
+    const descMasked = desc > 0 ? maskMoeda(desc) : ''
+    const juros  = parseMoeda(form.juros)  || 0
+    const multa  = parseMoeda(form.multa)  || 0
+    const vpLiq  = valorOriginal + juros + multa - desc
+    setForm(prev => ({
+      ...prev,
+      taxaOperadora: taxa,
+      desconto:      descMasked,
+      valorPago:     maskMoeda(Math.max(0, vpLiq)),
+    }))
+  }
+
+  // Auto-recalcula valorPago quando encargos/descontos mudam
+  function onEncargosChange(key: 'juros' | 'multa' | 'desconto', v: string) {
+    setForm(prev => {
+      const next = { ...prev, [key]: v }
+      const j    = parseMoeda(next.juros)   || 0
+      const m    = parseMoeda(next.multa)   || 0
+      const d    = parseMoeda(next.desconto) || 0
+      return { ...next, valorPago: maskMoeda(Math.max(0, valorOriginal + j + m - d)) }
+    })
+  }
+
   function submit() {
     setErro('')
     if (!form.contaId) return setErro('Selecione a conta bancária')
@@ -1102,24 +1255,31 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
     if (vp <= 0) return setErro('Valor pago deve ser maior que zero')
 
     baixar.mutate({
-      parcelaId:     parcela.parcelaId,
-      contaId:       parseInt(form.contaId),
-      dataPagamento: form.dataPagamento,
-      valorPago:     vp,
-      juros:         parseMoeda(form.juros)    || 0,
-      multa:         parseMoeda(form.multa)    || 0,
-      desconto:      parseMoeda(form.desconto) || 0,
+      parcelaId:      parcela.parcelaId,
+      contaId:        parseInt(form.contaId),
+      dataPagamento:  form.dataPagamento,
+      valorPago:      vp,
+      juros:          parseMoeda(form.juros)    || 0,
+      multa:          parseMoeda(form.multa)    || 0,
+      desconto:       parseMoeda(form.desconto) || 0,
+      formaPagamento: form.formaPagamento || undefined,
     })
   }
 
   const tipo = parcela.tipo as 'PAGAR' | 'RECEBER'
+  const vp       = parseMoeda(form.valorPago) || 0
+  const jv       = parseMoeda(form.juros)     || 0
+  const mv       = parseMoeda(form.multa)     || 0
+  const dv       = parseMoeda(form.desconto)  || 0
+  const difValor = vp - valorOriginal
+  const temDif   = Math.abs(difValor) > 0.009
 
   return (
     <Modal
       open={true}
       onClose={onClose}
-      title="Registrar Pagamento"
-      width={460}
+      title={`Registrar ${tipo === 'PAGAR' ? 'Pagamento' : 'Recebimento'}`}
+      width={500}
       footer={
         <>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
@@ -1132,24 +1292,56 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
       {erro && <div style={{ marginBottom: 16 }}><Alert type="danger">{erro}</Alert></div>}
 
       {/* Info da parcela */}
-      <div style={{
-        background: C.bg, borderRadius: 8, border: '1px solid ' + C.border,
-        padding: '12px 14px', marginBottom: 20,
-      }}>
-        <p style={{ margin: 0, color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Parcela
-        </p>
-        <p style={{ margin: '4px 0 0', color: C.text, fontSize: 14, fontWeight: 600 }}>
-          {parcela.descricao}
-        </p>
+      <div style={{ background: C.bg, borderRadius: 8, border: '1px solid ' + C.border, padding: '12px 14px', marginBottom: 18 }}>
+        <p style={{ margin: 0, color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Parcela</p>
+        <p style={{ margin: '4px 0 0', color: C.text, fontSize: 14, fontWeight: 600 }}>{parcela.descricao}</p>
         <p style={{ margin: '4px 0 0', color: C.textMuted, fontSize: 12 }}>
           Vencimento: <strong>{fmtData(parcela.vencimento)}</strong>{' '}
-          · Valor original:{' '}
-          <strong style={{ color: tipo === 'PAGAR' ? C.debit : C.credit }}>
-            {fmtBRLFull(Number(parcela.valor))}
-          </strong>
+          · Valor contratado:{' '}
+          <strong style={{ color: tipo === 'PAGAR' ? C.debit : C.credit }}>{fmtBRLFull(valorOriginal)}</strong>
         </p>
       </div>
+
+      {/* Forma de pagamento */}
+      <FormRow cols={1}>
+        <Select
+          label="Forma de Pagamento"
+          value={form.formaPagamento}
+          onChange={e => {
+            f('formaPagamento', e.target.value)
+            if (e.target.value !== 'credito') {
+              setForm(prev => ({ ...prev, formaPagamento: e.target.value, taxaOperadora: '', desconto: '', valorPago: maskMoeda(valorOriginal) }))
+            }
+          }}
+          options={FORMAS_PAGAMENTO}
+        />
+      </FormRow>
+
+      {/* Taxa operadora (apenas cartão crédito) */}
+      {form.formaPagamento === 'credito' && (
+        <div style={{ background: '#1A1A2E', border: '1px solid #3B3B6B', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+          <p style={{ margin: '0 0 10px', color: '#A78BFA', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            💳 Taxa da Operadora de Cartão
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Taxa (%)</label>
+              <input
+                type="number" step="0.01" min="0" max="10" value={form.taxaOperadora}
+                onChange={e => onTaxaChange(e.target.value)}
+                placeholder="Ex: 2.99"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 7, background: C.bg, border: '1px solid ' + C.border, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }}
+              />
+            </div>
+            {dv > 0 && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>Desconto</div>
+                <div style={{ color: C.debit, fontWeight: 700 }}>- {fmtBRLFull(dv)}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <FormRow cols={1}>
         <Select
@@ -1163,7 +1355,7 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
 
       <FormRow>
         <Input label="Data de Pagamento *" type="date" value={form.dataPagamento} onChange={e => f('dataPagamento', e.target.value)} />
-        <InputMoeda label="Valor Pago *" value={form.valorPago} onChange={v => f('valorPago', v)} />
+        <InputMoeda label="Valor Efetivo *" value={form.valorPago} onChange={v => f('valorPago', v)} />
       </FormRow>
 
       <div style={{ marginBottom: 6 }}>
@@ -1172,10 +1364,47 @@ function ModalBaixa({ parcela, contas, onClose, onSuccess }: {
         </label>
       </div>
       <FormRow cols={3}>
-        <InputMoeda label="Juros" value={form.juros} onChange={v => f('juros', v)} />
-        <InputMoeda label="Multa" value={form.multa} onChange={v => f('multa', v)} />
-        <InputMoeda label="Desconto" value={form.desconto} onChange={v => f('desconto', v)} />
+        <InputMoeda label="Juros"    value={form.juros}    onChange={v => onEncargosChange('juros',    v)} />
+        <InputMoeda label="Multa"    value={form.multa}    onChange={v => onEncargosChange('multa',    v)} />
+        <InputMoeda label="Desconto" value={form.desconto} onChange={v => onEncargosChange('desconto', v)} />
       </FormRow>
+
+      {/* Resumo do cálculo */}
+      {(jv > 0 || mv > 0 || dv > 0 || temDif) && (
+        <div style={{
+          background: C.bg, borderRadius: 8, border: '1px solid ' + C.border,
+          padding: '10px 14px', marginTop: 4, fontSize: 12,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ color: C.textMuted }}>Valor contratado</span>
+            <span style={{ color: C.text }}>{fmtBRLFull(valorOriginal)}</span>
+          </div>
+          {jv > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ color: C.textMuted }}>+ Juros</span>
+            <span style={{ color: C.warning }}>+ {fmtBRLFull(jv)}</span>
+          </div>}
+          {mv > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ color: C.textMuted }}>+ Multa</span>
+            <span style={{ color: C.warning }}>+ {fmtBRLFull(mv)}</span>
+          </div>}
+          {dv > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ color: C.textMuted }}>- Desconto{form.formaPagamento === 'credito' ? ' (taxa cartão)' : ''}</span>
+            <span style={{ color: C.debit }}>- {fmtBRLFull(dv)}</span>
+          </div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid ' + C.border, paddingTop: 6, marginTop: 4 }}>
+            <span style={{ color: C.text, fontWeight: 700 }}>Valor {tipo === 'PAGAR' ? 'pago' : 'recebido'} efetivo</span>
+            <span style={{ color: tipo === 'PAGAR' ? C.debit : C.credit, fontWeight: 800, fontSize: 14 }}>{fmtBRLFull(vp)}</span>
+          </div>
+          {temDif && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ color: C.textMuted, fontSize: 11 }}>Diferença vs contratado</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: difValor > 0 ? C.warning : C.debit }}>
+                {difValor > 0 ? '+' : ''}{fmtBRLFull(difValor)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   )
 }
