@@ -154,12 +154,12 @@ const CSS = `
     font-size: 11pt;
     color: #000;
     background: #fff;
-    line-height: 1.55;
+    line-height: 1.45;
   }
   .page {
     width: 210mm;
     min-height: 297mm;
-    padding: 18mm 22mm 20mm;
+    padding: 14mm 20mm 16mm;
     background: #fff;
     position: relative;
     page-break-after: always;
@@ -170,23 +170,23 @@ const CSS = `
   .header {
     display: flex;
     align-items: center;
-    margin-bottom: 6mm;
+    margin-bottom: 4mm;
     background: #1a2744;
     border-radius: 4px;
-    padding: 6px 12px;
+    padding: 5px 12px;
   }
-  .header img { height: 36px; }
+  .header img { height: 32px; }
   .header span { color: #fff; }
   .header-line { flex: 1; }
 
   /* Title */
   .titulo-contrato {
     text-align: center;
-    font-size: 14pt;
+    font-size: 13pt;
     font-weight: 700;
     text-decoration: underline;
     text-transform: uppercase;
-    margin-bottom: 8mm;
+    margin-bottom: 5mm;
     letter-spacing: 0.04em;
   }
 
@@ -196,31 +196,31 @@ const CSS = `
     font-weight: 700;
     text-decoration: underline;
     text-transform: uppercase;
-    margin: 3.5mm 0 1.5mm;
+    margin: 2.5mm 0 1mm;
   }
   .clausula {
     text-align: justify;
-    margin-bottom: 2mm;
+    margin-bottom: 1.2mm;
     hyphens: auto;
   }
   .clausula strong { font-weight: 700; }
   .paragrafo {
     text-align: justify;
-    margin-bottom: 1.5mm;
+    margin-bottom: 0.8mm;
     hyphens: auto;
   }
   .lista-clausula {
-    margin: 2mm 0 2mm 10mm;
+    margin: 1mm 0 1mm 10mm;
   }
   .lista-clausula li {
-    margin-bottom: 1.5mm;
+    margin-bottom: 0.8mm;
     text-align: justify;
   }
 
   /* Partes */
   .parte-bloco {
     text-align: justify;
-    margin-bottom: 4mm;
+    margin-bottom: 2.5mm;
     hyphens: auto;
   }
   .parte-bloco strong { font-weight: 700; }
@@ -229,7 +229,7 @@ const CSS = `
   .tabela-pagamento {
     width: 100%;
     border-collapse: collapse;
-    margin: 3mm 0;
+    margin: 2mm 0;
     font-size: 10pt;
   }
   .tabela-pagamento th {
@@ -298,6 +298,7 @@ function logoTag(logoUrl: string | null | undefined): string {
 
 function buildHtml(dados: any): string {
   const { proposta, dimensionamento, equipamentos, precificacao, condicoesComerciais, empresa, cliente } = dados
+  const formaPagamentoContrato: string = dados.formaPagamentoContrato ?? ''
 
   // Seleciona condição comercial: prefere parcelado_marcos com mais parcelas,
   // depois qualquer ativa com mais parcelas, depois a primeira disponível
@@ -365,6 +366,28 @@ function buildHtml(dados: any): string {
 
   // ── CLÁUSULA 2 — PREÇO (parcelas) ──
   function renderParcelas(): string {
+    // ── Cartão de Crédito ──
+    if (formaPagamentoContrato === 'credito') {
+      const numParc = parcelas.length || 1
+      if (numParc <= 1) {
+        return `<p class="clausula">O pagamento será realizado <strong>à vista via cartão de crédito</strong>, no valor total de <strong>${fmt(valorTotal)}</strong>, a ser processado conforme as condições da operadora de cartão.</p>`
+      }
+      const valorParc = fmt(valorTotal / numParc)
+      return `<p class="clausula">O pagamento será realizado via <strong>cartão de crédito</strong> em <strong>${numParc} parcelas</strong> de aproximadamente <strong>${valorParc}</strong> cada, totalizando <strong>${fmt(valorTotal)}</strong>, processado conforme as condições da operadora de cartão do <strong>CONTRATANTE</strong>. O valor final poderá ser acrescido de taxas aplicadas pela operadora.</p>`
+    }
+
+    // ── Financiamento Bancário ──
+    if (formaPagamentoContrato === 'financiamento') {
+      return `<p class="clausula">O pagamento será realizado mediante <strong>financiamento bancário ou CDC</strong>, conforme contrato de crédito firmado entre o <strong>CONTRATANTE</strong> e a instituição financeira por ele escolhida. O valor contratado de <strong>${fmt(valorTotal)}</strong> será repassado à <strong>CONTRATADA</strong> após a liberação do crédito pela instituição financeira, nas condições por ela estipuladas.</p>`
+    }
+
+    // ── PIX / À Vista ──
+    if (formaPagamentoContrato === 'pix' || formaPagamentoContrato === 'vista') {
+      const banco = dadosBancarios(empresa, null)
+      return `<p class="clausula">O pagamento será realizado <strong>à vista</strong>, no valor total de <strong>${fmt(valorTotal)}</strong>, mediante <strong>PIX ou transferência bancária</strong>${banco ? ` para: ${banco}` : ''}, a ser confirmado antes da execução dos serviços.</p>`
+    }
+
+    // ── Padrão: tabela de parcelas ──
     if (!parcelas.length) {
       return `<p class="clausula">O pagamento será realizado conforme condições acordadas entre as partes.</p>`
     }
@@ -741,7 +764,7 @@ function buildHtml(dados: any): string {
     de qualquer outro, por mais privilegiado que seja.
   </p>
 
-  <p class="clausula" style="margin-top:4mm;">
+  <p class="clausula" style="margin-top:3mm;">
     E por estarem as partes, <strong>CONTRATANTE</strong> e <strong>CONTRATADA</strong>, em pleno acordo,
     em tudo quanto se encontra disposto neste instrumento particular
     (PROPOSTA nº <strong>${numProposta}</strong> de <strong>${dataEmissao}</strong>),

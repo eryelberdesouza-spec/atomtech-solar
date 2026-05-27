@@ -1284,6 +1284,7 @@ export function PropostaDetailPage() {
   const [tabServico, setTabServico]     = useState('itens')
   const [gerandoPdf, setGerandoPdf] = useState(false)
   const [gerandoContrato, setGerandoContrato] = useState(false)
+  const [showModalFormaPag, setShowModalFormaPag] = useState(false)
   const [showClonar, setShowClonar]         = useState(false)
   const [showAltCliente, setShowAltCliente] = useState(false)
   const [showCapaModal, setShowCapaModal]   = useState(false)
@@ -1399,11 +1400,23 @@ export function PropostaDetailPage() {
 
   const handleGerarContrato = () => {
     if (!data) { alert('Dados da proposta ainda não carregados.'); return }
+    // Sempre mostra o modal de forma de pagamento antes de gerar qualquer contrato
+    setShowModalFormaPag(true)
+  }
+
+  const handleGerarContratoComFormaPag = (formaPagamentoContrato: string) => {
+    setShowModalFormaPag(false)
     setGerandoContrato(true)
+    const isServicoProposta = (data as any)?.proposta?.tipoProposta === 'servico_geral'
     setTimeout(() => {
       try {
-        const dadosContrato = { ...data, empresa: { ...(data as any).empresa, ...empresa }, cliente: clienteData }
-        if ((data as any).proposta?.tipoProposta === 'servico_geral') {
+        const dadosContrato = {
+          ...data,
+          empresa: { ...(data as any).empresa, ...empresa },
+          cliente: clienteData,
+          formaPagamentoContrato,
+        }
+        if (isServicoProposta) {
           abrirContratoServicoNoNavegador(dadosContrato)
         } else {
           abrirContratoNoNavegador(dadosContrato)
@@ -1658,6 +1671,109 @@ export function PropostaDetailPage() {
           onClose={() => setShowAltCliente(false)}
         />
       )}
+
+      {/* ── MODAL: FORMA DE PAGAMENTO DO CONTRATO ───────────────── */}
+      {showModalFormaPag && (
+        <ModalFormaPagamentoContrato
+          onConfirm={handleGerarContratoComFormaPag}
+          onClose={() => setShowModalFormaPag(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── MODAL: FORMA DE PAGAMENTO DO CONTRATO ───────────────────────────────────
+const OPCOES_FORMA_PAG_CONTRATO = [
+  {
+    value: 'padrao',
+    icon: '📋',
+    label: 'Tabela de Parcelas',
+    desc: 'Exibe a tabela padrão com todas as parcelas, valores, prazos e formas de pagamento conforme cadastrado na proposta.',
+  },
+  {
+    value: 'credito',
+    icon: '💳',
+    label: 'Cartão de Crédito',
+    desc: 'O contrato indicará que o pagamento foi realizado via cartão de crédito. A tabela de parcelas não será exibida.',
+  },
+  {
+    value: 'financiamento',
+    icon: '🏦',
+    label: 'Financiamento Bancário',
+    desc: 'O contrato indicará que o pagamento será via financiamento bancário ou CDC. A tabela de parcelas não será exibida.',
+  },
+  {
+    value: 'pix',
+    icon: '⚡',
+    label: 'PIX / À Vista',
+    desc: 'O contrato indicará pagamento à vista via PIX ou transferência bancária. A tabela de parcelas não será exibida.',
+  },
+]
+
+function ModalFormaPagamentoContrato({
+  onConfirm, onClose,
+}: {
+  onConfirm: (formaPagamento: string) => void
+  onClose: () => void
+}) {
+  const [selecionado, setSelecionado] = useState('padrao')
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000, padding: 16,
+    }}>
+      <div style={{
+        background: C.darkMid, border: `1px solid ${C.darkBorder}`,
+        borderRadius: 14, padding: '24px 28px', width: '100%', maxWidth: 520,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <h3 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0 }}>
+            📄 Gerar Contrato
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 18px' }}>
+          Escolha como o pagamento será apresentado no contrato:
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {OPCOES_FORMA_PAG_CONTRATO.map(op => (
+            <label key={op.value} onClick={() => setSelecionado(op.value)} style={{
+              display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px',
+              borderRadius: 10, border: `2px solid ${selecionado === op.value ? C.accent : C.darkBorder}`,
+              background: selecionado === op.value ? `${C.accent}10` : C.dark,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}>
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%', border: `2px solid ${selecionado === op.value ? C.accent : C.darkBorder}`,
+                background: selecionado === op.value ? C.accent : 'transparent',
+                flexShrink: 0, marginTop: 2,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {selecionado === op.value && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+              </div>
+              <div>
+                <div style={{ color: C.text, fontWeight: 600, fontSize: 14, marginBottom: 3 }}>
+                  {op.icon} {op.label}
+                </div>
+                <div style={{ color: C.textMuted, fontSize: 12, lineHeight: 1.4 }}>{op.desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+          <Btn size="sm" variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn size="sm" onClick={() => onConfirm(selecionado)}
+            style={{ background: C.accent, color: '#fff', border: 'none' }}>
+            📄 Gerar Contrato
+          </Btn>
+        </div>
+      </div>
     </div>
   )
 }
