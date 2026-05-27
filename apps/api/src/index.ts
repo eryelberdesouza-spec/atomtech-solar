@@ -423,6 +423,65 @@ app.get('/run-migration-fin-forma-pagamento', async (_, res) => {
   }
 })
 
+// ── Diagnóstico proposta Denise ──────────────────────────────────────────────
+app.get('/diag-denise', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [props]: any = await conn.execute(`
+      SELECT p.id, p.numero, p.status, p.contrato_formalizado, p.data_formalizacao,
+             c.nome AS cliente,
+             ft.id AS fin_titulo_id, ft.descricao AS fin_descricao
+      FROM proposta p
+      INNER JOIN cliente c ON c.id = p.cliente_id
+      LEFT JOIN fin_titulo ft ON ft.proposta_id = p.id
+      WHERE c.nome LIKE '%Denise%'
+      ORDER BY p.id DESC LIMIT 20
+    `)
+    const result: any[] = []
+    for (const p of props) {
+      const row: any = { ...p }
+      if (p.fin_titulo_id) {
+        const [parcelas]: any = await conn.execute(
+          'SELECT id, numero, valor, vencimento, status, data_pagamento FROM fin_parcela WHERE titulo_id = ? ORDER BY numero',
+          [p.fin_titulo_id]
+        )
+        row.parcelas = parcelas
+      }
+      result.push(row)
+    }
+    await conn.end()
+    res.json({ ok: true, data: result })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Reverter proposta para status 'aceita' sem formalização ─────────────────
+app.get('/reverter-proposta/:id', async (req, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const id = parseInt(req.params.id)
+    if (!id) { res.status(400).json({ ok: false, error: 'id inválido' }); return }
+    // Verifica se NÃO há fin_titulo vinculado
+    const [check]: any = await conn.execute('SELECT id FROM fin_titulo WHERE proposta_id = ?', [id])
+    if (check.length > 0) {
+      await conn.end()
+      res.status(400).json({ ok: false, error: 'Proposta já foi importada para o financeiro (fin_titulo existe). Não é seguro reverter.' })
+      return
+    }
+    await conn.execute(
+      'UPDATE proposta SET contrato_formalizado = 0, data_formalizacao = NULL WHERE id = ?',
+      [id]
+    )
+    await conn.end()
+    res.json({ ok: true, message: `Proposta ${id} revertida: contrato_formalizado=0` })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {
