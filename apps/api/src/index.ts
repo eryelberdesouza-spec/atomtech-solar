@@ -396,12 +396,28 @@ app.get('/run-migration-fin-forma-pagamento', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
     const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
-    await conn.execute(`
-      ALTER TABLE fin_parcela
-      ADD COLUMN IF NOT EXISTS forma_pagamento VARCHAR(50) NULL AFTER desconto
+    // Verifica se a coluna já existe (compatível com MySQL 5.7+)
+    const [rows]: any = await conn.execute(`
+      SELECT COUNT(*) as cnt
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'fin_parcela'
+        AND COLUMN_NAME = 'forma_pagamento'
     `)
+    const existe = rows[0]?.cnt > 0
+    if (!existe) {
+      await conn.execute(`
+        ALTER TABLE fin_parcela
+        ADD COLUMN forma_pagamento VARCHAR(50) NULL AFTER desconto
+      `)
+    }
     await conn.end()
-    res.json({ ok: true, message: 'Coluna forma_pagamento adicionada a fin_parcela' })
+    res.json({
+      ok: true,
+      message: existe
+        ? 'Coluna forma_pagamento ja existia — nada alterado'
+        : 'Coluna forma_pagamento adicionada com sucesso a fin_parcela',
+    })
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e.message })
   }
