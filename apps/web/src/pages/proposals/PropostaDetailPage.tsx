@@ -1285,6 +1285,7 @@ export function PropostaDetailPage() {
   const [gerandoPdf, setGerandoPdf] = useState(false)
   const [gerandoContrato, setGerandoContrato] = useState(false)
   const [showModalFormaPag, setShowModalFormaPag] = useState(false)
+  const [formaPagContrato, setFormaPagContrato] = useState('padrao')
   const [showClonar, setShowClonar]         = useState(false)
   const [showAltCliente, setShowAltCliente] = useState(false)
   const [showCapaModal, setShowCapaModal]   = useState(false)
@@ -1404,22 +1405,22 @@ export function PropostaDetailPage() {
     setShowModalFormaPag(true)
   }
 
-  const handleGerarContratoComFormaPag = (formaPagamentoContrato: string) => {
+  const handleGerarContratoComFormaPag = () => {
     setShowModalFormaPag(false)
     setGerandoContrato(true)
     const isServicoProposta = (data as any)?.proposta?.tipoProposta === 'servico_geral'
+    const formaSelecionada = formaPagContrato   // captura do estado do pai — sem ambiguidade
     setTimeout(() => {
       try {
         const dadosContrato = {
           ...data,
           empresa: { ...(data as any).empresa, ...empresa },
           cliente: clienteData,
-          formaPagamentoContrato,
         }
         if (isServicoProposta) {
           abrirContratoServicoNoNavegador(dadosContrato)
         } else {
-          abrirContratoNoNavegador(dadosContrato)
+          abrirContratoNoNavegador(dadosContrato, formaSelecionada)
         }
       } catch (e) {
         alert('Erro ao gerar contrato. Verifique se popups estão permitidos neste site.')
@@ -1675,6 +1676,8 @@ export function PropostaDetailPage() {
       {/* ── MODAL: FORMA DE PAGAMENTO DO CONTRATO ───────────────── */}
       {showModalFormaPag && (
         <ModalFormaPagamentoContrato
+          value={formaPagContrato}
+          onChange={setFormaPagContrato}
           onConfirm={handleGerarContratoComFormaPag}
           onClose={() => setShowModalFormaPag(false)}
         />
@@ -1712,23 +1715,25 @@ const OPCOES_FORMA_PAG_CONTRATO = [
 ]
 
 function ModalFormaPagamentoContrato({
-  onConfirm, onClose,
+  value, onChange, onConfirm, onClose,
 }: {
-  onConfirm: (formaPagamento: string) => void
+  value: string
+  onChange: (v: string) => void
+  onConfirm: () => void
   onClose: () => void
 }) {
-  const [selecionado, setSelecionado] = useState('padrao')
+  const op = OPCOES_FORMA_PAG_CONTRATO.find(o => o.value === value)
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1000, padding: 16,
     }}>
       <div style={{
         background: C.darkMid, border: `1px solid ${C.darkBorder}`,
         borderRadius: 14, padding: '24px 28px', width: '100%', maxWidth: 520,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <h3 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0 }}>
@@ -1736,40 +1741,58 @@ function ModalFormaPagamentoContrato({
           </h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
-        <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 18px' }}>
+        <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 16px' }}>
           Escolha como o pagamento será apresentado no contrato:
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {OPCOES_FORMA_PAG_CONTRATO.map(op => (
-            <label key={op.value} onClick={() => setSelecionado(op.value)} style={{
-              display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px',
-              borderRadius: 10, border: `2px solid ${selecionado === op.value ? C.accent : C.darkBorder}`,
-              background: selecionado === op.value ? `${C.accent}10` : C.dark,
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}>
-              <div style={{
-                width: 18, height: 18, borderRadius: '50%', border: `2px solid ${selecionado === op.value ? C.accent : C.darkBorder}`,
-                background: selecionado === op.value ? C.accent : 'transparent',
-                flexShrink: 0, marginTop: 2,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {selecionado === op.value && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-              </div>
-              <div>
-                <div style={{ color: C.text, fontWeight: 600, fontSize: 14, marginBottom: 3 }}>
-                  {op.icon} {op.label}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {OPCOES_FORMA_PAG_CONTRATO.map(o => {
+            const sel = value === o.value
+            return (
+              <div
+                key={o.value}
+                onClick={() => onChange(o.value)}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                  padding: '11px 14px', borderRadius: 10,
+                  border: `2px solid ${sel ? C.accent : C.darkBorder}`,
+                  background: sel ? `${C.accent}15` : C.dark,
+                  cursor: 'pointer', userSelect: 'none',
+                }}
+              >
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                  border: `2px solid ${sel ? C.accent : C.darkBorder}`,
+                  background: sel ? C.accent : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {sel && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />}
                 </div>
-                <div style={{ color: C.textMuted, fontSize: 12, lineHeight: 1.4 }}>{op.desc}</div>
+                <div>
+                  <div style={{ color: sel ? C.text : C.textMuted, fontWeight: sel ? 700 : 500, fontSize: 14, marginBottom: 2 }}>
+                    {o.icon} {o.label}
+                  </div>
+                  <div style={{ color: C.textDim, fontSize: 11.5, lineHeight: 1.4 }}>{o.desc}</div>
+                </div>
               </div>
-            </label>
-          ))}
+            )
+          })}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+        {op && (
+          <div style={{
+            marginTop: 14, padding: '8px 12px', borderRadius: 8,
+            background: `${C.accent}10`, border: `1px solid ${C.accent}30`,
+            fontSize: 12, color: C.accent,
+          }}>
+            ✓ Selecionado: <strong>{op.icon} {op.label}</strong>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
           <Btn size="sm" variant="ghost" onClick={onClose}>Cancelar</Btn>
-          <Btn size="sm" onClick={() => onConfirm(selecionado)}
-            style={{ background: C.accent, color: '#fff', border: 'none' }}>
+          <Btn size="sm" onClick={onConfirm}
+            style={{ background: C.accent, color: '#fff', border: 'none', fontWeight: 700 }}>
             📄 Gerar Contrato
           </Btn>
         </div>

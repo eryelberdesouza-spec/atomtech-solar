@@ -296,9 +296,9 @@ function logoTag(logoUrl: string | null | undefined): string {
 
 // ─── GERAÇÃO DO HTML ──────────────────────────────────────────────
 
-function buildHtml(dados: any): string {
+function buildHtml(dados: any, formaPagamento: string): string {
   const { proposta, dimensionamento, equipamentos, precificacao, condicoesComerciais, empresa, cliente } = dados
-  const formaPagamentoContrato: string = dados.formaPagamentoContrato ?? ''
+  const formaPagamentoContrato: string = formaPagamento ?? ''
 
   // Seleciona condição comercial: prefere parcelado_marcos com mais parcelas,
   // depois qualquer ativa com mais parcelas, depois a primeira disponível
@@ -844,8 +844,8 @@ function buildHtml(dados: any): string {
 
 // ─── FUNÇÃO PÚBLICA ───────────────────────────────────────────────
 
-export function abrirContratoNoNavegador(dados: any): void {
-  const html = buildHtml(dados)
+export function abrirContratoNoNavegador(dados: any, formaPagamento: string = ''): void {
+  const html = buildHtml(dados, formaPagamento)
   const janela = window.open('', '_blank')
   if (!janela) {
     alert('Não foi possível abrir o contrato. Verifique se popups estão permitidos neste site.')
