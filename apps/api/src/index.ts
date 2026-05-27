@@ -457,6 +457,62 @@ app.get('/diag-denise', async (_, res) => {
   }
 })
 
+// ── Diagnóstico condições comerciais de uma proposta ────────────────────────
+app.get('/diag-proposta-condicoes/:id', async (req, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const id = parseInt(req.params.id)
+    const [conds]: any = await conn.execute(
+      'SELECT id, descricao, tipo, valor_total FROM condicao_comercial WHERE proposta_id = ? ORDER BY id',
+      [id]
+    )
+    const result: any[] = []
+    for (const c of conds) {
+      const [parcelas]: any = await conn.execute(
+        'SELECT id, numero_parcela, valor, prazo_dias, tipo_prazo FROM parcela_pagamento WHERE condicao_id = ? ORDER BY numero_parcela',
+        [c.id]
+      )
+      result.push({ ...c, parcelas })
+    }
+    // Verifica fin_titulo
+    const [fin]: any = await conn.execute(
+      'SELECT id, descricao, valor_original FROM fin_titulo WHERE proposta_id = ?', [id]
+    )
+    for (const f of fin) {
+      const [fp]: any = await conn.execute(
+        'SELECT id, numero, valor, vencimento, status FROM fin_parcela WHERE titulo_id = ?', [f.id]
+      )
+      f.fin_parcelas = fp
+    }
+    await conn.end()
+    res.json({ ok: true, condicoes: result, fin_titulos: fin })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Limpar fin_titulo vazio (sem parcelas) para reimportação ─────────────────
+app.get('/limpar-fin-titulo-vazio/:tituloId', async (req, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const id = parseInt(req.params.tituloId)
+    if (!id) { res.status(400).json({ ok: false, error: 'id inválido' }); return }
+    const [parcelas]: any = await conn.execute('SELECT COUNT(*) as cnt FROM fin_parcela WHERE titulo_id = ?', [id])
+    if (parcelas[0].cnt > 0) {
+      await conn.end()
+      res.status(400).json({ ok: false, error: `Este título tem ${parcelas[0].cnt} parcelas — não é seguro remover automaticamente. Estorne os pagamentos antes.` })
+      return
+    }
+    await conn.execute('DELETE FROM fin_titulo WHERE id = ?', [id])
+    await conn.end()
+    res.json({ ok: true, message: `fin_titulo ${id} removido (estava sem parcelas). A proposta agora pode ser reimportada.` })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Reverter proposta para status 'aceita' sem formalização ─────────────────
 app.get('/reverter-proposta/:id', async (req, res) => {
   try {
