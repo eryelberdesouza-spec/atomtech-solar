@@ -2,10 +2,15 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
+import * as pdfParseModule from 'pdf-parse'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from './routers'
 import { createContext, testConnection } from './routers/trpc'
 import { parseInter, parseSicoob } from './lib/extratoParser'
+
+// pdf-parse pode exportar como default ou como o próprio módulo dependendo da versão
+const pdfParseFn: (buffer: Buffer) => Promise<{ text: string }> =
+  (pdfParseModule as any).default ?? pdfParseModule
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -549,9 +554,7 @@ app.post('/extrato/parse', upload.single('pdf'), async (req, res) => {
     if (!['INTER', 'SICOOB'].includes(banco)) {
       res.status(400).json({ ok: false, error: 'Banco inválido. Use INTER ou SICOOB' }); return
     }
-    const pdfParseMod = await import('pdf-parse')
-    const pdfParse = (pdfParseMod as any).default ?? pdfParseMod
-    const parsed = await pdfParse(req.file.buffer)
+    const parsed = await pdfParseFn(req.file.buffer)
     const text: string = parsed.text
 
     const transacoes = banco === 'INTER' ? parseInter(text) : parseSicoob(text)

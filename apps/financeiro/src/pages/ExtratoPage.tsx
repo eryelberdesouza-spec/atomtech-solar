@@ -80,20 +80,22 @@ interface ModalImportarProps {
   contas: any[]
   planos: any[]
   centros: any[]
+  pessoas: any[]
 }
 
-function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: ModalImportarProps) {
-  const [contaId,     setContaId]     = useState('')
-  const [planoId,     setPlanoId]     = useState('')
-  const [centroId,    setCentroId]    = useState('')
-  const [formaPag,    setFormaPag]    = useState(() => tx ? detectarFormaPag(tx.descricao) : 'pix')
-  const [descricao,   setDescricao]   = useState(tx?.descricao ?? '')
-  const [salvarComo,  setSalvarComo]  = useState<'ABERTA' | 'PAGA'>('ABERTA')
-  const [loading,     setLoading]     = useState(false)
-  const [erro,        setErro]        = useState('')
+function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoas }: ModalImportarProps) {
+  const [contaId,    setContaId]    = useState('')
+  const [planoId,    setPlanoId]    = useState('')
+  const [centroId,   setCentroId]   = useState('')
+  const [pessoaId,   setPessoaId]   = useState('')
+  const [formaPag,   setFormaPag]   = useState(() => tx ? detectarFormaPag(tx.descricao) : 'pix')
+  const [descricao,  setDescricao]  = useState(tx?.descricao ?? '')
+  const [salvarComo, setSalvarComo] = useState<'ABERTA' | 'PAGA'>('ABERTA')
+  const [buscaPessoa, setBuscaPessoa] = useState('')
+  const [loading,    setLoading]    = useState(false)
+  const [erro,       setErro]       = useState('')
 
-  const criarTitulo   = (trpc as any).fin.titulo.create.useMutation()
-  const baixarParcela = (trpc as any).fin.parcela.baixar.useMutation()
+  const criarTitulo = (trpc as any).fin.titulo.create.useMutation()
 
   if (!tx) return null
 
@@ -101,29 +103,29 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
   const label = tipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'
   const cor   = tipo === 'RECEBER' ? C.credit : C.debit
 
+  // Filtra pessoas: clientes para recebimento, fornecedores para pagamento
+  const pessoasFiltradas = pessoas.filter((p: any) => {
+    const matchTipo = tipo === 'RECEBER' ? p.isCliente : p.isFornecedor
+    if (!matchTipo) return false
+    if (!buscaPessoa.trim()) return true
+    return p.nome.toLowerCase().includes(buscaPessoa.toLowerCase())
+  })
+
+  const pessoaSelecionada = pessoas.find((p: any) => String(p.id) === pessoaId)
+
   const handleConfirmar = async () => {
-    if (salvarComo === 'PAGA' && !contaId) { setErro('Selecione a conta bancária para baixar o lançamento'); return }
     setLoading(true); setErro('')
     try {
-      // 1. Cria título + 1 parcela ABERTA
-      const res = await criarTitulo.mutateAsync({
+      await criarTitulo.mutateAsync({
         tipo,
         descricao: descricao || tx.descricao,
-        pessoaId:      null,
-        planoContasId: planoId  ? parseInt(planoId)  : null,
-        centroCustoId: centroId ? parseInt(centroId) : null,
+        pessoaId:      pessoaId  ? parseInt(pessoaId)  : null,
+        planoContasId: planoId   ? parseInt(planoId)   : null,
+        centroCustoId: centroId  ? parseInt(centroId)  : null,
         valorOriginal: tx.valor,
         emissao: tx.data,
         parcelas: [{ numero: 1, valor: tx.valor, vencimento: tx.data }],
       })
-
-      // 2. Se "Já liquidado", busca a parcela pelo tituloId e baixa
-      if (salvarComo === 'PAGA' && res?.tituloId) {
-        // A parcela criada tem o mesmo vencimento — usamos lista parcelas
-        // Abordagem simples: criar como aberta e orientar o usuário a baixar na listagem
-        // (o parcelaId não é retornado diretamente pelo create)
-      }
-
       onSuccess()
     } catch (e: any) {
       setErro(e.message || 'Erro ao criar lançamento')
@@ -133,7 +135,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
   }
 
   return (
-    <Modal open={!!tx} title={`Criar Lançamento — ${label}`} onClose={onClose} width={520}>
+    <Modal open={!!tx} title={`Criar Lançamento — ${label}`} onClose={onClose} width={540}>
       {/* Resumo da transação */}
       <div style={{
         background: cor + '12', border: `1px solid ${cor}30`,
@@ -144,7 +146,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
           <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>
             {tx.banco} · {fmtDataBR(tx.data)}
           </div>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 600, maxWidth: 340, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 13, color: C.text, fontWeight: 600, maxWidth: 360, lineHeight: 1.4 }}>
             {tx.descricao}
           </div>
         </div>
@@ -159,9 +161,9 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
         </Alert>
       )}
 
-      {/* Campos */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+        {/* Descrição */}
         <div>
           <label style={labelStyle}>Descrição do lançamento</label>
           <input
@@ -172,8 +174,75 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
           />
         </div>
 
+        {/* Pessoa — com busca inline */}
         <div>
-          <label style={labelStyle}>Conta bancária{salvarComo === 'PAGA' ? ' *' : ''}</label>
+          <label style={labelStyle}>
+            {tipo === 'RECEBER' ? 'Cliente' : 'Fornecedor'}
+            <span style={{ fontWeight: 400, color: C.textDim }}> (opcional)</span>
+          </label>
+          {pessoaSelecionada ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: cor + '12', border: `1px solid ${cor}40`,
+              borderRadius: 8, padding: '8px 12px',
+            }}>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
+                {pessoaSelecionada.nome}
+              </span>
+              <button
+                onClick={() => { setPessoaId(''); setBuscaPessoa('') }}
+                style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+              >×</button>
+            </div>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <input
+                value={buscaPessoa}
+                onChange={e => setBuscaPessoa(e.target.value)}
+                placeholder={`Buscar ${tipo === 'RECEBER' ? 'cliente' : 'fornecedor'}...`}
+                style={inputStyle}
+              />
+              {buscaPessoa.trim() && pessoasFiltradas.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                  background: C.bgCard, border: `1px solid ${C.border}`,
+                  borderRadius: 8, marginTop: 4, maxHeight: 180, overflowY: 'auto',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                }}>
+                  {pessoasFiltradas.slice(0, 10).map((p: any) => (
+                    <div
+                      key={p.id}
+                      onClick={() => { setPessoaId(String(p.id)); setBuscaPessoa('') }}
+                      style={{
+                        padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: C.text,
+                        borderBottom: `1px solid ${C.border}40`, transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = C.bgHover)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {p.nome}
+                      {p.documento && <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{p.documento}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {buscaPessoa.trim() && pessoasFiltradas.length === 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                  background: C.bgCard, border: `1px solid ${C.border}`,
+                  borderRadius: 8, marginTop: 4, padding: '10px 14px',
+                  fontSize: 12, color: C.textMuted,
+                }}>
+                  Nenhum {tipo === 'RECEBER' ? 'cliente' : 'fornecedor'} encontrado
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Conta bancária */}
+        <div>
+          <label style={labelStyle}>Conta bancária</label>
           <select value={contaId} onChange={e => setContaId(e.target.value)} style={selectStyle}>
             <option value="">— Selecione a conta —</option>
             {contas.map((c: any) => (
@@ -182,6 +251,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
           </select>
         </div>
 
+        {/* Plano + Centro */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label style={labelStyle}>Plano de Contas</label>
@@ -203,6 +273,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
           </div>
         </div>
 
+        {/* Forma de pagamento */}
         <div>
           <label style={labelStyle}>Forma de pagamento</label>
           <select value={formaPag} onChange={e => setFormaPag(e.target.value)} style={selectStyle}>
@@ -210,6 +281,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
           </select>
         </div>
 
+        {/* Status */}
         <div>
           <label style={labelStyle}>Salvar como</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -232,7 +304,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros }: Moda
           </div>
           {salvarComo === 'PAGA' && (
             <div style={{ fontSize: 10, color: C.textMuted, marginTop: 5 }}>
-              * Será criado como Em Aberto. Baixe manualmente na tela de Lançamentos para registrar o pagamento com conta e data exata.
+              Será criado como Em Aberto — baixe na tela de Lançamentos para registrar a conta e data exata.
             </div>
           )}
         </div>
@@ -262,13 +334,15 @@ export function ExtratoPage() {
   const [importados, setImportados] = useState<Set<number>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const contasQ = (trpc as any).fin.conta.list.useQuery()
-  const planoQ  = (trpc as any).fin.planoContas.list.useQuery()
-  const centroQ = (trpc as any).fin.centroCusto.list.useQuery()
+  const contasQ  = (trpc as any).fin.conta.list.useQuery()
+  const planoQ   = (trpc as any).fin.planoContas.list.useQuery()
+  const centroQ  = (trpc as any).fin.centroCusto.list.useQuery()
+  const pessoaQ  = (trpc as any).fin.pessoa.list.useQuery()
 
-  const contas  = contasQ.data ?? []
-  const planos  = planoQ.data  ?? []
-  const centros = centroQ.data ?? []
+  const contas   = contasQ.data  ?? []
+  const planos   = planoQ.data   ?? []
+  const centros  = centroQ.data  ?? []
+  const pessoas  = pessoaQ.data  ?? []
 
   const processarPDF = async () => {
     if (!file) { setErro('Selecione um arquivo PDF'); return }
@@ -521,7 +595,7 @@ export function ExtratoPage() {
       {/* ── Modal Importar ───────────────────────────────────── */}
       <ModalImportar
         tx={txModal}
-        contas={contas} planos={planos} centros={centros}
+        contas={contas} planos={planos} centros={centros} pessoas={pessoas}
         onClose={() => setTxModal(null)}
         onSuccess={() => {
           if (txModal && resultado) {
