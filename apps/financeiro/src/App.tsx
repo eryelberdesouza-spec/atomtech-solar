@@ -12,6 +12,7 @@ import { DREPage } from './pages/DREPage'
 import { PessoasPage } from './pages/pessoas/PessoasPage'
 import { ConfiguracoesPage } from './pages/config/ConfiguracoesPage'
 import { PropostasPage } from './pages/PropostasPage'
+import { ExtratoPage } from './pages/ExtratoPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   // Aceita token de qualquer das duas plataformas
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/pessoas" element={<PessoasPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
               <Route path="/propostas" element={<PropostasPage />} />
+              <Route path="/extrato" element={<ExtratoPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

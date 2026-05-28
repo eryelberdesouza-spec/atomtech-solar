@@ -9,6 +9,7 @@ const NAV = [
   { path: '/dre',         label: 'DRE',           icon: '◫', color: '#34D399', desc: 'Resultado do exercício' },
   { path: '/pessoas',      label: 'Pessoas',       icon: '◉', color: '#A78BFA', desc: 'Clientes e Fornecedores' },
   { path: '/propostas',    label: 'Propostas',     icon: '◑', color: '#F59E0B', desc: 'Importar propostas aceitas' },
+  { path: '/extrato',      label: 'Extrato',       icon: '⇅', color: '#60A5FA', desc: 'Importar extrato bancário' },
   { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#6B9E87', desc: 'Contas, Plano, Custos' },
 ]
 

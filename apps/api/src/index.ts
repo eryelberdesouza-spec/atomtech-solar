@@ -1,12 +1,15 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import multer from 'multer'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from './routers'
 import { createContext, testConnection } from './routers/trpc'
+import { parseInter, parseSicoob } from './lib/extratoParser'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } })
 
 const ALLOWED_ORIGINS = [
   'https://atomtech-solar-web.vercel.app',
@@ -534,6 +537,30 @@ app.get('/reverter-proposta/:id', async (req, res) => {
     await conn.end()
     res.json({ ok: true, message: `Proposta ${id} revertida: contrato_formalizado=0` })
   } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Parse de Extrato Bancário (PDF) ─────────────────────────────────────────
+app.post('/extrato/parse', upload.single('pdf'), async (req, res) => {
+  try {
+    if (!req.file) { res.status(400).json({ ok: false, error: 'Nenhum arquivo enviado' }); return }
+    const banco = ((req.body as any).banco || '').toString().toUpperCase() as 'INTER' | 'SICOOB'
+    if (!['INTER', 'SICOOB'].includes(banco)) {
+      res.status(400).json({ ok: false, error: 'Banco inválido. Use INTER ou SICOOB' }); return
+    }
+    const pdfParseMod = await import('pdf-parse')
+    const pdfParse = (pdfParseMod as any).default ?? pdfParseMod
+    const parsed = await pdfParse(req.file.buffer)
+    const text: string = parsed.text
+
+    const transacoes = banco === 'INTER' ? parseInter(text) : parseSicoob(text)
+    const totalEntradas = transacoes.filter(t => t.tipo === 'C').reduce((s, t) => s + t.valor, 0)
+    const totalSaidas   = transacoes.filter(t => t.tipo === 'D').reduce((s, t) => s + t.valor, 0)
+
+    res.json({ ok: true, transacoes, total: transacoes.length, totalEntradas, totalSaidas })
+  } catch (e: any) {
+    console.error('Erro parsing extrato:', e)
     res.status(500).json({ ok: false, error: e.message })
   }
 })
