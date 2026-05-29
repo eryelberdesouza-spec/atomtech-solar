@@ -814,7 +814,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
         <Table
           columns={[
             { key: 'vencimento', label: 'Vencimento', width: '105px' },
-            { key: 'pessoa',     label: tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente' },
+            { key: 'pessoa',     label: tipo === 'PAGAR' ? 'Fornecedor / Prestador' : 'Cliente' },
             { key: 'descricao',  label: 'Descrição' },
             { key: 'documento',  label: 'Documento',  width: '110px' },
             { key: 'valor',      label: 'Valor',      align: 'right', width: '115px' },
@@ -829,7 +829,21 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             ),
             pessoa: r.pessoaNome
               ? <span style={{ color: C.text }}>{r.pessoaNome}</span>
-              : <span style={{ color: C.textDim }}>—</span>,
+              : (
+                <span
+                  onClick={() => setEditandoTituloId(r.tituloId)}
+                  title="Clique para vincular um fornecedor/cliente"
+                  style={{
+                    color: C.textDim, cursor: 'pointer', fontSize: 11,
+                    borderBottom: `1px dashed ${C.border}`,
+                    transition: 'color 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = C.emerald)}
+                  onMouseLeave={e => (e.currentTarget.style.color = C.textDim)}
+                >
+                  + vincular
+                </span>
+              ),
             descricao: (
               <div>
                 <span style={{ color: C.text, fontSize: 13 }}>{r.descricao}</span>
