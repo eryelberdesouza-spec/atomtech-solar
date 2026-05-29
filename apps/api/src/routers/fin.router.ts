@@ -252,11 +252,12 @@ const pessoaRouter = router({
       tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.insert(finPessoa).values({
+      const [res] = await ctx.db.insert(finPessoa).values({
         empresaId: ctx.usuario.empresaId, ...input,
         email: input.email || null,
       })
-      return { ok: true }
+      const id = (res as any).insertId as number
+      return { ok: true, id }
     }),
 
   update: protectedProcedure

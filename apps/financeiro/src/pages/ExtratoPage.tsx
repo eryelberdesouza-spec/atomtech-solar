@@ -93,14 +93,14 @@ function CadastroRapido({ nomeInicial, tipo, onSalvo, onCancelar }: CadastroRapi
   const [erro,    setErro]    = useState('')
 
   const criarPessoa = (trpc as any).fin.pessoa.create.useMutation()
-  const pessoaQ     = (trpc as any).fin.pessoa.list.useQuery()
   const utils       = (trpc as any).useUtils()
 
   const handleSalvar = async () => {
     if (!nome.trim()) { setErro('Informe o nome'); return }
     setLoading(true); setErro('')
     try {
-      await criarPessoa.mutateAsync({
+      // A API agora retorna { ok, id } — usamos o ID diretamente, sem race condition
+      const result = await criarPessoa.mutateAsync({
         tipoPessoa,
         nome: nome.trim(),
         cpfCnpj:      cpfCnpj.trim() || null,
@@ -112,14 +112,10 @@ function CadastroRapido({ nomeInicial, tipo, onSalvo, onCancelar }: CadastroRapi
         regime: null, observacoes: null,
         banco: null, tipoPix: null, chavePix: null, tipoPagamento: null,
       })
-      // Invalida cache e aguarda reload para pegar o ID da nova pessoa
-      await utils.fin.pessoa.list.invalidate()
-      // Espera um tick para o React Query revalidar
-      await new Promise(r => setTimeout(r, 400))
-      const fresh: any[] = pessoaQ.data ?? []
-      // Busca pelo nome exato na lista atualizada
-      const found = fresh.find((p: any) => p.nome.toLowerCase() === nome.trim().toLowerCase())
-      onSalvo({ id: found?.id ?? 0, nome: nome.trim() })
+      // Invalida o cache para que a lista de pessoas seja atualizada em todas as telas
+      utils.fin.pessoa.list.invalidate()
+      // ID vem diretamente do retorno da API — sem busca por nome, sem race condition
+      onSalvo({ id: result.id, nome: nome.trim() })
     } catch (e: any) {
       setErro(e.message || 'Erro ao cadastrar')
     } finally {
