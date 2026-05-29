@@ -3,7 +3,7 @@
 // Suporta: Banco Inter e Sicoob
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { trpc } from '../lib/trpc'
 import { PageWrapper, C, Btn, KpiCard, Modal, Spinner, Alert } from '../components/ui'
 import { fmtBRLFull } from '../lib/masks'
@@ -32,6 +32,10 @@ const API_BASE =
     ? 'https://atomtech-solar-production.up.railway.app'
     : 'http://localhost:3001'
 
+const STORAGE_KEY   = 'atomfin_extrato_v2'
+const STORAGE_IMP   = 'atomfin_extrato_importados_v2'
+const MAX_AGE_MS    = 48 * 60 * 60 * 1000 // 48 horas
+
 function fmtDataBR(iso: string) {
   if (!iso) return ''
   const [y, m, d] = iso.split('-')
@@ -57,18 +61,126 @@ const FORMAS_PAG = [
 
 // ─── Estilos reutilizáveis ───────────────────────────────────────────────────
 
-const labelStyle = { fontSize: 11, color: C.textMuted, fontWeight: 700 as const, marginBottom: 5, display: 'block' as const }
-
+const labelStyle = {
+  fontSize: 11, color: C.textMuted, fontWeight: 700 as const,
+  marginBottom: 5, display: 'block' as const,
+}
 const inputStyle = {
   width: '100%', boxSizing: 'border-box' as const,
   background: C.bgHover, border: `1px solid ${C.border}`,
   borderRadius: 8, padding: '8px 12px',
-  color: C.text, fontSize: 13, outline: 'none',
-  fontFamily: 'inherit',
+  color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit',
+}
+const selectStyle = { ...inputStyle, cursor: 'pointer' }
+
+// ─── Mini-form de cadastro rápido de Pessoa ───────────────────────────────────
+
+interface CadastroRapidoProps {
+  nomeInicial: string
+  tipo: 'RECEBER' | 'PAGAR'
+  onSalvo: (pessoa: { id: number; nome: string }) => void
+  onCancelar: () => void
 }
 
-const selectStyle = {
-  ...inputStyle, cursor: 'pointer',
+function CadastroRapido({ nomeInicial, tipo, onSalvo, onCancelar }: CadastroRapidoProps) {
+  const [nome,       setNome]       = useState(nomeInicial)
+  const [cpfCnpj,   setCpfCnpj]    = useState('')
+  const [tipoPessoa, setTipoPessoa] = useState<'FISICA' | 'JURIDICA'>('JURIDICA')
+  const [papel,      setPapel]      = useState<'CLIENTE' | 'FORNECEDOR' | 'AMBOS'>(
+    tipo === 'RECEBER' ? 'CLIENTE' : 'FORNECEDOR'
+  )
+  const [loading, setLoading] = useState(false)
+  const [erro,    setErro]    = useState('')
+
+  const criarPessoa = (trpc as any).fin.pessoa.create.useMutation()
+  const pessoaQ     = (trpc as any).fin.pessoa.list.useQuery()
+  const utils       = (trpc as any).useUtils()
+
+  const handleSalvar = async () => {
+    if (!nome.trim()) { setErro('Informe o nome'); return }
+    setLoading(true); setErro('')
+    try {
+      await criarPessoa.mutateAsync({
+        tipoPessoa,
+        nome: nome.trim(),
+        cpfCnpj:      cpfCnpj.trim() || null,
+        isCliente:    papel === 'CLIENTE'    || papel === 'AMBOS',
+        isFornecedor: papel === 'FORNECEDOR' || papel === 'AMBOS',
+        fantasia: null, email: null, telefone: null,
+        cep: null, logradouro: null, numero: null, complemento: null,
+        bairro: null, cidade: null, estado: null,
+        regime: null, observacoes: null,
+        banco: null, tipoPix: null, chavePix: null, tipoPagamento: null,
+      })
+      // Invalida cache e aguarda reload para pegar o ID da nova pessoa
+      await utils.fin.pessoa.list.invalidate()
+      // Espera um tick para o React Query revalidar
+      await new Promise(r => setTimeout(r, 400))
+      const fresh: any[] = pessoaQ.data ?? []
+      // Busca pelo nome exato na lista atualizada
+      const found = fresh.find((p: any) => p.nome.toLowerCase() === nome.trim().toLowerCase())
+      onSalvo({ id: found?.id ?? 0, nome: nome.trim() })
+    } catch (e: any) {
+      setErro(e.message || 'Erro ao cadastrar')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{
+      background: C.bgCard, border: `1px solid ${C.emerald}40`,
+      borderRadius: 10, padding: '16px',
+      marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.emerald, marginBottom: 2 }}>
+        ＋ CADASTRO RÁPIDO
+      </div>
+
+      {erro && (
+        <Alert type="danger">{erro}</Alert>
+      )}
+
+      <div>
+        <label style={labelStyle}>Nome *</label>
+        <input value={nome} onChange={e => setNome(e.target.value)} style={inputStyle} autoFocus />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <label style={labelStyle}>Tipo de pessoa</label>
+          <select value={tipoPessoa} onChange={e => setTipoPessoa(e.target.value as any)} style={selectStyle}>
+            <option value="JURIDICA">Jurídica (empresa)</option>
+            <option value="FISICA">Física (CPF)</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Papel</label>
+          <select value={papel} onChange={e => setPapel(e.target.value as any)} style={selectStyle}>
+            <option value="CLIENTE">Cliente</option>
+            <option value="FORNECEDOR">Fornecedor / Prestador</option>
+            <option value="AMBOS">Ambos</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label style={labelStyle}>CPF / CNPJ (opcional)</label>
+        <input
+          value={cpfCnpj} onChange={e => setCpfCnpj(e.target.value)}
+          placeholder="000.000.000-00 ou 00.000.000/0001-00"
+          style={inputStyle}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+        <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
+        <Btn variant="primary" onClick={handleSalvar} disabled={loading}>
+          {loading ? <Spinner size={13} /> : '✓ Salvar e vincular'}
+        </Btn>
+      </div>
+    </div>
+  )
 }
 
 // ─── Modal de Importação de Transação ────────────────────────────────────────
@@ -84,16 +196,18 @@ interface ModalImportarProps {
 }
 
 function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoas }: ModalImportarProps) {
-  const [contaId,    setContaId]    = useState('')
-  const [planoId,    setPlanoId]    = useState('')
-  const [centroId,   setCentroId]   = useState('')
-  const [pessoaId,   setPessoaId]   = useState('')
-  const [formaPag,   setFormaPag]   = useState(() => tx ? detectarFormaPag(tx.descricao) : 'pix')
-  const [descricao,  setDescricao]  = useState(tx?.descricao ?? '')
-  const [salvarComo, setSalvarComo] = useState<'ABERTA' | 'PAGA'>('ABERTA')
-  const [buscaPessoa, setBuscaPessoa] = useState('')
-  const [loading,    setLoading]    = useState(false)
-  const [erro,       setErro]       = useState('')
+  const [contaId,      setContaId]      = useState('')
+  const [planoId,      setPlanoId]      = useState('')
+  const [centroId,     setCentroId]     = useState('')
+  const [pessoaId,     setPessoaId]     = useState('')
+  const [pessoaNome,   setPessoaNome]   = useState('')  // nome da pessoa selecionada
+  const [formaPag,     setFormaPag]     = useState(() => tx ? detectarFormaPag(tx.descricao) : 'pix')
+  const [descricao,    setDescricao]    = useState(tx?.descricao ?? '')
+  const [salvarComo,   setSalvarComo]   = useState<'ABERTA' | 'PAGA'>('ABERTA')
+  const [buscaPessoa,  setBuscaPessoa]  = useState('')
+  const [mostraCadastro, setMostraCadastro] = useState(false)
+  const [loading,      setLoading]      = useState(false)
+  const [erro,         setErro]         = useState('')
 
   const criarTitulo = (trpc as any).fin.titulo.create.useMutation()
 
@@ -103,15 +217,20 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   const label = tipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'
   const cor   = tipo === 'RECEBER' ? C.credit : C.debit
 
-  // Filtra pessoas: clientes para recebimento, fornecedores para pagamento
+  // Filtra pessoas por tipo e busca
   const pessoasFiltradas = pessoas.filter((p: any) => {
     const matchTipo = tipo === 'RECEBER' ? p.isCliente : p.isFornecedor
     if (!matchTipo) return false
-    if (!buscaPessoa.trim()) return true
+    if (!buscaPessoa.trim()) return false  // só mostra dropdown ao digitar
     return p.nome.toLowerCase().includes(buscaPessoa.toLowerCase())
   })
 
-  const pessoaSelecionada = pessoas.find((p: any) => String(p.id) === pessoaId)
+  const handleSelecionarPessoa = (p: { id: number; nome: string }) => {
+    setPessoaId(String(p.id))
+    setPessoaNome(p.nome)
+    setBuscaPessoa('')
+    setMostraCadastro(false)
+  }
 
   const handleConfirmar = async () => {
     setLoading(true); setErro('')
@@ -135,8 +254,8 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   }
 
   return (
-    <Modal open={!!tx} title={`Criar Lançamento — ${label}`} onClose={onClose} width={540}>
-      {/* Resumo da transação */}
+    <Modal open={!!tx} title={`Criar Lançamento — ${label}`} onClose={onClose} width={560}>
+      {/* Resumo */}
       <div style={{
         background: cor + '12', border: `1px solid ${cor}30`,
         borderRadius: 10, padding: '12px 16px', marginBottom: 20,
@@ -146,7 +265,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
           <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>
             {tx.banco} · {fmtDataBR(tx.data)}
           </div>
-          <div style={{ fontSize: 13, color: C.text, fontWeight: 600, maxWidth: 360, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 13, color: C.text, fontWeight: 600, maxWidth: 380, lineHeight: 1.4 }}>
             {tx.descricao}
           </div>
         </div>
@@ -155,64 +274,57 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
         </div>
       </div>
 
-      {erro && (
-        <Alert type="danger" style={{ marginBottom: 14 }}>
-          {erro}
-        </Alert>
-      )}
+      {erro && <Alert type="danger" style={{ marginBottom: 14 }}>{erro}</Alert>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Descrição */}
         <div>
           <label style={labelStyle}>Descrição do lançamento</label>
-          <input
-            value={descricao}
-            onChange={e => setDescricao(e.target.value)}
-            placeholder="Descrição"
-            style={inputStyle}
-          />
+          <input value={descricao} onChange={e => setDescricao(e.target.value)}
+            placeholder="Descrição" style={inputStyle} />
         </div>
 
-        {/* Pessoa — com busca inline */}
+        {/* Pessoa — busca + cadastro rápido */}
         <div>
           <label style={labelStyle}>
-            {tipo === 'RECEBER' ? 'Cliente' : 'Fornecedor'}
+            {tipo === 'RECEBER' ? 'Cliente' : 'Fornecedor / Prestador'}
             <span style={{ fontWeight: 400, color: C.textDim }}> (opcional)</span>
           </label>
-          {pessoaSelecionada ? (
+
+          {pessoaNome ? (
+            /* Pessoa selecionada */
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: cor + '12', border: `1px solid ${cor}40`,
               borderRadius: 8, padding: '8px 12px',
             }}>
-              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
-                {pessoaSelecionada.nome}
-              </span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{pessoaNome}</span>
               <button
-                onClick={() => { setPessoaId(''); setBuscaPessoa('') }}
-                style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}
+                onClick={() => { setPessoaId(''); setPessoaNome(''); setMostraCadastro(false) }}
+                style={{ background:'none', border:'none', color: C.textMuted, cursor:'pointer', fontSize:16, padding:'0 2px' }}
               >×</button>
             </div>
           ) : (
             <div style={{ position: 'relative' }}>
               <input
                 value={buscaPessoa}
-                onChange={e => setBuscaPessoa(e.target.value)}
-                placeholder={`Buscar ${tipo === 'RECEBER' ? 'cliente' : 'fornecedor'}...`}
+                onChange={e => { setBuscaPessoa(e.target.value); setMostraCadastro(false) }}
+                placeholder={`Buscar ${tipo === 'RECEBER' ? 'cliente' : 'fornecedor'}... ou digite para cadastrar novo`}
                 style={inputStyle}
               />
-              {buscaPessoa.trim() && pessoasFiltradas.length > 0 && (
+
+              {/* Dropdown de resultados */}
+              {buscaPessoa.trim() && !mostraCadastro && (
                 <div style={{
                   position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
                   background: C.bgCard, border: `1px solid ${C.border}`,
-                  borderRadius: 8, marginTop: 4, maxHeight: 180, overflowY: 'auto',
+                  borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto',
                   boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                 }}>
                   {pessoasFiltradas.slice(0, 10).map((p: any) => (
-                    <div
-                      key={p.id}
-                      onClick={() => { setPessoaId(String(p.id)); setBuscaPessoa('') }}
+                    <div key={p.id}
+                      onClick={() => handleSelecionarPessoa(p)}
                       style={{
                         padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: C.text,
                         borderBottom: `1px solid ${C.border}40`, transition: 'background 0.1s',
@@ -224,19 +336,35 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
                       {p.documento && <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{p.documento}</span>}
                     </div>
                   ))}
-                </div>
-              )}
-              {buscaPessoa.trim() && pessoasFiltradas.length === 0 && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                  background: C.bgCard, border: `1px solid ${C.border}`,
-                  borderRadius: 8, marginTop: 4, padding: '10px 14px',
-                  fontSize: 12, color: C.textMuted,
-                }}>
-                  Nenhum {tipo === 'RECEBER' ? 'cliente' : 'fornecedor'} encontrado
+
+                  {/* Opção de cadastrar novo — sempre aparece quando há texto digitado */}
+                  <div
+                    onClick={() => setMostraCadastro(true)}
+                    style={{
+                      padding: '10px 14px', cursor: 'pointer', fontSize: 12,
+                      color: C.emerald, fontWeight: 700,
+                      borderTop: pessoasFiltradas.length > 0 ? `1px solid ${C.border}` : 'none',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = C.emerald + '10')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    ＋ Cadastrar "{buscaPessoa}" agora
+                  </div>
                 </div>
               )}
             </div>
+          )}
+
+          {/* Mini-form de cadastro rápido */}
+          {mostraCadastro && (
+            <CadastroRapido
+              nomeInicial={buscaPessoa}
+              tipo={tipo}
+              onSalvo={handleSelecionarPessoa}
+              onCancelar={() => setMostraCadastro(false)}
+            />
           )}
         </div>
 
@@ -286,32 +414,23 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
           <label style={labelStyle}>Salvar como</label>
           <div style={{ display: 'flex', gap: 8 }}>
             {(['ABERTA', 'PAGA'] as const).map(op => (
-              <button
-                key={op}
-                onClick={() => setSalvarComo(op)}
-                style={{
-                  flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-                  border: `1px solid ${salvarComo === op ? cor : C.border}`,
-                  background: salvarComo === op ? cor + '18' : C.bgCard,
-                  color: salvarComo === op ? cor : C.textMuted,
-                  transition: 'all 0.15s',
-                }}
-              >
+              <button key={op} onClick={() => setSalvarComo(op)} style={{
+                flex: 1, padding: '9px', borderRadius: 8, cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                border: `1px solid ${salvarComo === op ? cor : C.border}`,
+                background: salvarComo === op ? cor + '18' : C.bgCard,
+                color: salvarComo === op ? cor : C.textMuted,
+                transition: 'all 0.15s',
+              }}>
                 {op === 'ABERTA' ? '○ Em Aberto' : '✓ Já Liquidado'}
               </button>
             ))}
           </div>
-          {salvarComo === 'PAGA' && (
-            <div style={{ fontSize: 10, color: C.textMuted, marginTop: 5 }}>
-              Será criado como Em Aberto — baixe na tela de Lançamentos para registrar a conta e data exata.
-            </div>
-          )}
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
-        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+        <Btn variant="ghost" onClick={onClose}>Fechar</Btn>
         <Btn variant="primary" onClick={handleConfirmar} disabled={loading}>
           {loading ? <Spinner size={14} /> : 'Criar Lançamento'}
         </Btn>
@@ -323,15 +442,16 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
 // ─── Componente Principal ────────────────────────────────────────────────────
 
 export function ExtratoPage() {
-  const [banco, setBanco]         = useState<'INTER' | 'SICOOB'>('INTER')
-  const [file, setFile]           = useState<File | null>(null)
-  const [resultado, setResultado] = useState<ParseResult | null>(null)
-  const [loading, setLoading]     = useState(false)
-  const [erro, setErro]           = useState('')
-  const [filtro, setFiltro]       = useState<'TODOS' | 'C' | 'D'>('TODOS')
-  const [busca, setBusca]         = useState('')
-  const [txModal, setTxModal]     = useState<ExtratoTransacao | null>(null)
+  const [banco,      setBanco]      = useState<'INTER' | 'SICOOB'>('INTER')
+  const [file,       setFile]       = useState<File | null>(null)
+  const [resultado,  setResultado]  = useState<ParseResult | null>(null)
+  const [loading,    setLoading]    = useState(false)
+  const [erro,       setErro]       = useState('')
+  const [filtro,     setFiltro]     = useState<'TODOS' | 'C' | 'D'>('TODOS')
+  const [busca,      setBusca]      = useState('')
+  const [txModal,    setTxModal]    = useState<ExtratoTransacao | null>(null)
   const [importados, setImportados] = useState<Set<number>>(new Set())
+  const [restorado,  setRestorado]  = useState(false)  // veio do localStorage
   const fileRef = useRef<HTMLInputElement>(null)
 
   const contasQ  = (trpc as any).fin.conta.list.useQuery()
@@ -344,9 +464,56 @@ export function ExtratoPage() {
   const centros  = centroQ.data  ?? []
   const pessoas  = pessoaQ.data  ?? []
 
+  // ── Restaurar extrato do localStorage ao carregar ──────────────────────────
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const { banco: b, resultado: r, timestamp } = JSON.parse(saved)
+        if (Date.now() - timestamp < MAX_AGE_MS) {
+          setBanco(b)
+          setResultado(r)
+          setRestorado(true)
+        } else {
+          localStorage.removeItem(STORAGE_KEY)
+          localStorage.removeItem(STORAGE_IMP)
+        }
+      }
+      const savedImp = localStorage.getItem(STORAGE_IMP)
+      if (savedImp) {
+        setImportados(new Set(JSON.parse(savedImp)))
+      }
+    } catch { /* ignora erro de parse */ }
+  }, [])
+
+  // ── Salvar extrato no localStorage quando muda ─────────────────────────────
+  useEffect(() => {
+    if (resultado) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ banco, resultado, timestamp: Date.now() }))
+    }
+  }, [resultado, banco])
+
+  // ── Salvar importados quando muda ─────────────────────────────────────────
+  useEffect(() => {
+    if (importados.size > 0) {
+      localStorage.setItem(STORAGE_IMP, JSON.stringify([...importados]))
+    }
+  }, [importados])
+
+  const limparExtrato = () => {
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(STORAGE_IMP)
+    setResultado(null)
+    setImportados(new Set())
+    setFile(null)
+    setErro('')
+    setRestorado(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   const processarPDF = async () => {
     if (!file) { setErro('Selecione um arquivo PDF'); return }
-    setLoading(true); setErro(''); setResultado(null); setImportados(new Set())
+    setLoading(true); setErro(''); setResultado(null); setImportados(new Set()); setRestorado(false)
     try {
       const token = localStorage.getItem('atomfin_token') || localStorage.getItem('atomtech_token') || ''
       const form = new FormData()
@@ -380,102 +547,134 @@ export function ExtratoPage() {
   }, [resultado, filtro, busca])
 
   const txs = txsFiltradas()
+  const pendentes = resultado ? resultado.total - importados.size : 0
 
   return (
     <PageWrapper>
-      {/* ── Cabeçalho ─────────────────────────────────────────── */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ color: C.text, fontSize: 18, fontWeight: 800, margin: 0 }}>
-          Extrato Bancário
-        </h2>
-        <p style={{ color: C.textMuted, fontSize: 12, margin: '4px 0 0' }}>
-          Importe extratos em PDF do Banco Inter ou Sicoob e crie lançamentos diretamente
-        </p>
-      </div>
-
-      {/* ── Upload ────────────────────────────────────────────── */}
-      <div style={{
-        background: C.bgCard, border: `1px solid ${C.border}`,
-        borderRadius: 14, padding: '24px 28px', marginBottom: 24,
-      }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 18, letterSpacing: '0.05em' }}>
-          CARREGAR EXTRATO
+      {/* ── Cabeçalho ──────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ color: C.text, fontSize: 18, fontWeight: 800, margin: 0 }}>
+            Extrato Bancário
+          </h2>
+          <p style={{ color: C.textMuted, fontSize: 12, margin: '4px 0 0' }}>
+            Importe extratos em PDF do Banco Inter ou Sicoob e crie lançamentos diretamente
+          </p>
         </div>
-
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-
-          {/* Banco */}
-          <div>
-            <div style={{ ...labelStyle, marginBottom: 8 }}>BANCO</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {(['INTER', 'SICOOB'] as const).map(b => (
-                <button
-                  key={b}
-                  onClick={() => { setBanco(b); setResultado(null); setFile(null); setErro(''); if (fileRef.current) fileRef.current.value = '' }}
-                  style={{
-                    padding: '9px 22px', borderRadius: 9, cursor: 'pointer',
-                    fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
-                    border: `1px solid ${banco === b ? C.emerald : C.border}`,
-                    background: banco === b ? C.emerald + '18' : C.bgHover,
-                    color: banco === b ? C.emerald : C.textMuted,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {b === 'INTER' ? '🟠 Banco Inter' : '🟢 Sicoob'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Arquivo */}
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div style={{ ...labelStyle, marginBottom: 8 }}>ARQUIVO PDF</div>
-            <div
-              onClick={() => fileRef.current?.click()}
-              style={{
-                border: `1.5px dashed ${file ? C.emerald : C.border}`,
-                borderRadius: 9, padding: '11px 16px',
-                cursor: 'pointer', transition: 'all 0.15s',
-                background: file ? C.emerald + '08' : C.bgHover,
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}
-              onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.borderColor = C.emerald)}
-              onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.borderColor = file ? C.emerald : C.border)}
-            >
-              <span style={{ fontSize: 18 }}>📄</span>
-              <span style={{ fontSize: 12, color: file ? C.emerald : C.textMuted }}>
-                {file ? file.name : 'Clique para selecionar o PDF do extrato'}
-              </span>
-            </div>
-            <input
-              ref={fileRef} type="file" accept=".pdf,application/pdf"
-              style={{ display: 'none' }}
-              onChange={e => { setFile(e.target.files?.[0] ?? null); setResultado(null); setErro('') }}
-            />
-          </div>
-
-          {/* Botão */}
-          <Btn variant="primary" onClick={processarPDF} disabled={loading || !file}>
-            {loading ? <><Spinner size={14} />&nbsp;Processando...</> : '⚡ Processar PDF'}
-          </Btn>
-        </div>
-
-        {erro && (
-          <Alert type="danger" style={{ marginTop: 14 }}>
-            {erro}
-          </Alert>
+        {resultado && (
+          <button
+            onClick={limparExtrato}
+            style={{
+              padding: '7px 16px', borderRadius: 8, cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+              border: `1px solid ${C.border}`, background: 'transparent',
+              color: C.textMuted, transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = C.danger; (e.currentTarget as HTMLButtonElement).style.color = C.danger }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = C.border; (e.currentTarget as HTMLButtonElement).style.color = C.textMuted }}
+          >
+            ✕ Limpar extrato
+          </button>
         )}
       </div>
 
-      {/* ── Resultados ────────────────────────────────────────── */}
+      {/* ── Banner: extrato restaurado ─────────────────────────────── */}
+      {restorado && resultado && (
+        <Alert type="info" style={{ marginBottom: 16 }}>
+          📂 Extrato restaurado — você tem <strong>{pendentes} lançamento{pendentes !== 1 ? 's' : ''} pendente{pendentes !== 1 ? 's' : ''}</strong>.
+          Continue de onde parou ou clique em "Limpar extrato" para começar um novo.
+        </Alert>
+      )}
+
+      {/* ── Upload ──────────────────────────────────────────────────── */}
+      {!resultado && (
+        <div style={{
+          background: C.bgCard, border: `1px solid ${C.border}`,
+          borderRadius: 14, padding: '24px 28px', marginBottom: 24,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 18, letterSpacing: '0.05em' }}>
+            CARREGAR EXTRATO
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {/* Banco */}
+            <div>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>BANCO</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['INTER', 'SICOOB'] as const).map(b => (
+                  <button key={b} onClick={() => { setBanco(b); setFile(null); setErro(''); if (fileRef.current) fileRef.current.value = '' }}
+                    style={{
+                      padding: '9px 22px', borderRadius: 9, cursor: 'pointer',
+                      fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                      border: `1px solid ${banco === b ? C.emerald : C.border}`,
+                      background: banco === b ? C.emerald + '18' : C.bgHover,
+                      color: banco === b ? C.emerald : C.textMuted,
+                      transition: 'all 0.15s',
+                    }}>
+                    {b === 'INTER' ? '🟠 Banco Inter' : '🟢 Sicoob'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Arquivo */}
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>ARQUIVO PDF</div>
+              <div
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border: `1.5px dashed ${file ? C.emerald : C.border}`,
+                  borderRadius: 9, padding: '11px 16px',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  background: file ? C.emerald + '08' : C.bgHover,
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}
+                onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.borderColor = C.emerald)}
+                onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.borderColor = file ? C.emerald : C.border)}
+              >
+                <span style={{ fontSize: 18 }}>📄</span>
+                <span style={{ fontSize: 12, color: file ? C.emerald : C.textMuted }}>
+                  {file ? file.name : 'Clique para selecionar o PDF do extrato'}
+                </span>
+              </div>
+              <input ref={fileRef} type="file" accept=".pdf,application/pdf"
+                style={{ display: 'none' }}
+                onChange={e => { setFile(e.target.files?.[0] ?? null); setErro('') }} />
+            </div>
+
+            {/* Botão */}
+            <Btn variant="primary" onClick={processarPDF} disabled={loading || !file}>
+              {loading ? <><Spinner size={14} />&nbsp;Processando...</> : '⚡ Processar PDF'}
+            </Btn>
+          </div>
+
+          {erro && <Alert type="danger" style={{ marginTop: 14 }}>{erro}</Alert>}
+        </div>
+      )}
+
+      {/* Quando já tem resultado: mostra botão para trocar o arquivo */}
+      {resultado && !restorado && (
+        <div style={{
+          background: C.bgCard, border: `1px solid ${C.border}`,
+          borderRadius: 10, padding: '12px 18px', marginBottom: 20,
+          display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 12, color: C.textMuted }}>
+            📄 {file?.name ?? 'Extrato carregado'} · {banco === 'INTER' ? '🟠 Banco Inter' : '🟢 Sicoob'}
+          </span>
+          <Btn variant="ghost" onClick={limparExtrato}>Carregar outro extrato</Btn>
+        </div>
+      )}
+
+      {/* ── Resultados ───────────────────────────────────────────────── */}
       {resultado && (
         <>
           {/* KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 20 }}>
-            <KpiCard label="Transações"      value={resultado.total.toString()}         color={C.info} />
-            <KpiCard label="Total Entradas"  value={fmtBRLFull(resultado.totalEntradas)} color={C.credit} />
-            <KpiCard label="Total Saídas"    value={fmtBRLFull(resultado.totalSaidas)}  color={C.debit} />
-            <KpiCard label="Já importados"   value={`${importados.size} / ${resultado.total}`} color={C.emerald} />
+            <KpiCard label="Transações"     value={resultado.total.toString()}          color={C.info} />
+            <KpiCard label="Total Entradas" value={fmtBRLFull(resultado.totalEntradas)} color={C.credit} />
+            <KpiCard label="Total Saídas"   value={fmtBRLFull(resultado.totalSaidas)}  color={C.debit} />
+            <KpiCard label="Importados"     value={`${importados.size} / ${resultado.total}`} color={C.emerald} />
           </div>
 
           {/* Filtros */}
@@ -497,7 +696,7 @@ export function ExtratoPage() {
             </div>
             <input
               value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar por descrição ou data (YYYY-MM-DD)..."
+              placeholder="Buscar por descrição ou data..."
               style={{
                 flex: 1, minWidth: 200,
                 background: C.bgHover, border: `1px solid ${C.border}`,
@@ -511,18 +710,14 @@ export function ExtratoPage() {
           </div>
 
           {/* Tabela */}
-          <div style={{
-            background: C.bgCard, border: `1px solid ${C.border}`,
-            borderRadius: 14, overflow: 'hidden',
-          }}>
+          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
             <div style={{
               display: 'grid', gridTemplateColumns: '96px 1fr 90px 130px 112px',
               padding: '10px 18px', borderBottom: `1px solid ${C.border}`,
               fontSize: 10, fontWeight: 700, color: C.textDim,
               letterSpacing: '0.1em', textTransform: 'uppercase',
             }}>
-              <div>Data</div>
-              <div>Descrição</div>
+              <div>Data</div><div>Descrição</div>
               <div style={{ textAlign: 'center' }}>Tipo</div>
               <div style={{ textAlign: 'right' }}>Valor</div>
               <div style={{ textAlign: 'center' }}>Ação</div>
@@ -533,7 +728,6 @@ export function ExtratoPage() {
                 const idx = resultado.transacoes.indexOf(tx)
                 const importado = importados.has(idx)
                 const cor = tx.tipo === 'C' ? C.credit : C.debit
-
                 return (
                   <div key={idx} style={{
                     display: 'grid', gridTemplateColumns: '96px 1fr 90px 130px 112px',
@@ -592,7 +786,7 @@ export function ExtratoPage() {
         </>
       )}
 
-      {/* ── Modal Importar ───────────────────────────────────── */}
+      {/* ── Modal Importar ───────────────────────────────────────────── */}
       <ModalImportar
         tx={txModal}
         contas={contas} planos={planos} centros={centros} pessoas={pessoas}
