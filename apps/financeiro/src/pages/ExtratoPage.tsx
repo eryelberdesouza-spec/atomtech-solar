@@ -213,10 +213,8 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   const label = tipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'
   const cor   = tipo === 'RECEBER' ? C.credit : C.debit
 
-  // Filtra pessoas por tipo e busca
+  // Filtra pessoas pela busca (sem restringir por papel — qualquer cadastro deve aparecer)
   const pessoasFiltradas = pessoas.filter((p: any) => {
-    const matchTipo = tipo === 'RECEBER' ? p.isCliente : p.isFornecedor
-    if (!matchTipo) return false
     if (!buscaPessoa.trim()) return false  // só mostra dropdown ao digitar
     return p.nome.toLowerCase().includes(buscaPessoa.toLowerCase())
   })

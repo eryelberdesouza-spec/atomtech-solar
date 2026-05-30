@@ -181,7 +181,9 @@ function ModalEditarLancamento({
     })
   }
 
-  const pessoasFiltradas = pessoas.filter((p: any) => tipo === 'PAGAR' ? p.isFornecedor : p.isCliente)
+  // No contexto de edição/vinculação mostramos TODAS as pessoas (sem filtrar por papel)
+  // O filtro por isFornecedor/isCliente fica apenas na criação de novos lançamentos
+  const pessoasFiltradas = pessoas
   const planosFiltrados  = planosContas.filter((p: any) => p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO')
   const label = tipo === 'PAGAR' ? 'Pagar' : 'Receber'
 
