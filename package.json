@@ -10,7 +10,9 @@
     "build": "npm run build -w apps/api && npm run build -w apps/web && npm run build -w apps/financeiro",
     "db:generate": "npm run db:generate -w apps/api",
     "db:migrate": "npm run db:migrate -w apps/api",
-    "db:seed": "npm run db:seed -w apps/api"
+    "db:seed": "npm run db:seed -w apps/api",
+    "deploy:financeiro": "cd apps/financeiro && vercel --prod --yes",
+    "deploy:web": "cd apps/web && vercel --prod --yes"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
