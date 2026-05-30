@@ -1449,6 +1449,110 @@ const dreRouter = router({
     }),
 })
 
+// ─── EXTRATO IMPORT (atômico: pessoa + título + parcela + baixa) ──────────────
+// Resolve o problema de race condition do frontend: em vez de duas chamadas
+// separadas (criar pessoa, depois criar título), tudo ocorre em uma única
+// transação no servidor — eliminando dependência de estado React entre chamadas.
+
+const extratoRouter = router({
+  importar: protectedProcedure
+    .input(z.object({
+      // Transação do extrato
+      tipo:       z.enum(['PAGAR', 'RECEBER']),
+      descricao:  z.string().min(1),
+      valor:      z.number().positive(),
+      data:       z.string(),   // YYYY-MM-DD (emissão + vencimento)
+      // Pessoa — ou id de existente, ou dados de nova (mutuamente exclusivo)
+      pessoaId:       z.number().positive().nullish(),
+      pessoaNova: z.object({
+        nome:         z.string().min(1),
+        tipoPessoa:   z.enum(['FISICA', 'JURIDICA']),
+        isCliente:    z.boolean(),
+        isFornecedor: z.boolean(),
+        cpfCnpj:      z.string().nullish(),
+      }).nullish(),
+      // Classificação
+      planoContasId: z.number().nullish(),
+      centroCustoId: z.number().nullish(),
+      // Conta + pagamento (obrigatórios se salvarComo = 'PAGA')
+      salvarComo:     z.enum(['ABERTA', 'PAGA']),
+      contaId:        z.number().nullish(),
+      formaPagamento: z.string().nullish(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // 1. Criar pessoa nova se fornecida
+      let pessoaIdFinal: number | null = input.pessoaId ?? null
+
+      if (!pessoaIdFinal && input.pessoaNova) {
+        const p = input.pessoaNova
+        const [resPessoa] = await ctx.db.insert(finPessoa).values({
+          empresaId:    empId,
+          tipoPessoa:   p.tipoPessoa,
+          nome:         p.nome,
+          cpfCnpj:      p.cpfCnpj ?? null,
+          isCliente:    p.isCliente ? 1 : 0,
+          isFornecedor: p.isFornecedor ? 1 : 0,
+          fantasia:     null, email: null, telefone: null,
+          cep: null, logradouro: null, numero: null, complemento: null,
+          bairro: null, cidade: null, estado: null,
+          regime: null, observacoes: null,
+          banco: null, tipoPix: null, chavePix: null, tipoPagamento: null,
+        })
+        const novoPessoaId = (resPessoa as any).insertId as number
+        if (!novoPessoaId || novoPessoaId <= 0) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Erro ao criar cadastro da pessoa' })
+        }
+        pessoaIdFinal = novoPessoaId
+      }
+
+      // 2. Criar título
+      const [resTitulo] = await ctx.db.insert(finTitulo).values({
+        empresaId:     empId,
+        tipo:          input.tipo,
+        descricao:     input.descricao,
+        pessoaId:      pessoaIdFinal,
+        planoContasId: input.planoContasId ?? null,
+        centroCustoId: input.centroCustoId ?? null,
+        valorOriginal: input.valor.toFixed(2),
+        emissao:       input.data as any,
+        documento:     null,
+        propostaId:    null,
+        observacoes:   null,
+        ativo:         1 as any,
+      })
+      const tituloId = (resTitulo as any).insertId as number
+      if (!tituloId) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Erro ao criar lançamento' })
+
+      // 3. Criar parcela
+      const [resParcela] = await ctx.db.insert(finParcela).values({
+        tituloId,
+        numero:     1,
+        valor:      input.valor.toFixed(2),
+        vencimento: input.data as any,
+        status:     'ABERTA',
+      })
+      const parcelaId = (resParcela as any).insertId as number
+
+      // 4. Baixar se já liquidado
+      if (input.salvarComo === 'PAGA' && input.contaId && parcelaId) {
+        await ctx.db.update(finParcela).set({
+          status:         'PAGA',
+          contaId:        input.contaId,
+          dataPagamento:  input.data as any,
+          valorPago:      input.valor.toFixed(2),
+          formaPagamento: input.formaPagamento ?? null,
+          juros:          '0.00',
+          multa:          '0.00',
+          desconto:       '0.00',
+        }).where(eq(finParcela.id, parcelaId))
+      }
+
+      return { ok: true, tituloId, pessoaId: pessoaIdFinal }
+    }),
+})
+
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────
 
 export const finRouter = router({
@@ -1464,4 +1568,5 @@ export const finRouter = router({
   fluxoCaixa:    fluxoCaixaRouter,
   dre:           dreRouter,
   proposta:      propostaFinRouter,
+  extrato:       extratoRouter,
 })

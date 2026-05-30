@@ -73,54 +73,44 @@ const inputStyle = {
 }
 const selectStyle = { ...inputStyle, cursor: 'pointer' }
 
-// ─── Mini-form de cadastro rápido de Pessoa ───────────────────────────────────
+// ─── Tipo de dados de nova pessoa (sem chamada de API aqui) ──────────────────
+
+interface PessoaNovaDados {
+  nome:         string
+  tipoPessoa:   'FISICA' | 'JURIDICA'
+  isCliente:    boolean
+  isFornecedor: boolean
+  cpfCnpj:      string | null
+}
+
+// ─── Mini-form de cadastro rápido de Pessoa (só coleta dados — API call é atômica) ──
 
 interface CadastroRapidoProps {
   nomeInicial: string
   tipo: 'RECEBER' | 'PAGAR'
-  onSalvo: (pessoa: { id: number; nome: string }) => void
-  onCancelar: () => void
+  onConfirmar: (dados: PessoaNovaDados) => void
+  onCancelar:  () => void
 }
 
-function CadastroRapido({ nomeInicial, tipo, onSalvo, onCancelar }: CadastroRapidoProps) {
+function CadastroRapido({ nomeInicial, tipo, onConfirmar, onCancelar }: CadastroRapidoProps) {
   const [nome,       setNome]       = useState(nomeInicial)
   const [cpfCnpj,   setCpfCnpj]    = useState('')
   const [tipoPessoa, setTipoPessoa] = useState<'FISICA' | 'JURIDICA'>('JURIDICA')
   const [papel,      setPapel]      = useState<'CLIENTE' | 'FORNECEDOR' | 'AMBOS'>(
     tipo === 'RECEBER' ? 'CLIENTE' : 'FORNECEDOR'
   )
-  const [loading, setLoading] = useState(false)
-  const [erro,    setErro]    = useState('')
+  const [erro, setErro] = useState('')
 
-  const criarPessoa = (trpc as any).fin.pessoa.create.useMutation()
-  const utils       = (trpc as any).useUtils()
-
-  const handleSalvar = async () => {
+  const handleConfirmar = () => {
     if (!nome.trim()) { setErro('Informe o nome'); return }
-    setLoading(true); setErro('')
-    try {
-      // A API agora retorna { ok, id } — usamos o ID diretamente, sem race condition
-      const result = await criarPessoa.mutateAsync({
-        tipoPessoa,
-        nome: nome.trim(),
-        cpfCnpj:      cpfCnpj.trim() || null,
-        isCliente:    papel === 'CLIENTE'    || papel === 'AMBOS',
-        isFornecedor: papel === 'FORNECEDOR' || papel === 'AMBOS',
-        fantasia: null, email: null, telefone: null,
-        cep: null, logradouro: null, numero: null, complemento: null,
-        bairro: null, cidade: null, estado: null,
-        regime: null, observacoes: null,
-        banco: null, tipoPix: null, chavePix: null, tipoPagamento: null,
-      })
-      // Invalida o cache para que a lista de pessoas seja atualizada em todas as telas
-      utils.fin.pessoa.list.invalidate()
-      // ID vem diretamente do retorno da API — sem busca por nome, sem race condition
-      onSalvo({ id: result.id, nome: nome.trim() })
-    } catch (e: any) {
-      setErro(e.message || 'Erro ao cadastrar')
-    } finally {
-      setLoading(false)
-    }
+    setErro('')
+    onConfirmar({
+      nome:         nome.trim(),
+      tipoPessoa,
+      isCliente:    papel === 'CLIENTE'    || papel === 'AMBOS',
+      isFornecedor: papel === 'FORNECEDOR' || papel === 'AMBOS',
+      cpfCnpj:      cpfCnpj.trim() || null,
+    })
   }
 
   return (
@@ -130,12 +120,10 @@ function CadastroRapido({ nomeInicial, tipo, onSalvo, onCancelar }: CadastroRapi
       marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12,
     }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: C.emerald, marginBottom: 2 }}>
-        ＋ CADASTRO RÁPIDO
+        ＋ CADASTRO RÁPIDO — será salvo ao confirmar o lançamento
       </div>
 
-      {erro && (
-        <Alert type="danger">{erro}</Alert>
-      )}
+      {erro && <Alert type="danger">{erro}</Alert>}
 
       <div>
         <label style={labelStyle}>Nome *</label>
@@ -171,8 +159,8 @@ function CadastroRapido({ nomeInicial, tipo, onSalvo, onCancelar }: CadastroRapi
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
         <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
-        <Btn variant="primary" onClick={handleSalvar} disabled={loading}>
-          {loading ? <Spinner size={13} /> : '✓ Salvar e vincular'}
+        <Btn variant="primary" onClick={handleConfirmar}>
+          ✓ Usar este cadastro
         </Btn>
       </div>
     </div>
@@ -195,8 +183,11 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   const [contaId,      setContaId]      = useState('')
   const [planoId,      setPlanoId]      = useState('')
   const [centroId,     setCentroId]     = useState('')
+  // Pessoa existente (selecionada do dropdown)
   const [pessoaId,     setPessoaId]     = useState('')
-  const [pessoaNome,   setPessoaNome]   = useState('')  // nome da pessoa selecionada
+  const [pessoaNome,   setPessoaNome]   = useState('')
+  // Pessoa NOVA (preenchida no CadastroRapido — salva atomicamente com o lançamento)
+  const [pessoaNova,   setPessoaNova]   = useState<PessoaNovaDados | null>(null)
   const [formaPag,     setFormaPag]     = useState(() => tx ? detectarFormaPag(tx.descricao) : 'pix')
   const [descricao,    setDescricao]    = useState(tx?.descricao ?? '')
   const [salvarComo,   setSalvarComo]   = useState<'ABERTA' | 'PAGA'>('ABERTA')
@@ -205,7 +196,9 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   const [loading,      setLoading]      = useState(false)
   const [erro,         setErro]         = useState('')
 
-  const criarTitulo = (trpc as any).fin.titulo.create.useMutation()
+  // Endpoint atômico: cria pessoa (se nova) + título + parcela em uma única chamada
+  const importarExtrato = (trpc as any).fin.extrato.importar.useMutation()
+  const utils = (trpc as any).useUtils()
 
   if (!tx) return null
 
@@ -213,32 +206,56 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   const label = tipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'
   const cor   = tipo === 'RECEBER' ? C.credit : C.debit
 
-  // Filtra pessoas pela busca (sem restringir por papel — qualquer cadastro deve aparecer)
+  // Pessoa selecionada para exibição (existente ou nova pendente)
+  const pessoaExibida = pessoaNome || pessoaNova?.nome || ''
+
   const pessoasFiltradas = pessoas.filter((p: any) => {
-    if (!buscaPessoa.trim()) return false  // só mostra dropdown ao digitar
+    if (!buscaPessoa.trim()) return false
     return p.nome.toLowerCase().includes(buscaPessoa.toLowerCase())
   })
 
-  const handleSelecionarPessoa = (p: { id: number; nome: string }) => {
+  const handleSelecionarExistente = (p: { id: number; nome: string }) => {
     setPessoaId(String(p.id))
     setPessoaNome(p.nome)
+    setPessoaNova(null)   // limpa eventual nova cadastrada
     setBuscaPessoa('')
     setMostraCadastro(false)
+  }
+
+  const handleConfirmarCadastroRapido = (dados: PessoaNovaDados) => {
+    setPessoaNova(dados)
+    setPessoaId('')       // não há id ainda — será criado junto com o lançamento
+    setPessoaNome('')
+    setBuscaPessoa('')
+    setMostraCadastro(false)
+  }
+
+  const limparPessoa = () => {
+    setPessoaId(''); setPessoaNome(''); setPessoaNova(null)
+    setBuscaPessoa(''); setMostraCadastro(false)
   }
 
   const handleConfirmar = async () => {
     setLoading(true); setErro('')
     try {
-      await criarTitulo.mutateAsync({
+      const result = await importarExtrato.mutateAsync({
         tipo,
-        descricao: descricao || tx.descricao,
-        pessoaId:      pessoaId  ? parseInt(pessoaId)  : null,
-        planoContasId: planoId   ? parseInt(planoId)   : null,
-        centroCustoId: centroId  ? parseInt(centroId)  : null,
-        valorOriginal: tx.valor,
-        emissao: tx.data,
-        parcelas: [{ numero: 1, valor: tx.valor, vencimento: tx.data }],
+        descricao: descricao.trim() || tx.descricao,
+        valor:     tx.valor,
+        data:      tx.data,
+        // Pessoa: existente OU nova (o backend resolve)
+        pessoaId:      pessoaId && parseInt(pessoaId) > 0 ? parseInt(pessoaId) : undefined,
+        pessoaNova:    pessoaNova ?? undefined,
+        planoContasId: planoId  ? parseInt(planoId)  : undefined,
+        centroCustoId: centroId ? parseInt(centroId) : undefined,
+        salvarComo,
+        contaId:       contaId ? parseInt(contaId) : undefined,
+        formaPagamento: formaPag || undefined,
       })
+      // Se criou pessoa nova, invalida o cache de pessoas para aparecer em outros locais
+      if (result.pessoaId && pessoaNova) {
+        utils.fin.pessoa.list.invalidate()
+      }
       onSuccess()
     } catch (e: any) {
       setErro(e.message || 'Erro ao criar lançamento')
@@ -286,16 +303,23 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
             <span style={{ fontWeight: 400, color: C.textDim }}> (opcional)</span>
           </label>
 
-          {pessoaNome ? (
-            /* Pessoa selecionada */
+          {pessoaExibida ? (
+            /* Pessoa selecionada (existente ou nova pendente) */
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: cor + '12', border: `1px solid ${cor}40`,
               borderRadius: 8, padding: '8px 12px',
             }}>
-              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{pessoaNome}</span>
+              <div>
+                <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{pessoaExibida}</span>
+                {pessoaNova && (
+                  <span style={{ fontSize: 10, color: C.emerald, marginLeft: 8, fontWeight: 600 }}>
+                    ✦ novo — será cadastrado ao confirmar
+                  </span>
+                )}
+              </div>
               <button
-                onClick={() => { setPessoaId(''); setPessoaNome(''); setMostraCadastro(false) }}
+                onClick={limparPessoa}
                 style={{ background:'none', border:'none', color: C.textMuted, cursor:'pointer', fontSize:16, padding:'0 2px' }}
               >×</button>
             </div>
@@ -304,11 +328,10 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
               <input
                 value={buscaPessoa}
                 onChange={e => { setBuscaPessoa(e.target.value); setMostraCadastro(false) }}
-                placeholder={`Buscar ${tipo === 'RECEBER' ? 'cliente' : 'fornecedor'}... ou digite para cadastrar novo`}
+                placeholder={`Buscar ${tipo === 'RECEBER' ? 'cliente' : 'fornecedor'}... ou cadastrar novo`}
                 style={inputStyle}
               />
 
-              {/* Dropdown de resultados */}
               {buscaPessoa.trim() && !mostraCadastro && (
                 <div style={{
                   position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
@@ -318,7 +341,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
                 }}>
                   {pessoasFiltradas.slice(0, 10).map((p: any) => (
                     <div key={p.id}
-                      onClick={() => handleSelecionarPessoa(p)}
+                      onClick={() => handleSelecionarExistente(p)}
                       style={{
                         padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: C.text,
                         borderBottom: `1px solid ${C.border}40`, transition: 'background 0.1s',
@@ -327,11 +350,9 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       {p.nome}
-                      {p.documento && <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{p.documento}</span>}
+                      {p.cpfCnpj && <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{p.cpfCnpj}</span>}
                     </div>
                   ))}
-
-                  {/* Opção de cadastrar novo — sempre aparece quando há texto digitado */}
                   <div
                     onClick={() => setMostraCadastro(true)}
                     style={{
@@ -344,19 +365,18 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
                     onMouseEnter={e => (e.currentTarget.style.background = C.emerald + '10')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    ＋ Cadastrar "{buscaPessoa}" agora
+                    ＋ Cadastrar "{buscaPessoa}" como novo
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Mini-form de cadastro rápido */}
           {mostraCadastro && (
             <CadastroRapido
               nomeInicial={buscaPessoa}
               tipo={tipo}
-              onSalvo={handleSelecionarPessoa}
+              onConfirmar={handleConfirmarCadastroRapido}
               onCancelar={() => setMostraCadastro(false)}
             />
           )}
@@ -425,7 +445,12 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
         <Btn variant="ghost" onClick={onClose}>Fechar</Btn>
-        <Btn variant="primary" onClick={handleConfirmar} disabled={loading}>
+        <Btn
+          variant="primary"
+          onClick={handleConfirmar}
+          disabled={loading || mostraCadastro}
+          title={mostraCadastro ? 'Confirme ou cancele o cadastro antes de prosseguir' : undefined}
+        >
           {loading ? <Spinner size={14} /> : 'Criar Lançamento'}
         </Btn>
       </div>
