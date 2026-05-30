@@ -354,6 +354,43 @@ export function Layout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
             {!isMobile && <NovaPropostaDropdown />}
 
+            {/* Link para Financeiro — visível apenas para admin */}
+            {!isMobile && (() => {
+              const isAdmin = usuario?.role === 'admin'
+              return (
+                <a
+                  href={isAdmin ? 'https://financeiro-two-mu.vercel.app' : undefined}
+                  onClick={!isAdmin ? (e) => {
+                    e.preventDefault()
+                    alert('Acesso ao módulo Financeiro é restrito a administradores.\n\nSeu perfil: ' + (usuario?.role || 'desconhecido'))
+                  } : undefined}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 7,
+                    border: '1px solid ' + (isAdmin ? '#1E4033' : '#1E2D3A'),
+                    color: isAdmin ? '#10B981' : '#3A5070',
+                    fontSize: 11, fontWeight: 600, textDecoration: 'none',
+                    transition: 'all 0.15s', cursor: isAdmin ? 'pointer' : 'not-allowed',
+                    opacity: isAdmin ? 1 : 0.5,
+                  }}
+                  onMouseEnter={isAdmin ? e => {
+                    const el = e.currentTarget as HTMLAnchorElement
+                    el.style.background = '#10B98114'
+                    el.style.borderColor = '#10B98140'
+                  } : undefined}
+                  onMouseLeave={isAdmin ? e => {
+                    const el = e.currentTarget as HTMLAnchorElement
+                    el.style.background = 'transparent'
+                    el.style.borderColor = '#1E4033'
+                  } : undefined}
+                  title={isAdmin ? 'Abrir módulo Financeiro' : 'Acesso restrito a administradores'}
+                >
+                  ◈ Financeiro
+                  {!isAdmin && <span style={{ fontSize: 9, color: '#4A6080' }}>🔒</span>}
+                </a>
+              )
+            })()}
+
             {/* Avatar com dropdown de usuário */}
             <div ref={userMenuRef} style={{ position: 'relative' }}>
               <button

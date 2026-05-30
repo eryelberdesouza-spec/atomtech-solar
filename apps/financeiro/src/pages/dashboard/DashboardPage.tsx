@@ -17,7 +17,7 @@ export function DashboardPage() {
   const r = resumo ?? {
     saldoTotal: 0, aReceber: 0, aPagar: 0, resultado: 0,
     vencendoHoje: 0, vencidos: 0,
-    contasResume: [],
+    contasResume: [], lancamentosRecentes: [],
   }
 
   return (
@@ -108,14 +108,62 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Placeholder para lançamentos recentes (Fase 2) */}
-      <Card style={{ padding: '32px', textAlign: 'center' }}>
-        <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>📋</div>
-        <p style={{ color: C.text, fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Lançamentos Recentes</p>
-        <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
-          Os últimos lançamentos aparecerão aqui. Comece cadastrando os dados de configuração.
-        </p>
-      </Card>
+      {/* Lançamentos Recentes */}
+      <div>
+        <h3 style={{ color: C.text, fontSize: 14, fontWeight: 600, marginBottom: 14 }}>
+          Lançamentos Recentes
+        </h3>
+        {r.lancamentosRecentes.length === 0 ? (
+          <Card style={{ padding: '32px', textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>📋</div>
+            <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
+              Nenhum lançamento encontrado. Importe um extrato ou crie uma conta a pagar/receber.
+            </p>
+          </Card>
+        ) : (
+          <Card style={{ overflow: 'hidden', padding: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid ' + C.border }}>
+                  {['Tipo', 'Descrição', 'Pessoa', 'Data', 'Valor'].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 16px', textAlign: h === 'Valor' ? 'right' : 'left',
+                      fontSize: 10, fontWeight: 700, color: C.textMuted,
+                      textTransform: 'uppercase', letterSpacing: '0.06em',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {r.lancamentosRecentes.map((l: any) => (
+                  <tr key={l.tituloId} style={{ borderBottom: '1px solid ' + C.border + '60' }}>
+                    <td style={{ padding: '10px 16px' }}>
+                      {l.tipo === 'RECEBER'
+                        ? <span style={{ fontSize: 11, fontWeight: 700, color: C.credit }}>📥 Receber</span>
+                        : <span style={{ fontSize: 11, fontWeight: 700, color: C.debit }}>📤 Pagar</span>}
+                    </td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: C.text, maxWidth: 240 }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {l.descricao}
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: C.textMuted }}>
+                      {l.pessoaNome ?? <span style={{ color: C.textDim }}>—</span>}
+                    </td>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: C.textMuted, whiteSpace: 'nowrap' }}>
+                      {fmtData(l.emissao)}
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap',
+                      color: l.tipo === 'RECEBER' ? C.credit : C.debit }}>
+                      {fmtBRLFull(l.valor)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </div>
     </PageWrapper>
   )
 }

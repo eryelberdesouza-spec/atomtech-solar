@@ -399,6 +399,23 @@ const dashboardRouter = router({
 
     const saldoTotal = contasResume.reduce((sum: number, c: any) => sum + c.saldo, 0)
 
+    // Últimos 10 títulos criados (qualquer status)
+    const recentes = await ctx.db
+      .select({
+        tituloId:   finTitulo.id,
+        tipo:       finTitulo.tipo,
+        descricao:  finTitulo.descricao,
+        emissao:    finTitulo.emissao,
+        valor:      finTitulo.valorOriginal,
+        pessoaNome: finPessoa.nome,
+        createdAt:  finTitulo.createdAt,
+      })
+      .from(finTitulo)
+      .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+      .where(and(eq(finTitulo.empresaId, empId), eq(finTitulo.ativo, true)))
+      .orderBy(desc(finTitulo.createdAt))
+      .limit(10)
+
     return {
       saldoTotal,
       aReceber,
@@ -407,6 +424,14 @@ const dashboardRouter = router({
       vencendoHoje,
       vencidos,
       contasResume,
+      lancamentosRecentes: recentes.map(r => ({
+        tituloId:   r.tituloId,
+        tipo:       r.tipo,
+        descricao:  r.descricao,
+        emissao:    String(r.emissao).slice(0, 10),
+        valor:      Number(r.valor),
+        pessoaNome: r.pessoaNome ?? null,
+      })),
     }
   }),
 })
