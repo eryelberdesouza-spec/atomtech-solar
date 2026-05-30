@@ -252,9 +252,31 @@ const pessoaRouter = router({
       tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Nota: NÃO usar spread ...input com Drizzle+MySQL — booleanos devem ser
+      // convertidos explicitamente para 0/1, senão o INSERT falha silenciosamente
       const [res] = await ctx.db.insert(finPessoa).values({
-        empresaId: ctx.usuario.empresaId, ...input,
-        email: input.email || null,
+        empresaId:    ctx.usuario.empresaId,
+        tipoPessoa:   input.tipoPessoa,
+        nome:         input.nome,
+        fantasia:     input.fantasia ?? null,
+        cpfCnpj:      input.cpfCnpj ?? null,
+        email:        input.email || null,
+        telefone:     input.telefone ?? null,
+        isCliente:    input.isCliente ? 1 : 0,
+        isFornecedor: input.isFornecedor ? 1 : 0,
+        cep:          input.cep ?? null,
+        logradouro:   input.logradouro ?? null,
+        numero:       input.numero ?? null,
+        complemento:  input.complemento ?? null,
+        bairro:       input.bairro ?? null,
+        cidade:       input.cidade ?? null,
+        estado:       input.estado ?? null,
+        regime:       input.regime ?? null,
+        observacoes:  input.observacoes ?? null,
+        banco:        input.banco ?? null,
+        tipoPix:      input.tipoPix ?? null,
+        chavePix:     input.chavePix ?? null,
+        tipoPagamento:input.tipoPagamento ?? null,
       })
       const id = (res as any).insertId as number
       return { ok: true, id }
@@ -286,11 +308,34 @@ const pessoaRouter = router({
       tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input
+      // Nota: NÃO usar spread com Drizzle+MySQL para booleanos
       await ctx.db
         .update(finPessoa)
-        .set({ ...data, email: data.email || null, updatedAt: new Date() })
-        .where(and(eq(finPessoa.id, id), eq(finPessoa.empresaId, ctx.usuario.empresaId)))
+        .set({
+          tipoPessoa:   input.tipoPessoa,
+          nome:         input.nome,
+          fantasia:     input.fantasia ?? null,
+          cpfCnpj:      input.cpfCnpj ?? null,
+          email:        input.email || null,
+          telefone:     input.telefone ?? null,
+          isCliente:    input.isCliente ? 1 : 0,
+          isFornecedor: input.isFornecedor ? 1 : 0,
+          cep:          input.cep ?? null,
+          logradouro:   input.logradouro ?? null,
+          numero:       input.numero ?? null,
+          complemento:  input.complemento ?? null,
+          bairro:       input.bairro ?? null,
+          cidade:       input.cidade ?? null,
+          estado:       input.estado ?? null,
+          regime:       input.regime ?? null,
+          observacoes:  input.observacoes ?? null,
+          banco:        input.banco ?? null,
+          tipoPix:      input.tipoPix ?? null,
+          chavePix:     input.chavePix ?? null,
+          tipoPagamento:input.tipoPagamento ?? null,
+          updatedAt:    new Date(),
+        })
+        .where(and(eq(finPessoa.id, input.id), eq(finPessoa.empresaId, ctx.usuario.empresaId)))
       return { ok: true }
     }),
 
