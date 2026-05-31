@@ -5,7 +5,7 @@
 
 import { router } from './trpc'
 import { z } from 'zod'
-import { eq, and, like, or, asc, desc, sql, isNull, gte, lte } from 'drizzle-orm'
+import { eq, and, like, or, asc, desc, sql, isNull, gte, lte, lt, ne } from 'drizzle-orm'
 import { protectedProcedure } from './trpc'
 import { TRPCError } from '@trpc/server'
 import { createHash } from 'crypto'
@@ -1449,6 +1449,429 @@ const dreRouter = router({
     }),
 })
 
+// ─── GRÁFICOS ────────────────────────────────────────────────────────────────
+
+const graficosRouter = router({
+  // G1 + G2 — Evolução mensal (receitas, despesas, resultado, saldo acumulado)
+  evolucao: protectedProcedure
+    .input(z.object({ meses: z.number().min(3).max(24).default(12) }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const dataIni = new Date()
+      dataIni.setMonth(dataIni.getMonth() - input.meses + 1)
+      dataIni.setDate(1)
+      const iniStr = dataIni.toISOString().slice(0, 10)
+
+      // Parcelas pagas no período: receitas e despesas por mês
+      const rows = await ctx.db
+        .select({
+          mes:       sql<string>`DATE_FORMAT(${finParcela.dataPagamento}, '%Y-%m')`,
+          tipo:      finTitulo.tipo,
+          total:     sql<string>`SUM(${finParcela.valorPago})`,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.status, 'PAGA'),
+          gte(finParcela.dataPagamento, iniStr as any),
+        ))
+        .groupBy(sql`DATE_FORMAT(${finParcela.dataPagamento}, '%Y-%m')`, finTitulo.tipo)
+        .orderBy(sql`DATE_FORMAT(${finParcela.dataPagamento}, '%Y-%m')`)
+
+      // Monta mapa por mês
+      const map: Record<string, { mes: string; receitas: number; despesas: number }> = {}
+      for (const r of rows) {
+        const k = r.mes
+        if (!map[k]) map[k] = { mes: k, receitas: 0, despesas: 0 }
+        if (r.tipo === 'RECEBER') map[k].receitas += Number(r.total ?? 0)
+        if (r.tipo === 'PAGAR')   map[k].despesas += Number(r.total ?? 0)
+      }
+
+      // Saldo inicial das contas
+      const contas = await ctx.db
+        .select({ saldoInicial: finContaBancaria.saldoInicial })
+        .from(finContaBancaria)
+        .where(and(eq(finContaBancaria.empresaId, empId), eq(finContaBancaria.ativo, true)))
+      const saldoBase = contas.reduce((s, c) => s + Number(c.saldoInicial ?? 0), 0)
+
+      const evolucao = Object.values(map).sort((a, b) => a.mes.localeCompare(b.mes))
+      let saldoAcumulado = saldoBase
+      // Subtrai os movimentos antes do período para partir do saldo real
+      const anterior = await ctx.db
+        .select({ tipo: finTitulo.tipo, total: sql<string>`SUM(${finParcela.valorPago})` })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.status, 'PAGA'),
+          lt(finParcela.dataPagamento, iniStr as any),
+        ))
+        .groupBy(finTitulo.tipo)
+      for (const a of anterior) {
+        if (a.tipo === 'RECEBER') saldoAcumulado += Number(a.total ?? 0)
+        if (a.tipo === 'PAGAR')   saldoAcumulado -= Number(a.total ?? 0)
+      }
+
+      return evolucao.map(e => {
+        saldoAcumulado += e.receitas - e.despesas
+        return { ...e, resultado: e.receitas - e.despesas, saldo: saldoAcumulado }
+      })
+    }),
+
+  // G3 — Distribuição de despesas por Plano de Contas
+  distribuicaoDespesas: protectedProcedure
+    .input(z.object({ dataIni: z.string().nullish(), dataFim: z.string().nullish() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const hoje = new Date().toISOString().slice(0, 10)
+      const ini = input.dataIni ?? new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10)
+      const fim = input.dataFim ?? hoje
+
+      const rows = await ctx.db
+        .select({
+          planoId:   finTitulo.planoContasId,
+          planoNome: finPlanoContas.nome,
+          total:     sql<string>`SUM(${finParcela.valorPago})`,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPlanoContas, eq(finTitulo.planoContasId, finPlanoContas.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finTitulo.tipo, 'PAGAR'),
+          eq(finParcela.status, 'PAGA'),
+          gte(finParcela.dataPagamento, ini as any),
+          lte(finParcela.dataPagamento, fim as any),
+        ))
+        .groupBy(finTitulo.planoContasId, finPlanoContas.nome)
+        .orderBy(desc(sql`SUM(${finParcela.valorPago})`))
+        .limit(10)
+
+      return rows.map(r => ({
+        nome:  r.planoNome ?? 'Sem categoria',
+        total: Number(r.total ?? 0),
+      }))
+    }),
+
+  // G4 — Status das contas (pago / em aberto / vencido)
+  statusContas: protectedProcedure
+    .input(z.object({ tipo: z.enum(['PAGAR', 'RECEBER', 'AMBOS']).default('AMBOS') }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const hoje = new Date().toISOString().slice(0, 10)
+
+      const conds: any[] = [eq(finTitulo.empresaId, empId), eq(finTitulo.ativo, true), ne(finParcela.status, 'CANCELADA')]
+      if (input.tipo !== 'AMBOS') conds.push(eq(finTitulo.tipo, input.tipo))
+
+      const rows = await ctx.db
+        .select({ status: finParcela.status, vencimento: finParcela.vencimento, valor: finParcela.valor, valorPago: finParcela.valorPago })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(and(...conds))
+
+      let pago = 0, aberto = 0, vencido = 0
+      for (const r of rows) {
+        const v = String(r.vencimento).slice(0, 10)
+        if (r.status === 'PAGA')      pago    += Number(r.valorPago ?? r.valor)
+        else if (v >= hoje)           aberto  += Number(r.valor)
+        else                          vencido += Number(r.valor)
+      }
+      return [
+        { name: 'Pago',     value: pago,    fill: '#10B981' },
+        { name: 'Em Aberto',value: aberto,  fill: '#60A5FA' },
+        { name: 'Vencido',  value: vencido, fill: '#F87171' },
+      ]
+    }),
+})
+
+// ─── RELATÓRIOS ───────────────────────────────────────────────────────────────
+
+const relatoriosRouter = router({
+  // Aging — contas em faixas de vencimento
+  aging: protectedProcedure
+    .input(z.object({
+      tipo:    z.enum(['PAGAR', 'RECEBER', 'AMBOS']).default('AMBOS'),
+      dataBase: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const hoje = input.dataBase ?? new Date().toISOString().slice(0, 10)
+
+      const conds: any[] = [eq(finTitulo.empresaId, empId), eq(finTitulo.ativo, true), eq(finParcela.status, 'ABERTA')]
+      if (input.tipo !== 'AMBOS') conds.push(eq(finTitulo.tipo, input.tipo))
+
+      const rows = await ctx.db
+        .select({
+          parcelaId:  finParcela.id,
+          vencimento: finParcela.vencimento,
+          valor:      finParcela.valor,
+          tipo:       finTitulo.tipo,
+          descricao:  finTitulo.descricao,
+          pessoaNome: finPessoa.nome,
+          tituloId:   finTitulo.id,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(...conds))
+        .orderBy(asc(finParcela.vencimento))
+
+      const faixas = { a30: 0, a60: 0, a90: 0, acima90: 0, aVencer: 0 }
+      const detalhes = rows.map(r => {
+        const venc = String(r.vencimento).slice(0, 10)
+        const diff = Math.floor((new Date(hoje).getTime() - new Date(venc).getTime()) / 86400000)
+        let faixa: string
+        if (diff < 0)       { faixa = 'A Vencer';   faixas.aVencer  += Number(r.valor) }
+        else if (diff <= 30){ faixa = '0–30 dias';   faixas.a30      += Number(r.valor) }
+        else if (diff <= 60){ faixa = '31–60 dias';  faixas.a60      += Number(r.valor) }
+        else if (diff <= 90){ faixa = '61–90 dias';  faixas.a90      += Number(r.valor) }
+        else                { faixa = '+90 dias';    faixas.acima90  += Number(r.valor) }
+        return {
+          parcelaId:  r.parcelaId,
+          tituloId:   r.tituloId,
+          descricao:  r.descricao,
+          pessoaNome: r.pessoaNome,
+          vencimento: venc,
+          valor:      Number(r.valor),
+          diasAtraso: diff,
+          faixa,
+          tipo:       r.tipo,
+        }
+      })
+      return { faixas, detalhes }
+    }),
+
+  // Extrato bancário por conta
+  extratoBancario: protectedProcedure
+    .input(z.object({
+      contaId: z.number().optional(),
+      dataIni: z.string(),
+      dataFim: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // Contas disponíveis
+      const contas = await ctx.db.select().from(finContaBancaria)
+        .where(and(eq(finContaBancaria.empresaId, empId), eq(finContaBancaria.ativo, true)))
+        .orderBy(asc(finContaBancaria.nome))
+
+      const contaAlvo = input.contaId ?? contas[0]?.id
+      if (!contaAlvo) return { conta: null, movimentos: [], saldoInicial: 0, saldoFinal: 0, totalEntradas: 0, totalSaidas: 0 }
+
+      const conta = contas.find(c => c.id === contaAlvo)
+
+      // Movimentos: parcelas pagas nesta conta
+      const parcelas = await ctx.db
+        .select({
+          data:       finParcela.dataPagamento,
+          descricao:  finTitulo.descricao,
+          tipo:       finTitulo.tipo,
+          valor:      finParcela.valorPago,
+          forma:      finParcela.formaPagamento,
+          pessoaNome: finPessoa.nome,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.contaId, contaAlvo),
+          eq(finParcela.status, 'PAGA'),
+          gte(finParcela.dataPagamento, input.dataIni as any),
+          lte(finParcela.dataPagamento, input.dataFim as any),
+        ))
+        .orderBy(asc(finParcela.dataPagamento))
+
+      // Transferências envolvendo esta conta no período
+      const transfs = await ctx.db
+        .select({
+          data:          finTransferencia.data,
+          descricao:     finTransferencia.descricao,
+          valor:         finTransferencia.valor,
+          contaOrigemId: finTransferencia.contaOrigemId,
+        })
+        .from(finTransferencia)
+        .where(and(
+          eq(finTransferencia.empresaId, empId),
+          or(eq(finTransferencia.contaOrigemId, contaAlvo), eq(finTransferencia.contaDestinoId, contaAlvo)),
+          gte(finTransferencia.data, input.dataIni as any),
+          lte(finTransferencia.data, input.dataFim as any),
+        ))
+        .orderBy(asc(finTransferencia.data))
+
+      const movimentos: any[] = [
+        ...parcelas.map(p => ({
+          data:      String(p.data).slice(0, 10),
+          descricao: p.descricao,
+          pessoaNome: p.pessoaNome,
+          forma:     p.forma,
+          entrada:   p.tipo === 'RECEBER' ? Number(p.valor) : 0,
+          saida:     p.tipo === 'PAGAR'   ? Number(p.valor) : 0,
+          origem:    'lancamento',
+        })),
+        ...transfs.map(t => ({
+          data:      String(t.data).slice(0, 10),
+          descricao: t.descricao ?? 'Transferência interna',
+          pessoaNome: null,
+          forma:     'transferencia',
+          entrada:   t.contaOrigemId !== contaAlvo ? Number(t.valor) : 0,
+          saida:     t.contaOrigemId === contaAlvo ? Number(t.valor) : 0,
+          origem:    'transferencia',
+        })),
+      ].sort((a, b) => a.data.localeCompare(b.data))
+
+      const totalEntradas = movimentos.reduce((s, m) => s + m.entrada, 0)
+      const totalSaidas   = movimentos.reduce((s, m) => s + m.saida,   0)
+
+      return {
+        conta:         { id: conta?.id, nome: conta?.nome, tipo: conta?.tipo },
+        movimentos,
+        saldoInicial:  Number(conta?.saldoInicial ?? 0),
+        saldoFinal:    Number(conta?.saldoInicial ?? 0) + totalEntradas - totalSaidas,
+        totalEntradas,
+        totalSaidas,
+        contas: contas.map(c => ({ id: c.id, nome: c.nome })),
+      }
+    }),
+
+  // Por centro de custo
+  porCentroCusto: protectedProcedure
+    .input(z.object({ dataIni: z.string(), dataFim: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const rows = await ctx.db
+        .select({
+          centroId:   finTitulo.centroCustoId,
+          centroNome: finCentroCusto.nome,
+          centroCod:  finCentroCusto.codigo,
+          tipo:       finTitulo.tipo,
+          total:      sql<string>`SUM(${finParcela.valorPago})`,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finCentroCusto, eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finParcela.status, 'PAGA'),
+          gte(finParcela.dataPagamento, input.dataIni as any),
+          lte(finParcela.dataPagamento, input.dataFim as any),
+        ))
+        .groupBy(finTitulo.centroCustoId, finCentroCusto.nome, finCentroCusto.codigo, finTitulo.tipo)
+        .orderBy(asc(finCentroCusto.codigo))
+
+      const map: Record<string, any> = {}
+      for (const r of rows) {
+        const k = String(r.centroId ?? 'sem')
+        if (!map[k]) map[k] = { centroId: r.centroId, nome: r.centroNome ?? 'Sem centro', codigo: r.centroCod ?? '—', receitas: 0, despesas: 0 }
+        if (r.tipo === 'RECEBER') map[k].receitas += Number(r.total ?? 0)
+        if (r.tipo === 'PAGAR')   map[k].despesas += Number(r.total ?? 0)
+      }
+      return Object.values(map).map(c => ({ ...c, resultado: c.receitas - c.despesas }))
+    }),
+
+  // Por fornecedor / cliente
+  porPessoa: protectedProcedure
+    .input(z.object({
+      tipo:    z.enum(['PAGAR', 'RECEBER', 'AMBOS']).default('AMBOS'),
+      dataIni: z.string(),
+      dataFim: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const conds: any[] = [eq(finTitulo.empresaId, empId), eq(finParcela.status, 'PAGA'),
+        gte(finParcela.dataPagamento, input.dataIni as any),
+        lte(finParcela.dataPagamento, input.dataFim as any)]
+      if (input.tipo !== 'AMBOS') conds.push(eq(finTitulo.tipo, input.tipo))
+
+      const rows = await ctx.db
+        .select({
+          pessoaId:   finTitulo.pessoaId,
+          pessoaNome: finPessoa.nome,
+          tipo:       finTitulo.tipo,
+          qtd:        sql<string>`COUNT(DISTINCT ${finTitulo.id})`,
+          total:      sql<string>`SUM(${finParcela.valorPago})`,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(...conds))
+        .groupBy(finTitulo.pessoaId, finPessoa.nome, finTitulo.tipo)
+        .orderBy(desc(sql`SUM(${finParcela.valorPago})`))
+
+      const map: Record<string, any> = {}
+      for (const r of rows) {
+        const k = String(r.pessoaId ?? 'sem')
+        if (!map[k]) map[k] = { pessoaId: r.pessoaId, nome: r.pessoaNome ?? 'Sem vínculo', recebido: 0, pago: 0, qtdTitulos: 0 }
+        map[k].qtdTitulos += Number(r.qtd ?? 0)
+        if (r.tipo === 'RECEBER') map[k].recebido += Number(r.total ?? 0)
+        if (r.tipo === 'PAGAR')   map[k].pago     += Number(r.total ?? 0)
+      }
+      return Object.values(map).sort((a, b) => (b.recebido + b.pago) - (a.recebido + a.pago))
+    }),
+
+  // Inadimplência — parcelas vencidas em aberto
+  inadimplencia: protectedProcedure
+    .input(z.object({
+      tipo:      z.enum(['PAGAR', 'RECEBER', 'AMBOS']).default('RECEBER'),
+      diasMin:   z.number().min(1).default(1),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const hoje = new Date().toISOString().slice(0, 10)
+      const limiteDias = new Date()
+      limiteDias.setDate(limiteDias.getDate() - input.diasMin)
+      const limiteStr = limiteDias.toISOString().slice(0, 10)
+
+      const conds: any[] = [
+        eq(finTitulo.empresaId, empId),
+        eq(finTitulo.ativo, true),
+        eq(finParcela.status, 'ABERTA'),
+        lte(finParcela.vencimento, limiteStr as any),
+      ]
+      if (input.tipo !== 'AMBOS') conds.push(eq(finTitulo.tipo, input.tipo))
+
+      const rows = await ctx.db
+        .select({
+          parcelaId:  finParcela.id,
+          tituloId:   finTitulo.id,
+          tipo:       finTitulo.tipo,
+          descricao:  finTitulo.descricao,
+          vencimento: finParcela.vencimento,
+          valor:      finParcela.valor,
+          pessoaNome: finPessoa.nome,
+          pessoaId:   finTitulo.pessoaId,
+        })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(...conds))
+        .orderBy(asc(finParcela.vencimento))
+
+      const porPessoa: Record<string, any> = {}
+      const detalhes = rows.map(r => {
+        const venc = String(r.vencimento).slice(0, 10)
+        const dias = Math.floor((new Date(hoje).getTime() - new Date(venc).getTime()) / 86400000)
+        const k = String(r.pessoaId ?? 'sem')
+        if (!porPessoa[k]) porPessoa[k] = { pessoaId: r.pessoaId, nome: r.pessoaNome ?? 'Sem vínculo', total: 0, qtd: 0 }
+        porPessoa[k].total += Number(r.valor)
+        porPessoa[k].qtd++
+        return { parcelaId: r.parcelaId, tituloId: r.tituloId, descricao: r.descricao,
+          pessoaNome: r.pessoaNome, vencimento: venc, valor: Number(r.valor), diasAtraso: dias, tipo: r.tipo }
+      })
+
+      const totalVencido = detalhes.reduce((s, d) => s + d.valor, 0)
+      return {
+        totalVencido,
+        qtdParcelas: detalhes.length,
+        porPessoa: Object.values(porPessoa).sort((a, b) => b.total - a.total),
+        detalhes,
+      }
+    }),
+})
+
 // ─── EXTRATO IMPORT (atômico: pessoa + título + parcela + baixa) ──────────────
 // Resolve o problema de race condition do frontend: em vez de duas chamadas
 // separadas (criar pessoa, depois criar título), tudo ocorre em uma única
@@ -1569,4 +1992,6 @@ export const finRouter = router({
   dre:           dreRouter,
   proposta:      propostaFinRouter,
   extrato:       extratoRouter,
+  graficos:      graficosRouter,
+  relatorios:    relatoriosRouter,
 })
