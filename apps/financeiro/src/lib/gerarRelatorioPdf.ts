@@ -12,8 +12,19 @@ function fmtData(iso: string) {
 }
 
 const BASE_STYLE = `
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #1a1a2e; background: #fff; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px; color: #1a1a2e; background: #fff;
+    padding: 20px 24px;
+  }
+  @media print {
+    body { padding: 0; }
+  }
   h1 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
   h2 { font-size: 13px; font-weight: 700; margin: 16px 0 8px; color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 4px; }
   h3 { font-size: 11px; font-weight: 700; margin: 10px 0 6px; color: #374151; }
@@ -45,7 +56,7 @@ const BASE_STYLE = `
   .faixa-value { font-size: 13px; font-weight: 800; color: #1F2937; }
   .faixa-red .faixa-value { color: #DC2626; } .faixa-red .faixa-label { color: #991B1B; }
   .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #E5E7EB; font-size: 9px; color: #9CA3AF; text-align: center; }
-  @media print { body { padding: 0; } .no-print { display: none !important; } }
+  @media print { .no-print { display: none !important; } }
 `
 
 function cabecalho(titulo: string, sub: string, empresa: any) {
