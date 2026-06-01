@@ -392,12 +392,50 @@ const dashboardRouter = router({
     const vencendoHoje = parcelas.filter((p: any) => p.vencimento === hoje).length
     const vencidos = parcelas.filter((p: any) => p.vencimento < hoje).length
 
-    const contasResume = contas.map((c: any) => ({
-      id: c.id, nome: c.nome, tipo: c.tipo,
-      saldo: Number(c.saldoInicial ?? 0),
-    }))
+    // Soma todos os recebimentos e pagamentos já liquidados (acumulado total)
+    const movimentos = await ctx.db
+      .select({
+        tipo:  finTitulo.tipo,
+        total: sql<string>`SUM(${finParcela.valorPago})`,
+      })
+      .from(finParcela)
+      .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+      .where(and(
+        eq(finTitulo.empresaId, empId),
+        eq(finParcela.status, 'PAGA'),
+        eq(finTitulo.ativo, true),
+      ))
+      .groupBy(finTitulo.tipo)
 
-    const saldoTotal = contasResume.reduce((sum: number, c: any) => sum + c.saldo, 0)
+    const totalRecebido = movimentos.find((m: any) => m.tipo === 'RECEBER') ?? { total: '0' }
+    const totalPago     = movimentos.find((m: any) => m.tipo === 'PAGAR')   ?? { total: '0' }
+
+    // Saldo real = saldoInicial de todas as contas + recebimentos liquidados - pagamentos liquidados
+    const saldoBase = contas.reduce((sum: number, c: any) => sum + Number(c.saldoInicial ?? 0), 0)
+    const saldoTotal = saldoBase + Number(totalRecebido.total) - Number(totalPago.total)
+
+    // Saldo real por conta = saldoInicial + recebimentos nesta conta - pagamentos nesta conta
+    const movPorConta = await ctx.db
+      .select({
+        contaId: finParcela.contaId,
+        tipo:    finTitulo.tipo,
+        total:   sql<string>`SUM(${finParcela.valorPago})`,
+      })
+      .from(finParcela)
+      .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+      .where(and(eq(finTitulo.empresaId, empId), eq(finParcela.status, 'PAGA'), eq(finTitulo.ativo, true)))
+      .groupBy(finParcela.contaId, finTitulo.tipo)
+
+    const contasResume = contas.map((c: any) => {
+      const rec  = movPorConta.find((m: any) => m.contaId === c.id && m.tipo === 'RECEBER')
+      const pag  = movPorConta.find((m: any) => m.contaId === c.id && m.tipo === 'PAGAR')
+      return {
+        id:    c.id,
+        nome:  c.nome,
+        tipo:  c.tipo,
+        saldo: Number(c.saldoInicial ?? 0) + Number(rec?.total ?? 0) - Number(pag?.total ?? 0),
+      }
+    })
 
     // Últimos 10 títulos criados (qualquer status)
     const recentes = await ctx.db
