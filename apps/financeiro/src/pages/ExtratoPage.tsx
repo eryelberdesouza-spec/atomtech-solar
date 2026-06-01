@@ -50,6 +50,15 @@ function detectarFormaPag(desc: string): string {
   return 'pix'
 }
 
+// ─── Fingerprint determinístico para deduplicação cross-device ───────────────
+// Gerado a partir dos dados da transação — mesmo PDF em qualquer computador
+// produz o mesmo fingerprint. Persistido no banco para evitar duplicidade.
+function gerarFingerprint(tx: ExtratoTransacao): string {
+  const centavos = Math.round(tx.valor * 100)
+  const desc = tx.descricao.substring(0, 60).replace(/\s+/g, ' ').trim().toUpperCase()
+  return `${tx.banco}|${tx.data}|${centavos}|${desc}`
+}
+
 const FORMAS_PAG = [
   { value: 'pix',      label: '⚡ PIX'              },
   { value: 'ted_doc',  label: '🏦 TED / DOC'        },
@@ -177,9 +186,10 @@ interface ModalImportarProps {
   planos: any[]
   centros: any[]
   pessoas: any[]
+  fingerprint?: string
 }
 
-function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoas }: ModalImportarProps) {
+function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoas, fingerprint }: ModalImportarProps) {
   const [contaId,      setContaId]      = useState('')
   const [planoId,      setPlanoId]      = useState('')
   const [centroId,     setCentroId]     = useState('')
@@ -243,6 +253,7 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
         descricao: descricao.trim() || tx.descricao,
         valor:     tx.valor,
         data:      tx.data,
+        fingerprint: fingerprint ?? gerarFingerprint(tx),
         // Pessoa: existente OU nova (o backend resolve)
         pessoaId:      pessoaId && parseInt(pessoaId) > 0 ? parseInt(pessoaId) : undefined,
         pessoaNova:    pessoaNova ?? undefined,
@@ -469,7 +480,8 @@ export function ExtratoPage() {
   const [filtro,     setFiltro]     = useState<'TODOS' | 'C' | 'D'>('TODOS')
   const [busca,      setBusca]      = useState('')
   const [txModal,    setTxModal]    = useState<ExtratoTransacao | null>(null)
-  const [importados, setImportados] = useState<Set<number>>(new Set())
+  const [txModalFp,  setTxModalFp]  = useState<string>('')
+  const [importados, setImportados] = useState<Set<string>>(new Set())  // fingerprints
   const [restorado,  setRestorado]  = useState(false)  // veio do localStorage
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -477,33 +489,39 @@ export function ExtratoPage() {
   const planoQ   = (trpc as any).fin.planoContas.list.useQuery()
   const centroQ  = (trpc as any).fin.centroCusto.list.useQuery()
   const pessoaQ  = (trpc as any).fin.pessoa.list.useQuery()
+  const utils    = (trpc as any).useUtils()
 
   const contas   = contasQ.data  ?? []
   const planos   = planoQ.data   ?? []
   const centros  = centroQ.data  ?? []
   const pessoas  = pessoaQ.data  ?? []
 
-  // ── Restaurar extrato do localStorage ao carregar ──────────────────────────
+  // ── Restaurar extrato do localStorage e verificar importados no banco ───────
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const { banco: b, resultado: r, timestamp } = JSON.parse(saved)
-        if (Date.now() - timestamp < MAX_AGE_MS) {
-          setBanco(b)
-          setResultado(r)
-          setRestorado(true)
-        } else {
-          localStorage.removeItem(STORAGE_KEY)
-          localStorage.removeItem(STORAGE_IMP)
+    async function restaurar() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) {
+          const { banco: b, resultado: r, timestamp } = JSON.parse(saved)
+          if (Date.now() - timestamp < MAX_AGE_MS) {
+            setBanco(b)
+            setResultado(r)
+            setRestorado(true)
+            // Consulta o banco para saber quais já foram importados (cross-device)
+            const fps = (r as ParseResult).transacoes.map(gerarFingerprint)
+            const res = await utils.fin.extrato.verificarImportados.fetch({ fingerprints: fps })
+            if (res?.importados?.length) {
+              setImportados(new Set(res.importados))
+            }
+          } else {
+            localStorage.removeItem(STORAGE_KEY)
+            localStorage.removeItem(STORAGE_IMP)
+          }
         }
-      }
-      const savedImp = localStorage.getItem(STORAGE_IMP)
-      if (savedImp) {
-        setImportados(new Set(JSON.parse(savedImp)))
-      }
-    } catch { /* ignora erro de parse */ }
-  }, [])
+      } catch { /* ignora erro de parse */ }
+    }
+    restaurar()
+  }, [])  // eslint-disable-line
 
   // ── Salvar extrato no localStorage quando muda ─────────────────────────────
   useEffect(() => {
@@ -511,13 +529,6 @@ export function ExtratoPage() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ banco, resultado, timestamp: Date.now() }))
     }
   }, [resultado, banco])
-
-  // ── Salvar importados quando muda ─────────────────────────────────────────
-  useEffect(() => {
-    if (importados.size > 0) {
-      localStorage.setItem(STORAGE_IMP, JSON.stringify([...importados]))
-    }
-  }, [importados])
 
   const limparExtrato = () => {
     localStorage.removeItem(STORAGE_KEY)
@@ -546,6 +557,15 @@ export function ExtratoPage() {
       const data = await resp.json()
       if (!data.ok) throw new Error(data.error || 'Erro ao processar PDF')
       setResultado(data)
+      // Consulta o banco: quais transações deste extrato já foram importadas?
+      // Funciona mesmo em outro computador — a fonte de verdade é o banco.
+      try {
+        const fps = (data as ParseResult).transacoes.map(gerarFingerprint)
+        const res = await utils.fin.extrato.verificarImportados.fetch({ fingerprints: fps })
+        if (res?.importados?.length) {
+          setImportados(new Set(res.importados))
+        }
+      } catch { /* não bloqueia o fluxo principal */ }
     } catch (e: any) {
       setErro(e.message || 'Erro ao processar PDF')
     } finally {
@@ -744,9 +764,10 @@ export function ExtratoPage() {
 
             <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
               {txs.map((tx) => {
-                const idx = resultado.transacoes.indexOf(tx)
-                const importado = importados.has(idx)
+                const fp = gerarFingerprint(tx)
+                const importado = importados.has(fp)
                 const cor = tx.tipo === 'C' ? C.credit : C.debit
+                const idx = resultado.transacoes.indexOf(tx)
                 return (
                   <div key={idx} style={{
                     display: 'grid', gridTemplateColumns: '96px 1fr 90px 130px 112px',
@@ -777,7 +798,7 @@ export function ExtratoPage() {
                         <span style={{ fontSize: 11, color: C.emerald, fontWeight: 600 }}>✓ Importado</span>
                       ) : (
                         <button
-                          onClick={() => setTxModal(tx)}
+                          onClick={() => { setTxModal(tx); setTxModalFp(fp) }}
                           style={{
                             padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
                             border: `1px solid ${C.border}`, background: C.bgHover,
@@ -808,13 +829,12 @@ export function ExtratoPage() {
       {/* ── Modal Importar ───────────────────────────────────────────── */}
       <ModalImportar
         tx={txModal}
+        fingerprint={txModalFp}
         contas={contas} planos={planos} centros={centros} pessoas={pessoas}
         onClose={() => setTxModal(null)}
         onSuccess={() => {
-          if (txModal && resultado) {
-            const idx = resultado.transacoes.indexOf(txModal)
-            setImportados(prev => new Set([...prev, idx]))
-          }
+          // Marca como importado usando o fingerprint (persiste cross-device via banco)
+          if (txModalFp) setImportados(prev => new Set([...prev, txModalFp]))
           setTxModal(null)
         }}
       />

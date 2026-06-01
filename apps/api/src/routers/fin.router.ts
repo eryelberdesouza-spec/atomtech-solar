@@ -5,7 +5,7 @@
 
 import { router } from './trpc'
 import { z } from 'zod'
-import { eq, and, like, or, asc, desc, sql, isNull, gte, lte, lt, ne } from 'drizzle-orm'
+import { eq, and, like, or, asc, desc, sql, isNull, gte, lte, lt, ne, inArray } from 'drizzle-orm'
 import { protectedProcedure } from './trpc'
 import { TRPCError } from '@trpc/server'
 import { createHash } from 'crypto'
@@ -1916,6 +1916,25 @@ const relatoriosRouter = router({
 // transação no servidor — eliminando dependência de estado React entre chamadas.
 
 const extratoRouter = router({
+  // ── Verifica quais fingerprints já foram importados (cross-device) ──────────
+  verificarImportados: protectedProcedure
+    .input(z.object({ fingerprints: z.array(z.string()) }))
+    .query(async ({ ctx, input }) => {
+      if (input.fingerprints.length === 0) return { importados: [] }
+      // Busca parcelas cujo título pertence à empresa e tem fingerprint na lista
+      const rows = await ctx.db
+        .select({ fp: finParcela.extratoFingerprint })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(
+          and(
+            eq(finTitulo.empresaId, ctx.usuario.empresaId),
+            inArray(finParcela.extratoFingerprint, input.fingerprints)
+          )
+        )
+      return { importados: rows.map(r => r.fp).filter(Boolean) as string[] }
+    }),
+
   importar: protectedProcedure
     .input(z.object({
       // Transação do extrato
@@ -1923,6 +1942,7 @@ const extratoRouter = router({
       descricao:  z.string().min(1),
       valor:      z.number().positive(),
       data:       z.string(),   // YYYY-MM-DD (emissão + vencimento)
+      fingerprint: z.string().optional(),  // deduplicação cross-device
       // Pessoa — ou id de existente, ou dados de nova (mutuamente exclusivo)
       pessoaId:       z.number().positive().nullish(),
       pessoaNova: z.object({
@@ -1986,13 +2006,14 @@ const extratoRouter = router({
       const tituloId = (resTitulo as any).insertId as number
       if (!tituloId) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Erro ao criar lançamento' })
 
-      // 3. Criar parcela
+      // 3. Criar parcela (com fingerprint para deduplicação cross-device)
       const [resParcela] = await ctx.db.insert(finParcela).values({
         tituloId,
-        numero:     1,
-        valor:      input.valor.toFixed(2),
-        vencimento: input.data as any,
-        status:     'ABERTA',
+        numero:             1,
+        valor:              input.valor.toFixed(2),
+        vencimento:         input.data as any,
+        status:             'ABERTA',
+        extratoFingerprint: input.fingerprint ?? null,
       })
       const parcelaId = (resParcela as any).insertId as number
 

@@ -125,12 +125,14 @@ export const finParcela = mysqlTable('fin_parcela', {
   juros:          decimal('juros', { precision: 12, scale: 2 }).default('0'),
   multa:          decimal('multa', { precision: 12, scale: 2 }).default('0'),
   desconto:       decimal('desconto', { precision: 12, scale: 2 }).default('0'),
-  formaPagamento: varchar('forma_pagamento', { length: 50 }),
-  createdAt:      timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  formaPagamento:      varchar('forma_pagamento', { length: 50 }),
+  extratoFingerprint:  varchar('extrato_fingerprint', { length: 220 }),  // deduplicação cross-device
+  createdAt:           timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (t) => ({
-  idxTitulo:     index('idx_fin_parcela_titulo').on(t.tituloId),
-  idxVencimento: index('idx_fin_parcela_venc').on(t.vencimento),
-  idxStatus:     index('idx_fin_parcela_status').on(t.status),
+  idxTitulo:           index('idx_fin_parcela_titulo').on(t.tituloId),
+  idxVencimento:       index('idx_fin_parcela_venc').on(t.vencimento),
+  idxStatus:           index('idx_fin_parcela_status').on(t.status),
+  idxFingerprint:      index('idx_fin_parcela_fingerprint').on(t.extratoFingerprint),
 }))
 
 // ─── TRANSFERÊNCIA ────────────────────────────────────────────────────────────

@@ -14,17 +14,25 @@ const NAV = [
   { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#6B9E87', desc: 'Contas, Plano, Custos' },
 ]
 
-// Ícone próprio AtomFin — gráfico de barras ascendente com cifrão
-const IconAtomFin = ({ size = 22, color = '#022C22' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Barras de gráfico */}
-    <rect x="2" y="14" width="4" height="7" rx="1" fill={color} opacity="0.85"/>
-    <rect x="8" y="9"  width="4" height="12" rx="1" fill={color}/>
-    <rect x="14" y="5" width="4" height="16" rx="1" fill={color} opacity="0.85"/>
-    {/* Linha de tendência */}
-    <path d="M4 13 L10 8 L16 4" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/>
-    {/* Cifra R$ estilizada */}
-    <text x="19" y="8" fontSize="6" fontWeight="800" fill={color} fontFamily="sans-serif">$</text>
+// Logo Atom Tech — sol com raios (identidade SIGECO)
+const IconAtom = ({ size = 36 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="80" fill="#0D1C17"/>
+    <circle cx="256" cy="210" r="80" fill="#F5A623"/>
+    <g stroke="#F5A623" strokeWidth="18" strokeLinecap="round">
+      <line x1="256" y1="90"  x2="256" y2="58"/>
+      <line x1="256" y1="362" x2="256" y2="330"/>
+      <line x1="136" y1="210" x2="104" y2="210"/>
+      <line x1="408" y1="210" x2="376" y2="210"/>
+      <line x1="171" y1="125" x2="149" y2="103"/>
+      <line x1="363" y1="317" x2="341" y2="295"/>
+      <line x1="341" y1="125" x2="363" y2="103"/>
+      <line x1="149" y1="317" x2="171" y2="295"/>
+    </g>
+    <rect x="100" y="355" width="312" height="88" rx="12" fill="#10B981" opacity="0.25"/>
+    <line x1="204" y1="355" x2="204" y2="443" stroke="#10B981" strokeWidth="2" opacity="0.4"/>
+    <line x1="308" y1="355" x2="308" y2="443" stroke="#10B981" strokeWidth="2" opacity="0.4"/>
+    <line x1="100" y1="399" x2="412" y2="399" stroke="#10B981" strokeWidth="2" opacity="0.4"/>
   </svg>
 )
 
@@ -131,19 +139,16 @@ export function Layout() {
           justifyContent: collapsed ? 'center' : 'flex-start',
           gap: 12, minHeight: 70,
         }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-            background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(16,185,129,0.4)',
-          }}><IconAtomFin size={22} color="#022C22" /></div>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconAtom size={38} />
+          </div>
           {!collapsed && (
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
-                <span style={{ color: C.emerald }}>ATOM</span>FIN
+                <span style={{ color: '#F5A623' }}>SIGE</span><span style={{ color: C.emerald }}>CO</span>
               </div>
               <div style={{ fontSize: 9, color: C.emeraldFg, letterSpacing: '0.18em', marginTop: 3, fontWeight: 700 }}>
-                FINANCEIRO
+                GESTÃO
               </div>
             </div>
           )}
@@ -161,7 +166,7 @@ export function Layout() {
             fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
             textAlign: 'center',
           }}>
-            Controle Financeiro
+            SIGECO · Gestão Financeira
           </div>
         )}
 
@@ -292,7 +297,7 @@ export function Layout() {
                 {pageTitle}
               </h1>
               <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>
-                Atom Tech · Controle Financeiro
+                SIGECO · Gestão Financeira
               </div>
             </div>
           </div>
@@ -320,9 +325,9 @@ export function Layout() {
                 el.style.borderColor = C.border
                 el.style.color = C.textMuted
               }}
-              title="Ir para Plataforma de Propostas"
+              title="Ir para SIGECO Propostas"
             >
-              ☀ Propostas
+              ☀ SIGECO Propostas
             </a>
 
             {/* Avatar */}

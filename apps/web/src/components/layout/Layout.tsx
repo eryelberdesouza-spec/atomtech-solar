@@ -4,6 +4,28 @@ import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../ui/NovaPropostaDropdown'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
+// Logo Atom Tech — identidade SIGECO
+const IconAtom = ({ size = 36 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="80" fill="#111D2E"/>
+    <circle cx="256" cy="210" r="80" fill="#F5A623"/>
+    <g stroke="#F5A623" strokeWidth="18" strokeLinecap="round">
+      <line x1="256" y1="90"  x2="256" y2="58"/>
+      <line x1="256" y1="362" x2="256" y2="330"/>
+      <line x1="136" y1="210" x2="104" y2="210"/>
+      <line x1="408" y1="210" x2="376" y2="210"/>
+      <line x1="171" y1="125" x2="149" y2="103"/>
+      <line x1="363" y1="317" x2="341" y2="295"/>
+      <line x1="341" y1="125" x2="363" y2="103"/>
+      <line x1="149" y1="317" x2="171" y2="295"/>
+    </g>
+    <rect x="100" y="355" width="312" height="88" rx="12" fill="#3EBB7A" opacity="0.25"/>
+    <line x1="204" y1="355" x2="204" y2="443" stroke="#3EBB7A" strokeWidth="2" opacity="0.4"/>
+    <line x1="308" y1="355" x2="308" y2="443" stroke="#3EBB7A" strokeWidth="2" opacity="0.4"/>
+    <line x1="100" y1="399" x2="412" y2="399" stroke="#3EBB7A" strokeWidth="2" opacity="0.4"/>
+  </svg>
+)
+
 const IconLogout = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -162,20 +184,16 @@ export function Layout() {
             }} />
           ) : (
             <>
-              <div style={{
-                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                background: 'linear-gradient(135deg, #F5A623 0%, #E8720C 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 17, color: '#fff', fontWeight: 900,
-                boxShadow: '0 4px 16px rgba(245,166,35,0.4)',
-              }}>A</div>
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <IconAtom size={38} />
+              </div>
               {!collapsed && (
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#E2EAF5', lineHeight: 1.1 }}>
-                    <span style={{ color: '#F5A623' }}>ATOM</span>TECH
+                    <span style={{ color: '#F5A623' }}>SIGE</span><span style={{ color: '#3EBB7A' }}>CO</span>
                   </div>
                   <div style={{ fontSize: 9, color: '#3EBB7A', letterSpacing: '0.18em', marginTop: 3, fontWeight: 700 }}>
-                    ENERGIA SOLAR
+                    PROPOSTAS
                   </div>
                 </div>
               )}
@@ -345,7 +363,7 @@ export function Layout() {
               </h1>
               {!isMobile && (
                 <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>
-                  Atom Tech · Sistema de Propostas Fotovoltaicas
+                  SIGECO · Plataforma Comercial
                 </div>
               )}
             </div>
@@ -383,9 +401,9 @@ export function Layout() {
                     el.style.background = 'transparent'
                     el.style.borderColor = '#1E4033'
                   } : undefined}
-                  title={isAdmin ? 'Abrir módulo Financeiro' : 'Acesso restrito a administradores'}
+                  title={isAdmin ? 'Abrir SIGECO Gestão' : 'Acesso restrito a administradores'}
                 >
-                  ◈ Financeiro
+                  ◈ SIGECO Gestão
                   {!isAdmin && <span style={{ fontSize: 9, color: '#4A6080' }}>🔒</span>}
                 </a>
               )
