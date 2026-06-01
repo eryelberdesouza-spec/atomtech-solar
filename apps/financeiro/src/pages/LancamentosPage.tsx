@@ -737,7 +737,13 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
     const aberta  = rows.filter((r: any) => r.statusDisplay === 'ABERTA')
     const vencida = rows.filter((r: any) => r.statusDisplay === 'VENCIDA')
     const paga    = rows.filter((r: any) => r.status === 'PAGA')
+    // Total do período = soma de TODOS os lançamentos no filtro (abertos + vencidos + pagos)
+    const totalPeriodo = rows.reduce((s: number, r: any) => {
+      const v = r.status === 'PAGA' ? Number(r.valorPago ?? r.valor) : Number(r.valor)
+      return s + v
+    }, 0)
     return {
+      totalPeriodo,
       totalAberta:  aberta.reduce( (s: number, r: any) => s + Number(r.valor), 0),
       totalVencida: vencida.reduce((s: number, r: any) => s + Number(r.valor), 0),
       totalPago:    paga.reduce(   (s: number, r: any) => s + Number(r.valorPago ?? r.valor), 0),
@@ -753,20 +759,21 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <KpiCard
-          label={`Total a ${label}`}
-          value={fmtBRLFull(kpis.totalAberta + kpis.totalVencida)}
+          label={`Total no Período`}
+          value={fmtBRLFull(kpis.totalPeriodo)}
           icon={tipo === 'PAGAR' ? '📤' : '📥'}
           color={tipo === 'PAGAR' ? C.debit : C.credit}
+          sub={`${kpis.total} parcela(s)`}
         />
         <KpiCard
-          label="Vencidas"
-          value={fmtBRLFull(kpis.totalVencida)}
-          sub={`${kpis.countVencidas} parcela(s)`}
-          icon="⚠"
-          color={C.warning}
+          label={`Em Aberto`}
+          value={fmtBRLFull(kpis.totalAberta + kpis.totalVencida)}
+          icon="⏳"
+          color={kpis.totalVencida > 0 ? C.warning : C.info}
+          sub={kpis.countVencidas > 0 ? `${kpis.countVencidas} vencida(s)` : 'no prazo'}
         />
         <KpiCard
-          label="Pagas no Período"
+          label={tipo === 'PAGAR' ? 'Já Pago' : 'Já Recebido'}
           value={fmtBRLFull(kpis.totalPago)}
           icon="✓"
           color={C.success}
