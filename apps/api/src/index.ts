@@ -543,6 +543,31 @@ app.get('/reverter-proposta/:id', async (req, res) => {
   }
 })
 
+// ── Migração: adiciona coluna extrato_fingerprint na fin_parcela ─────────────
+app.get('/run-migration-extrato-fingerprint', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    try {
+      await conn.execute('ALTER TABLE fin_parcela ADD COLUMN extrato_fingerprint VARCHAR(220) NULL')
+      await conn.execute('CREATE INDEX idx_fin_parcela_fingerprint ON fin_parcela(extrato_fingerprint)')
+      await conn.end()
+      res.json({ ok: true, message: 'Coluna extrato_fingerprint e índice criados com sucesso' })
+    } catch (e: any) {
+      await conn.end()
+      if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column')) {
+        res.json({ ok: true, message: 'Coluna já existia — nada alterado' })
+      } else if (e.code === 'ER_DUP_KEYNAME') {
+        res.json({ ok: true, message: 'Índice já existia — nada alterado' })
+      } else {
+        res.status(500).json({ ok: false, error: e.message })
+      }
+    }
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Parse de Extrato Bancário (PDF) ─────────────────────────────────────────
 app.post('/extrato/parse', upload.single('pdf'), async (req, res) => {
   try {
