@@ -790,6 +790,74 @@ const tituloRouter = router({
       await ctx.db.delete(finTitulo).where(eq(finTitulo.id, input.tituloId))
       return { ok: true }
     }),
+
+  // ── Exclusão em lote (limpeza de duplicatas OFX) ──────────────────────────
+  // Valida senha do admin UMA VEZ para o lote inteiro.
+  // Permite excluir mesmo parcelas PAGAS (uso exclusivo para limpeza de duplicatas).
+  // Retorna preview dos títulos que SERÃO excluídos antes de confirmar.
+  previewLote: protectedProcedure
+    .input(z.object({ tituloIds: z.array(z.number()) }))
+    .query(async ({ ctx, input }) => {
+      if (input.tituloIds.length === 0) return { itens: [] }
+      const empId = ctx.usuario.empresaId
+
+      const rows = await ctx.db
+        .select({
+          id:        finTitulo.id,
+          tipo:      finTitulo.tipo,
+          descricao: finTitulo.descricao,
+          valor:     finTitulo.valorOriginal,
+          emissao:   finTitulo.emissao,
+          pessoaNome: finPessoa.nome,
+        })
+        .from(finTitulo)
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          inArray(finTitulo.id, input.tituloIds),
+        ))
+
+      return { itens: rows }
+    }),
+
+  deleteLote: protectedProcedure
+    .input(z.object({
+      tituloIds:  z.array(z.number()).min(1).max(200),
+      senhaAdmin: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // Valida senha do admin UMA VEZ para o lote todo
+      const senhaHash = createHash('sha256').update(input.senhaAdmin + 'atomtech_salt').digest('hex')
+      const [admin] = await ctx.db
+        .select({ id: usuario.id })
+        .from(usuario)
+        .where(and(
+          eq(usuario.empresaId, empId),
+          eq(usuario.role, 'admin'),
+          eq(usuario.senhaHash, senhaHash),
+        ))
+        .limit(1)
+      if (!admin) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Senha de administrador incorreta' })
+
+      // Verifica que todos os IDs pertencem à empresa
+      const titulos = await ctx.db
+        .select({ id: finTitulo.id })
+        .from(finTitulo)
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          inArray(finTitulo.id, input.tituloIds),
+        ))
+
+      const idsValidos = titulos.map((t: any) => t.id)
+      if (idsValidos.length === 0) throw new TRPCError({ code: 'NOT_FOUND', message: 'Nenhum título encontrado' })
+
+      // Exclui em lote (cascata remove as parcelas via FK)
+      await ctx.db.delete(finTitulo).where(inArray(finTitulo.id, idsValidos))
+
+      return { ok: true, excluidos: idsValidos.length }
+    }),
 })
 
 // ─── PARCELAS (Baixa / Estorno) ───────────────────────────────────────────────

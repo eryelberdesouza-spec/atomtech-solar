@@ -817,6 +817,122 @@ export function LancamentosPage() {
 
 // ─── TAB A PAGAR / A RECEBER (compartilhada) ──────────────────────────────────
 
+// ─── MODAL: EXCLUSÃO EM LOTE ─────────────────────────────────────────────────
+function ModalDeleteLote({
+  tituloIds, rows, onClose, onConfirmar, isLoading,
+}: {
+  tituloIds:   number[]
+  rows:        any[]
+  onClose:     () => void
+  onConfirmar: (senha: string) => void
+  isLoading:   boolean
+}) {
+  const [senha, setSenha] = useState('')
+  const [erro,  setErro]  = useState('')
+
+  const itens = rows.filter((r: any) => tituloIds.includes(r.tituloId))
+
+  const handleConfirmar = () => {
+    if (!senha.trim()) { setErro('Informe a senha de administrador'); return }
+    setErro('')
+    onConfirmar(senha)
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: '#00000088', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: C.bgMid, border: `1px solid ${C.danger}40`, borderRadius: 14,
+        padding: 28, width: 560, maxWidth: '95vw', maxHeight: '85vh',
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        {/* Cabeçalho */}
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.danger, marginBottom: 4 }}>
+            🗑 Excluir {tituloIds.length} lançamento{tituloIds.length > 1 ? 's' : ''} em lote
+          </div>
+          <div style={{ fontSize: 12, color: C.textMuted }}>
+            Esta ação é irreversível. Revise os itens abaixo antes de confirmar.
+          </div>
+        </div>
+
+        {/* Preview dos itens */}
+        <div style={{
+          background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
+          maxHeight: 280, overflowY: 'auto',
+        }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '80px 1fr 100px 80px',
+            padding: '6px 12px', background: C.bgHover,
+            fontSize: 9, fontWeight: 700, color: C.textDim,
+            textTransform: 'uppercase', letterSpacing: '0.06em',
+            borderBottom: `1px solid ${C.border}`,
+          }}>
+            <div>Data</div><div>Descrição</div><div>Valor</div><div>Pessoa</div>
+          </div>
+          {itens.map((r: any) => (
+            <div key={r.tituloId} style={{
+              display: 'grid', gridTemplateColumns: '80px 1fr 100px 80px',
+              padding: '7px 12px', borderBottom: `1px solid ${C.border}50`,
+              fontSize: 12, alignItems: 'center',
+            }}>
+              <div style={{ color: C.textMuted }}>{fmtData(r.vencimento)}</div>
+              <div style={{ color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }} title={r.descricao}>{r.descricao}</div>
+              <div style={{ color: r.tipo === 'PAGAR' ? C.debit : C.credit, fontWeight: 700 }}>{fmtBRLFull(Number(r.valor))}</div>
+              <div style={{ color: r.pessoaNome ? C.text : C.textDim, fontSize: 11 }}>{r.pessoaNome || '—'}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Aviso */}
+        <div style={{
+          background: C.danger + '12', border: `1px solid ${C.danger}40`,
+          borderRadius: 8, padding: '10px 14px', fontSize: 12, color: C.danger,
+        }}>
+          ⚠️ <strong>{itens.filter((r: any) => r.pessoaNome).length} com pessoa vinculada</strong> e{' '}
+          <strong>{itens.filter((r: any) => !r.pessoaNome).length} sem vinculação</strong> serão excluídos permanentemente.
+        </div>
+
+        {/* Senha */}
+        <div>
+          <label style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Senha de administrador
+          </label>
+          <input
+            type="password"
+            value={senha}
+            onChange={e => setSenha(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleConfirmar()}
+            placeholder="Digite sua senha para confirmar"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: C.bg, border: `1px solid ${erro ? C.danger : C.border}`,
+              borderRadius: 8, padding: '9px 12px', color: C.text,
+              fontSize: 13, outline: 'none', fontFamily: 'inherit',
+            }}
+            autoFocus
+          />
+          {erro && <div style={{ fontSize: 11, color: C.danger, marginTop: 4 }}>{erro}</div>}
+        </div>
+
+        {/* Ações */}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <Btn variant="ghost" onClick={onClose} disabled={isLoading}>Cancelar</Btn>
+          <Btn
+            onClick={handleConfirmar}
+            disabled={isLoading}
+            style={{ background: C.danger, color: '#fff' }}
+          >
+            {isLoading ? <><Spinner size={13} /> Excluindo...</> : `🗑 Excluir ${tituloIds.length} lançamento${tituloIds.length > 1 ? 's' : ''}`}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [statusFilter, setStatusFilter] = useState('')
   const [dataIni, setDataIni]           = useState(mesAtualIni())
@@ -828,13 +944,16 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [confirmDelete, setConfirmDelete]         = useState<any>(null)
   const [deleteErro, setDeleteErro]               = useState('')
   const [erro, setErro]                 = useState('')
+  // Seleção em lote
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
+  const [showDeleteLote, setShowDeleteLote] = useState(false)
 
   const { data: rows = [], isLoading, refetch } = (trpc as any).fin.titulo.list.useQuery({
     tipo,
     status:  statusFilter || undefined,
     dataIni: dataIni || undefined,
     dataFim: dataFim || undefined,
-  }, { staleTime: 0 })
+  }) // staleTime herdado (60s) — invalidateQueries após mutations garante dados frescos
 
   const { data: contas       = [] } = (trpc as any).fin.conta.list.useQuery()
   const { data: pessoas      = [] } = (trpc as any).fin.pessoa.list.useQuery()
@@ -844,6 +963,16 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const deletarTitulo = (trpc as any).fin.titulo.delete.useMutation({
     onSuccess: () => { setConfirmDelete(null); setDeleteErro(''); setErro(''); refetch() },
     onError:   (e: any) => setDeleteErro(e.message ?? 'Erro ao excluir'),
+  })
+
+  const deleteLote = (trpc as any).fin.titulo.deleteLote.useMutation({
+    onSuccess: (r: any) => {
+      setSelecionados(new Set())
+      setShowDeleteLote(false)
+      refetch()
+      alert(`✓ ${r.excluidos} lançamento(s) excluído(s) com sucesso.`)
+    },
+    onError: (e: any) => alert('Erro: ' + (e.message ?? 'Erro ao excluir lote')),
   })
 
   const estornar = (trpc as any).fin.parcela.estornar.useMutation({
@@ -927,7 +1056,32 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
         <div style={{ flex: '0 0 150px' }}>
           <Input label="Vencimento até" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
         </div>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {selecionados.size > 0 && (
+            <Btn
+              variant="ghost"
+              onClick={() => setShowDeleteLote(true)}
+              style={{ color: C.danger, borderColor: C.danger + '50', background: C.danger + '10' }}
+            >
+              🗑 Excluir {selecionados.size} selecionado{selecionados.size > 1 ? 's' : ''}
+            </Btn>
+          )}
+          <Btn
+            variant="ghost"
+            onClick={() => {
+              const semVinculo = rows.filter((r: any) => !r.pessoaNome).map((r: any) => r.tituloId)
+              setSelecionados(new Set(semVinculo))
+            }}
+            style={{ fontSize: 11 }}
+            title="Selecionar todos sem pessoa vinculada"
+          >
+            ☐ Sem vínculo ({rows.filter((r: any) => !r.pessoaNome).length})
+          </Btn>
+          {selecionados.size > 0 && (
+            <Btn variant="ghost" onClick={() => setSelecionados(new Set())} style={{ fontSize: 11 }}>
+              ✕ Limpar
+            </Btn>
+          )}
           <Btn onClick={() => setShowNovo(true)}>+ Nova Conta a {label}</Btn>
         </div>
       </div>
@@ -940,7 +1094,8 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
       ) : (
         <Table
           columns={[
-            { key: 'vencimento', label: 'Vencimento', width: '95px' },
+            { key: 'sel',        label: '',           width: '36px'  },
+            { key: 'vencimento', label: 'Vencimento', width: '95px'  },
             { key: 'pessoa',     label: tipo === 'PAGAR' ? 'Fornecedor / Prestador' : 'Cliente' },
             { key: 'descricao',  label: 'Descrição' },
             { key: 'conta',      label: 'Conta',      width: '110px' },
@@ -949,6 +1104,21 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             { key: 'acoes',      label: '',           align: 'right',  width: '135px' },
           ]}
           rows={rows.map((r: any) => ({
+            sel: (
+              <input
+                type="checkbox"
+                checked={selecionados.has(r.tituloId)}
+                onChange={e => {
+                  setSelecionados(prev => {
+                    const n = new Set(prev)
+                    e.target.checked ? n.add(r.tituloId) : n.delete(r.tituloId)
+                    return n
+                  })
+                }}
+                style={{ cursor: 'pointer', accentColor: C.danger, width: 14, height: 14 }}
+                onClick={e => e.stopPropagation()}
+              />
+            ),
             vencimento: (
               <span style={{ color: r.statusDisplay === 'VENCIDA' ? C.warning : C.textMuted, fontSize: 12 }}>
                 {fmtData(r.vencimento)}
@@ -979,15 +1149,22 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
                 )}
               </div>
             ),
-            conta: r.contaNome ? (
-              <span style={{
-                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                background: C.emerald + '18', color: C.emerald,
-                whiteSpace: 'nowrap' as const,
-              }}>
-                🏦 {r.contaNome}
-              </span>
-            ) : <span style={{ color: C.textDim, fontSize: 11 }}>—</span>,
+            conta: r.contaNome ? (() => {
+              const nome = String(r.contaNome).toLowerCase()
+              const isInter   = nome.includes('inter')
+              const isSicoob  = nome.includes('sicoob')
+              const cor = isInter ? '#F5A623' : isSicoob ? '#10B981' : C.emerald
+              return (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                  background: cor + '20', color: cor,
+                  border: `1px solid ${cor}40`,
+                  whiteSpace: 'nowrap' as const,
+                }}>
+                  🏦 {r.contaNome}
+                </span>
+              )
+            })() : <span style={{ color: C.textDim, fontSize: 11 }}>—</span>,
             valor: (() => {
               const valorOrig = Number(r.valor)
               const valorPago = r.valorPago != null ? Number(r.valorPago) : null
@@ -1109,6 +1286,17 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
           erro={deleteErro}
           onClose={() => { setConfirmDelete(null); setDeleteErro('') }}
           onConfirmar={senha => deletarTitulo.mutate({ tituloId: confirmDelete.tituloId, senhaAdmin: senha })}
+        />
+      )}
+
+      {/* Modal: Exclusão em lote */}
+      {showDeleteLote && (
+        <ModalDeleteLote
+          tituloIds={[...selecionados]}
+          rows={rows}
+          onClose={() => setShowDeleteLote(false)}
+          onConfirmar={senha => deleteLote.mutate({ tituloIds: [...selecionados], senhaAdmin: senha })}
+          isLoading={deleteLote.isLoading}
         />
       )}
     </>
@@ -1570,7 +1758,7 @@ function TabTransferencias() {
   const { data: transferencias = [], isLoading, refetch } = (trpc as any).fin.transferencia.list.useQuery({
     dataIni: dataIni || undefined,
     dataFim: dataFim || undefined,
-  }, { staleTime: 0 })
+  })
 
   const { data: contas = [] } = (trpc as any).fin.conta.list.useQuery()
 
@@ -1777,12 +1965,11 @@ function TabExtrato() {
   const [dataIni, setDataIni] = useState(mesAtualIni())
   const [dataFim, setDataFim] = useState('')
 
-  const qOpts = { staleTime: 0 }
   const filter = { dataIni: dataIni || undefined, dataFim: dataFim || undefined }
 
-  const { data: pagas = [],          isLoading: l1 } = (trpc as any).fin.titulo.list.useQuery({ tipo: 'PAGAR',   status: 'PAGA', ...filter }, qOpts)
-  const { data: recebidas = [],      isLoading: l2 } = (trpc as any).fin.titulo.list.useQuery({ tipo: 'RECEBER', status: 'PAGA', ...filter }, qOpts)
-  const { data: transferencias = [], isLoading: l3 } = (trpc as any).fin.transferencia.list.useQuery(filter, qOpts)
+  const { data: pagas = [],          isLoading: l1 } = (trpc as any).fin.titulo.list.useQuery({ tipo: 'PAGAR',   status: 'PAGA', ...filter })
+  const { data: recebidas = [],      isLoading: l2 } = (trpc as any).fin.titulo.list.useQuery({ tipo: 'RECEBER', status: 'PAGA', ...filter })
+  const { data: transferencias = [], isLoading: l3 } = (trpc as any).fin.transferencia.list.useQuery(filter)
 
   const isLoading = l1 || l2 || l3
 

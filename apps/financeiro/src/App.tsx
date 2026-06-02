@@ -96,9 +96,30 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false },
+    queries: {
+      staleTime:           60_000,   // 60s — evita refetch desnecessário ao trocar aba
+      gcTime:             300_000,   // 5min — mantém cache em memória
+      retry:                    1,
+      refetchOnWindowFocus:  false,  // não refetch ao focar janela
+      refetchOnReconnect:    false,
+    },
   },
 })
+
+// ── Warm-up + Keep-alive da API Railway ───────────────────────────────────────
+// Railway adormece após inatividade. Esta função acorda a API ao abrir o sistema
+// e pinga a cada 4 minutos para mantê-la ativa durante o uso.
+const API_HEALTH = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? 'https://atomtech-solar-production.up.railway.app/health'
+  : null
+
+if (API_HEALTH) {
+  // Warm-up imediato ao carregar o app
+  fetch(API_HEALTH).catch(() => {})
+
+  // Keep-alive a cada 4 minutos (Railway dorme após ~5 min sem atividade)
+  setInterval(() => fetch(API_HEALTH).catch(() => {}), 4 * 60 * 1000)
+}
 
 const trpcClient = createTRPCClient()
 
