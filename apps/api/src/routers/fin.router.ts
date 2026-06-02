@@ -2033,6 +2033,95 @@ const extratoRouter = router({
 
       return { ok: true, tituloId, pessoaId: pessoaIdFinal }
     }),
+
+  // ── Importação em lote (OFX conciliação automática) ─────────────────────────
+  // Cria múltiplos lançamentos de uma vez, ignorando FITIDs já importados.
+  importarLote: protectedProcedure
+    .input(z.object({
+      contaId:  z.number().optional(),
+      itens: z.array(z.object({
+        tipo:          z.enum(['PAGAR', 'RECEBER']),
+        descricao:     z.string().min(1),
+        valor:         z.number().positive(),
+        data:          z.string(),
+        fingerprint:   z.string(),        // FITID do OFX — deduplicação 100%
+        planoContasId: z.number().nullish(),
+        salvarComo:    z.enum(['ABERTA', 'PAGA']).default('PAGA'),
+        formaPagamento: z.string().optional(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // 1. Descobre quais fingerprints já existem (evita duplicar)
+      const fps = input.itens.map(i => i.fingerprint)
+      const existentes = await ctx.db
+        .select({ fp: finParcela.extratoFingerprint })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(
+          and(
+            eq(finTitulo.empresaId, empId),
+            inArray(finParcela.extratoFingerprint, fps)
+          )
+        )
+      const fpExistentes = new Set(existentes.map(r => r.fp).filter(Boolean))
+
+      let criados = 0
+      let ignorados = 0
+
+      // 2. Cria cada item que não existe ainda
+      for (const item of input.itens) {
+        if (fpExistentes.has(item.fingerprint)) { ignorados++; continue }
+
+        // Criar título
+        const [resTitulo] = await ctx.db.insert(finTitulo).values({
+          empresaId:     empId,
+          tipo:          item.tipo,
+          descricao:     item.descricao,
+          pessoaId:      null,
+          planoContasId: item.planoContasId ?? null,
+          centroCustoId: null,
+          valorOriginal: item.valor.toFixed(2),
+          emissao:       item.data as any,
+          documento:     null,
+          propostaId:    null,
+          observacoes:   'Importado via OFX',
+          ativo:         1 as any,
+        })
+        const tituloId = (resTitulo as any).insertId as number
+        if (!tituloId) continue
+
+        // Criar parcela
+        const [resParcela] = await ctx.db.insert(finParcela).values({
+          tituloId,
+          numero:             1,
+          valor:              item.valor.toFixed(2),
+          vencimento:         item.data as any,
+          status:             'ABERTA',
+          extratoFingerprint: item.fingerprint,
+        })
+        const parcelaId = (resParcela as any).insertId as number
+
+        // Baixar se já liquidado
+        if (item.salvarComo === 'PAGA' && input.contaId && parcelaId) {
+          await ctx.db.update(finParcela).set({
+            status:         'PAGA',
+            contaId:        input.contaId,
+            dataPagamento:  item.data as any,
+            valorPago:      item.valor.toFixed(2),
+            formaPagamento: item.formaPagamento ?? 'pix',
+            juros:          '0.00',
+            multa:          '0.00',
+            desconto:       '0.00',
+          }).where(eq(finParcela.id, parcelaId))
+        }
+
+        criados++
+      }
+
+      return { ok: true, criados, ignorados, total: input.itens.length }
+    }),
 })
 
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────

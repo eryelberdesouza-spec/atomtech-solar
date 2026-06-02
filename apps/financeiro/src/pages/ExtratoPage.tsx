@@ -469,9 +469,385 @@ function ModalImportar({ tx, onClose, onSuccess, contas, planos, centros, pessoa
   )
 }
 
+// ─── Tipos OFX ───────────────────────────────────────────────────────────────
+
+interface OFXTransacao {
+  fitid:    string
+  data:     string
+  descricao: string
+  valor:    number
+  tipo:     'C' | 'D'
+  banco:    string
+  conta:    string
+  sugestaoTipo:      'RECEBER' | 'PAGAR'
+  sugestaoCategoria: string
+}
+
+interface OFXResultado {
+  transacoes:    OFXTransacao[]
+  total:         number
+  totalEntradas: number
+  totalSaidas:   number
+  banco:         string
+  conta:         string
+  periodoInicio: string
+  periodoFim:    string
+}
+
+// ─── Componente OFX ──────────────────────────────────────────────────────────
+
+function OFXPage() {
+  const [file,         setFile]         = useState<File | null>(null)
+  const [resultado,    setResultado]    = useState<OFXResultado | null>(null)
+  const [loading,      setLoading]      = useState(false)
+  const [loadingLote,  setLoadingLote]  = useState(false)
+  const [erro,         setErro]         = useState('')
+  const [sucesso,      setSucesso]      = useState('')
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [importados,   setImportados]   = useState<Set<string>>(new Set())  // fitids já no banco
+  const [contaId,      setContaId]      = useState('')
+  const [planos,       setPlanos]       = useState<any[]>([])
+  const [planoMap,     setPlanoMap]     = useState<Record<string, number>>({})
+  const [contas,       setContas]       = useState<any[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
+  const utils = (trpc as any).useUtils()
+
+  const contasQ = (trpc as any).fin.conta.list.useQuery()
+  const planoQ  = (trpc as any).fin.planoContas.list.useQuery()
+  const importarLote = (trpc as any).fin.extrato.importarLote.useMutation()
+
+  useEffect(() => {
+    if (contasQ.data) setContas(contasQ.data)
+  }, [contasQ.data])
+
+  useEffect(() => {
+    if (planoQ.data) {
+      setPlanos(planoQ.data)
+      // Monta mapa: nome → id para fuzzy match de categoria
+      const m: Record<string, number> = {}
+      for (const p of planoQ.data) {
+        m[p.nome.toLowerCase()] = p.id
+      }
+      setPlanoMap(m)
+    }
+  }, [planoQ.data])
+
+  // Fuzzy match: dado o nome sugerido, acha o plano mais próximo cadastrado
+  function resolverPlanoId(sugestao: string): number | undefined {
+    if (!sugestao) return undefined
+    const sg = sugestao.toLowerCase()
+    // 1. Match exato
+    if (planoMap[sg]) return planoMap[sg]
+    // 2. Match parcial
+    const chave = Object.keys(planoMap).find(k => k.includes(sg) || sg.includes(k))
+    return chave ? planoMap[chave] : undefined
+  }
+
+  const processarOFX = async () => {
+    if (!file) { setErro('Selecione um arquivo OFX'); return }
+    setLoading(true); setErro(''); setSucesso(''); setResultado(null); setSelecionados(new Set()); setImportados(new Set())
+    try {
+      const token = localStorage.getItem('atomfin_token') || localStorage.getItem('atomtech_token') || ''
+      const form = new FormData()
+      form.append('ofx', file)
+      const resp = await fetch(`${API_BASE}/extrato/parse-ofx`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      })
+      const data = await resp.json()
+      if (!data.ok) throw new Error(data.error || 'Erro ao processar OFX')
+      setResultado(data)
+      // Pré-seleciona todas as transações
+      setSelecionados(new Set(data.transacoes.map((t: OFXTransacao) => t.fitid)))
+      // Verifica no banco quais FITIDs já foram importados
+      const fitids = data.transacoes.map((t: OFXTransacao) => t.fitid)
+      const res = await utils.fin.extrato.verificarImportados.fetch({ fingerprints: fitids })
+      if (res?.importados?.length) {
+        const jaImportados = new Set<string>(res.importados)
+        setImportados(jaImportados)
+        // Desmarca automaticamente os já importados
+        setSelecionados(new Set(fitids.filter((f: string) => !jaImportados.has(f))))
+      }
+    } catch (e: any) {
+      setErro(e.message || 'Erro ao processar OFX')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const importarSelecionados = async () => {
+    if (!resultado || selecionados.size === 0) return
+    setLoadingLote(true); setSucesso('')
+    try {
+      const itens = resultado.transacoes
+        .filter(t => selecionados.has(t.fitid) && !importados.has(t.fitid))
+        .map(t => ({
+          tipo:          t.sugestaoTipo,
+          descricao:     t.descricao,
+          valor:         t.valor,
+          data:          t.data,
+          fingerprint:   t.fitid,
+          planoContasId: resolverPlanoId(t.sugestaoCategoria) ?? undefined,
+          salvarComo:    'PAGA' as const,
+          formaPagamento: t.tipo === 'C' ? 'pix' : detectarFormaPag(t.descricao),
+        }))
+
+      const r = await importarLote.mutateAsync({
+        contaId: contaId ? parseInt(contaId) : undefined,
+        itens,
+      })
+      setSucesso(`✓ ${r.criados} lançamento(s) criado(s)${r.ignorados > 0 ? ` · ${r.ignorados} já existiam` : ''}`)
+      // Marca os importados agora
+      setSelecionados(new Set())
+      setImportados(prev => new Set([...prev, ...itens.map(i => i.fingerprint)]))
+    } catch (e: any) {
+      setErro(e.message || 'Erro ao importar lote')
+    } finally {
+      setLoadingLote(false)
+    }
+  }
+
+  const pendentes = resultado ? resultado.transacoes.filter(t => !importados.has(t.fitid)).length : 0
+
+  return (
+    <div>
+      {/* Cabeçalho OFX */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0D2040 0%, #091830 100%)',
+        border: `1px solid ${C.border}`,
+        borderRadius: 12, padding: '20px 24px', marginBottom: 20,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#60A5FA', marginBottom: 4 }}>
+            ⚡ Conciliação Automática — OFX
+          </div>
+          <div style={{ fontSize: 11, color: C.textMuted, maxWidth: 500 }}>
+            Exporte o extrato como <strong style={{ color: C.text }}>.OFX</strong> pelo app do banco.
+            O sistema classifica automaticamente e importa em lote — sem digitar nada.
+          </div>
+          <div style={{ fontSize: 10, color: '#3A5070', marginTop: 6 }}>
+            Inter: App → Extrato → Exportar → OFX &nbsp;·&nbsp; Sicoob: Internet Banking → Extrato → OFX
+          </div>
+        </div>
+        <div style={{
+          background: '#60A5FA14', border: '1px solid #60A5FA30',
+          borderRadius: 8, padding: '6px 14px',
+          fontSize: 10, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.08em',
+        }}>
+          FITID · Deduplicação 100%
+        </div>
+      </div>
+
+      {/* Upload OFX */}
+      {!resultado && (
+        <div style={{
+          border: `2px dashed ${C.border}`, borderRadius: 12,
+          padding: '32px', textAlign: 'center',
+          background: C.bgCard, marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>📂</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+            Selecione o arquivo OFX
+          </div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 20 }}>
+            Formatos aceitos: .ofx · .qfx
+          </div>
+          <input
+            ref={fileRef} type="file" accept=".ofx,.qfx"
+            style={{ display: 'none' }}
+            onChange={e => { setFile(e.target.files?.[0] || null); setErro('') }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <Btn variant="ghost" onClick={() => fileRef.current?.click()}>
+              📁 Escolher arquivo
+            </Btn>
+            {file && (
+              <Btn variant="primary" onClick={processarOFX} disabled={loading}>
+                {loading ? <Spinner size={14} /> : '⚡ Processar OFX'}
+              </Btn>
+            )}
+          </div>
+          {file && (
+            <div style={{ marginTop: 12, fontSize: 12, color: C.emerald }}>
+              📄 {file.name}
+            </div>
+          )}
+          {erro && <Alert type="danger" style={{ marginTop: 16 }}>{erro}</Alert>}
+        </div>
+      )}
+
+      {/* Resultado */}
+      {resultado && (
+        <>
+          {/* KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <KpiCard label="Transações"     value={resultado.total.toString()}                      color={C.info} />
+            <KpiCard label="Total Entradas" value={fmtBRLFull(resultado.totalEntradas)}             color={C.credit} />
+            <KpiCard label="Total Saídas"   value={fmtBRLFull(resultado.totalSaidas)}              color={C.debit} />
+            <KpiCard label="Já importados"  value={(resultado.total - pendentes).toString()}        color={C.emerald} />
+            <KpiCard label="Pendentes"      value={pendentes.toString()}                            color="#60A5FA" />
+          </div>
+
+          {sucesso && <Alert type="success" style={{ marginBottom: 16 }}>{sucesso}</Alert>}
+          {erro     && <Alert type="danger"  style={{ marginBottom: 16 }}>{erro}</Alert>}
+
+          {/* Toolbar */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            flexWrap: 'wrap', gap: 10, marginBottom: 12,
+          }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setSelecionados(new Set(resultado.transacoes.filter(t => !importados.has(t.fitid)).map(t => t.fitid)))}
+                style={{ fontSize: 11, color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
+              >
+                Selecionar pendentes
+              </button>
+              <button
+                onClick={() => setSelecionados(new Set())}
+                style={{ fontSize: 11, color: C.textMuted, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
+              >
+                Limpar seleção
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, marginRight: 6 }}>Conta bancária</label>
+                <select
+                  value={contaId} onChange={e => setContaId(e.target.value)}
+                  style={{ ...selectStyle, width: 'auto', fontSize: 12, padding: '6px 10px' }}
+                >
+                  <option value="">Sem vinculação</option>
+                  {contas.map((c: any) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+              <Btn
+                variant="primary"
+                onClick={importarSelecionados}
+                disabled={loadingLote || selecionados.size === 0}
+              >
+                {loadingLote
+                  ? <Spinner size={14} />
+                  : `⚡ Importar ${selecionados.size} selecionado(s)`}
+              </Btn>
+              <Btn variant="ghost" onClick={() => { setResultado(null); setFile(null); setSucesso(''); setErro('') }}>
+                ✕ Novo arquivo
+              </Btn>
+            </div>
+          </div>
+
+          {/* Tabela de transações */}
+          <div style={{
+            background: C.bgCard, border: `1px solid ${C.border}`,
+            borderRadius: 12, overflow: 'hidden',
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '32px 96px 1fr 140px 120px 110px',
+              padding: '8px 16px', background: C.bgMid,
+              fontSize: 10, fontWeight: 700, color: C.textDim, textTransform: 'uppercase',
+              borderBottom: `1px solid ${C.border}`,
+            }}>
+              <div />
+              <div>Data</div>
+              <div>Descrição / Categoria sugerida</div>
+              <div>Tipo</div>
+              <div style={{ textAlign: 'right' }}>Valor</div>
+              <div style={{ textAlign: 'center' }}>Status</div>
+            </div>
+
+            <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+              {resultado.transacoes.map(tx => {
+                const jaImportado = importados.has(tx.fitid)
+                const selecionado = selecionados.has(tx.fitid)
+                const cor = tx.tipo === 'C' ? C.credit : C.debit
+
+                return (
+                  <div key={tx.fitid} style={{
+                    display: 'grid', gridTemplateColumns: '32px 96px 1fr 140px 120px 110px',
+                    padding: '9px 16px', borderBottom: `1px solid ${C.border}50`,
+                    alignItems: 'center',
+                    background: jaImportado ? C.emerald + '08'
+                              : selecionado ? '#60A5FA08'
+                              : 'transparent',
+                    opacity: jaImportado ? 0.55 : 1,
+                    transition: 'background 0.1s',
+                  }}>
+                    {/* Checkbox */}
+                    <div>
+                      {!jaImportado && (
+                        <input
+                          type="checkbox"
+                          checked={selecionado}
+                          onChange={e => {
+                            setSelecionados(prev => {
+                              const n = new Set(prev)
+                              e.target.checked ? n.add(tx.fitid) : n.delete(tx.fitid)
+                              return n
+                            })
+                          }}
+                          style={{ cursor: 'pointer', accentColor: '#60A5FA' }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Data */}
+                    <div style={{ fontSize: 12, color: C.textMuted, fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtDataBR(tx.data)}
+                    </div>
+
+                    {/* Descrição + categoria */}
+                    <div style={{ overflow: 'hidden', paddingRight: 8 }}>
+                      <div style={{ fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.descricao}>
+                        {tx.descricao}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#60A5FA99', marginTop: 1 }}>
+                        📂 {tx.sugestaoCategoria}
+                      </div>
+                    </div>
+
+                    {/* Tipo sugerido */}
+                    <div>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700,
+                        padding: '2px 8px', borderRadius: 10,
+                        background: cor + '18', color: cor,
+                      }}>
+                        {tx.tipo === 'C' ? '↓ Receber' : '↑ Pagar'}
+                      </span>
+                    </div>
+
+                    {/* Valor */}
+                    <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums' }}>
+                      {tx.tipo === 'D' ? '- ' : '+ '}{fmtBRLFull(tx.valor)}
+                    </div>
+
+                    {/* Status */}
+                    <div style={{ textAlign: 'center' }}>
+                      {jaImportado
+                        ? <span style={{ fontSize: 11, color: C.emerald, fontWeight: 700 }}>✓ Importado</span>
+                        : selecionado
+                          ? <span style={{ fontSize: 11, color: '#60A5FA', fontWeight: 600 }}>☑ Selecionado</span>
+                          : <span style={{ fontSize: 11, color: C.textDim }}>— Ignorar</span>
+                      }
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Componente Principal ────────────────────────────────────────────────────
 
 export function ExtratoPage() {
+  const [aba,        setAba]        = useState<'PDF' | 'OFX'>('OFX')
   const [banco,      setBanco]      = useState<'INTER' | 'SICOOB'>('INTER')
   const [file,       setFile]       = useState<File | null>(null)
   const [resultado,  setResultado]  = useState<ParseResult | null>(null)
@@ -591,13 +967,13 @@ export function ExtratoPage() {
   return (
     <PageWrapper>
       {/* ── Cabeçalho ──────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ color: C.text, fontSize: 18, fontWeight: 800, margin: 0 }}>
             Extrato Bancário
           </h2>
           <p style={{ color: C.textMuted, fontSize: 12, margin: '4px 0 0' }}>
-            Importe extratos em PDF do Banco Inter ou Sicoob e crie lançamentos diretamente
+            Importe extratos e concilie lançamentos automaticamente
           </p>
         </div>
         {resultado && (
@@ -616,6 +992,40 @@ export function ExtratoPage() {
           </button>
         )}
       </div>
+
+      {/* ── Abas PDF / OFX ────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+        {([
+          { id: 'OFX', label: '⚡ OFX · Automático', desc: 'Recomendado' },
+          { id: 'PDF', label: '📄 PDF · Manual',     desc: 'Inter / Sicoob' },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setAba(tab.id)}
+            style={{
+              padding: '9px 18px', border: 'none', background: 'none',
+              cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: 13, fontWeight: aba === tab.id ? 700 : 400,
+              color: aba === tab.id ? C.emerald : C.textMuted,
+              borderBottom: aba === tab.id ? `2px solid ${C.emerald}` : '2px solid transparent',
+              marginBottom: -1, transition: 'all 0.15s',
+            }}
+          >
+            {tab.label}
+            {tab.id === 'OFX' && (
+              <span style={{ marginLeft: 6, fontSize: 9, background: '#60A5FA22', color: '#60A5FA', padding: '1px 6px', borderRadius: 8, fontWeight: 700 }}>
+                NOVO
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Aba OFX */}
+      {aba === 'OFX' && <OFXPage />}
+
+      {/* Aba PDF */}
+      {aba === 'PDF' && <>
 
       {/* ── Banner: extrato restaurado ─────────────────────────────── */}
       {restorado && resultado && (
@@ -825,6 +1235,8 @@ export function ExtratoPage() {
           </div>
         </>
       )}
+
+      </>} {/* fim aba PDF */}
 
       {/* ── Modal Importar ───────────────────────────────────────────── */}
       <ModalImportar

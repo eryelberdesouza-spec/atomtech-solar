@@ -7,6 +7,7 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from './routers'
 import { createContext, testConnection } from './routers/trpc'
 import { parseInter, parseSicoob } from './lib/extratoParser'
+import { parseOFX } from './lib/ofxParser'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -560,6 +561,26 @@ app.post('/extrato/parse', upload.single('pdf'), async (req, res) => {
     res.json({ ok: true, transacoes, total: transacoes.length, totalEntradas, totalSaidas })
   } catch (e: any) {
     console.error('Erro parsing extrato:', e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Parse de Extrato OFX/QFX (Conciliação Automática) ───────────────────────
+// Aceita arquivos .ofx/.qfx (texto) exportados diretamente pelo banco.
+// Retorna transações com FITID único + sugestão de categoria automática.
+app.post('/extrato/parse-ofx', upload.single('ofx'), async (req, res) => {
+  try {
+    if (!req.file) { res.status(400).json({ ok: false, error: 'Nenhum arquivo enviado' }); return }
+    // OFX é texto puro — lê o buffer como string
+    const content = req.file.buffer.toString('latin1')  // encoding padrão dos bancos BR
+    const result = parseOFX(content)
+    if (result.total === 0) {
+      res.status(400).json({ ok: false, error: 'Nenhuma transação encontrada. Verifique se o arquivo é um OFX válido.' })
+      return
+    }
+    res.json({ ok: true, ...result })
+  } catch (e: any) {
+    console.error('Erro parsing OFX:', e)
     res.status(500).json({ ok: false, error: e.message })
   }
 })
