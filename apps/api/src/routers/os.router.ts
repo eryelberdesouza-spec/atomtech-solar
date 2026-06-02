@@ -204,11 +204,19 @@ export const osRouter = router({
         [input.id],
       )
 
+      // Notas do Diário de Campo
+      const [notas]: any = await pool.execute(
+        `SELECT id, texto, autor, created_at AS createdAt
+         FROM os_nota WHERE ordem_servico_id = ? ORDER BY created_at ASC`,
+        [input.id],
+      )
+
       return {
         ...os,
         temAgendamento: Number(os.temAgendamento) === 1,
         marcos:         marcos as any[],
         agendamentos:   agendamentos as any[],
+        notas:          notas as any[],
       }
     }),
 
@@ -230,17 +238,7 @@ export const osRouter = router({
       if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Só é possível criar OS para propostas aceitas.' })
       if (Number(prop.contrato_formalizado) !== 1) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O contrato ainda não foi formalizado.' })
 
-      // Verifica se já existe OS para esta proposta
-      const [existRows]: any = await pool.execute(
-        `SELECT id, numero FROM ordem_servico WHERE proposta_id = ? AND empresa_id = ? LIMIT 1`,
-        [input.propostaId, empId],
-      )
-      if ((existRows as any[]).length > 0) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: `Já existe a OS ${(existRows as any[])[0].numero} para esta proposta.`,
-        })
-      }
+      // Múltiplas OS por proposta são permitidas (projetos em etapas)
 
       const numero = await gerarNumeroOS(empId)
 
@@ -534,6 +532,49 @@ export const osRouter = router({
         if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Agendamento não encontrado' })
 
         await pool.execute(`DELETE FROM os_agendamento WHERE id = ?`, [input.id])
+        return { ok: true }
+      }),
+  }),
+
+  // ── Diário de Campo (Notas) ──────────────────────────────────────
+  nota: router({
+
+    criar: protectedProcedure
+      .input(z.object({
+        ordemServicoId: z.number().int().positive(),
+        texto:          z.string().min(1).max(2000),
+        autor:          z.string().max(100).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+
+        const [check]: any = await pool.execute(
+          `SELECT id FROM ordem_servico WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.ordemServicoId, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
+
+        await pool.execute(
+          `INSERT INTO os_nota (ordem_servico_id, empresa_id, texto, autor) VALUES (?, ?, ?, ?)`,
+          [input.ordemServicoId, ctx.usuario.empresaId, input.texto, input.autor ?? null],
+        )
+        return { ok: true }
+      }),
+
+    deletar: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+
+        const [check]: any = await pool.execute(
+          `SELECT n.id FROM os_nota n
+           JOIN ordem_servico os ON os.id = n.ordem_servico_id
+           WHERE n.id = ? AND os.empresa_id = ? LIMIT 1`,
+          [input.id, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Nota não encontrada' })
+
+        await pool.execute(`DELETE FROM os_nota WHERE id = ?`, [input.id])
         return { ok: true }
       }),
   }),

@@ -543,6 +543,34 @@ app.get('/reverter-proposta/:id', async (req, res) => {
   }
 })
 
+// ── Migração: cria tabela os_nota (Diário de Campo) ──────────────────────────
+app.get('/run-migration-os-nota', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_nota (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        ordem_servico_id  INT NOT NULL,
+        empresa_id        INT NOT NULL,
+        texto             TEXT NOT NULL,
+        autor             VARCHAR(100),
+        created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_os_nota_os (ordem_servico_id),
+        INDEX idx_os_nota_emp (empresa_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela os_nota criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 // ── Migração: adiciona coluna extrato_fingerprint na fin_parcela ─────────────
 app.get('/run-migration-extrato-fingerprint', async (_, res) => {
   try {
