@@ -468,6 +468,236 @@ function AbaDiarioCampo({ os, osId, onRefresh }: any) {
   )
 }
 
+// ─── Aba: Anexos ─────────────────────────────────────────────────────────────
+const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? 'https://atomtech-solar-production.up.railway.app'
+  : 'http://localhost:3001'
+
+function getToken() {
+  return localStorage.getItem('atomtech_token') || ''
+}
+
+function fmtTamanho(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
+  const [uploading,    setUploading]    = useState(false)
+  const [erro,         setErro]         = useState('')
+  const [preview,      setPreview]      = useState<{ id: number; nome: string; tipoMime: string } | null>(null)
+  const [dragOver,     setDragOver]     = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const utils  = (trpc as any).useUtils()
+  const refresh = () => utils.os.anexo.list.invalidate({ ordemServicoId: osId })
+
+  const { data: anexos = [], isLoading } = (trpc as any).os.anexo.list.useQuery(
+    { ordemServicoId: osId },
+    { staleTime: 30_000 },
+  )
+
+  const deletarAnexo = (trpc as any).os.anexo.deletar.useMutation({
+    onSuccess: refresh,
+    onError: (e: any) => alert('Erro: ' + e.message),
+  })
+
+  const uploadFile = async (file: File) => {
+    setErro('')
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('arquivo', file)
+      const resp = await fetch(`${API_BASE}/os/${osId}/anexo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: form,
+      })
+      const data = await resp.json()
+      if (!data.ok) throw new Error(data.error || 'Erro ao enviar arquivo')
+      refresh()
+    } catch (e: any) {
+      setErro(e.message || 'Erro ao enviar arquivo')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files?.length) return
+    Array.from(files).forEach(f => uploadFile(f))
+  }
+
+  const fileUrl = (id: number) =>
+    `${API_BASE}/os-anexo/${id}?token=${encodeURIComponent(getToken())}`
+
+  const isImage = (mime: string) => mime.startsWith('image/')
+  const isPDF   = (mime: string) => mime === 'application/pdf'
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <h3 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 700, margin: 0 }}>📎 Anexos</h3>
+          <p style={{ color: '#4A6080', fontSize: 12, margin: '3px 0 0' }}>{anexos.length} arquivo(s) — fotos e PDFs do serviço</p>
+        </div>
+        {osStatus !== 'cancelada' && (
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #F5A62360', background: '#F5A62318', color: '#F5A623', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}
+          >
+            {uploading ? '⏳ Enviando...' : '📎 + Anexar arquivo'}
+          </button>
+        )}
+      </div>
+
+      <input ref={fileRef} type="file" multiple accept="image/*,application/pdf" style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+
+      {erro && (
+        <div style={{ background: '#F8514912', border: '1px solid #F8514940', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#F85149', marginBottom: 12 }}>{erro}</div>
+      )}
+
+      {/* Drop zone */}
+      {osStatus !== 'cancelada' && (
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
+          onClick={() => fileRef.current?.click()}
+          style={{
+            border: `2px dashed ${dragOver ? '#F5A623' : '#1E3050'}`,
+            borderRadius: 10, padding: '16px', textAlign: 'center',
+            cursor: 'pointer', marginBottom: 16, transition: 'all 0.15s',
+            background: dragOver ? '#F5A62308' : 'transparent',
+          }}
+        >
+          <span style={{ fontSize: 11, color: dragOver ? '#F5A623' : '#2A3F55' }}>
+            {uploading ? '⏳ Enviando arquivos...' : '📂 Arraste fotos ou PDFs aqui, ou clique para selecionar'}
+          </span>
+        </div>
+      )}
+
+      {/* Grid de anexos */}
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><Spinner /></div>
+      ) : anexos.length === 0 ? (
+        <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: '40px', textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📎</div>
+          <div style={{ color: '#4A6080', fontSize: 13 }}>Nenhum anexo ainda.</div>
+          <div style={{ color: '#2A3F55', fontSize: 12, marginTop: 4 }}>Adicione fotos ou PDFs do serviço.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+          {(anexos as any[]).map((a: any) => (
+            <div
+              key={a.id}
+              style={{
+                background: '#111D2E', border: '1px solid #1E3050', borderRadius: 10,
+                overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s', position: 'relative',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#F5A623'}
+              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#1E3050'}
+            >
+              {/* Thumbnail / preview */}
+              <div
+                onClick={() => setPreview({ id: a.id, nome: a.nome, tipoMime: a.tipoMime })}
+                style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#0C1828' }}
+              >
+                {isImage(a.tipoMime) ? (
+                  <img
+                    src={fileUrl(a.id)}
+                    alt={a.nome}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    loading="lazy"
+                  />
+                ) : isPDF(a.tipoMime) ? (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 48 }}>📄</div>
+                    <div style={{ fontSize: 10, color: '#4A6080', marginTop: 4 }}>PDF</div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 40 }}>📎</div>
+                )}
+              </div>
+
+              {/* Info + ações */}
+              <div style={{ padding: '8px 10px' }}>
+                <div style={{ fontSize: 11, color: '#C8D8EC', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.nome}>
+                  {a.nome}
+                </div>
+                <div style={{ fontSize: 10, color: '#4A6080', marginTop: 2 }}>{fmtTamanho(a.tamanho)}</div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                  <button
+                    onClick={() => setPreview({ id: a.id, nome: a.nome, tipoMime: a.tipoMime })}
+                    style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#8A9BB5', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit' }}
+                  >👁 Ver</button>
+                  <a
+                    href={fileUrl(a.id)}
+                    download={a.nome}
+                    style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#8A9BB5', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >⬇</a>
+                  {osStatus !== 'cancelada' && (
+                    <button
+                      onClick={() => window.confirm(`Excluir "${a.nome}"?`) && deletarAnexo.mutate({ id: a.id })}
+                      style={{ padding: '4px 6px', borderRadius: 5, border: '1px solid #F8514940', background: 'transparent', color: '#F85149', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit' }}
+                    >✕</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal de Preview */}
+      {preview && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: '#000000CC', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => e.target === e.currentTarget && setPreview(null)}
+        >
+          {/* Barra de controles */}
+          <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 8 }}>
+            <a href={fileUrl(preview.id)} download={preview.nome} style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>⬇ Baixar</a>
+            <a href={fileUrl(preview.id)} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>↗ Abrir</a>
+            <button onClick={() => setPreview(null)} style={{ padding: '8px 14px', borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕ Fechar</button>
+          </div>
+
+          {/* Nome do arquivo */}
+          <div style={{ position: 'absolute', top: 16, left: 16, color: '#C8D8EC', fontSize: 13, fontWeight: 600, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            📎 {preview.nome}
+          </div>
+
+          {/* Conteúdo */}
+          <div style={{ maxWidth: '90vw', maxHeight: '80vh', marginTop: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {isImage(preview.tipoMime) ? (
+              <img
+                src={fileUrl(preview.id)}
+                alt={preview.nome}
+                style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.8)', objectFit: 'contain' }}
+              />
+            ) : isPDF(preview.tipoMime) ? (
+              <iframe
+                src={fileUrl(preview.id)}
+                style={{ width: '80vw', height: '78vh', borderRadius: 8, border: 'none', background: '#fff' }}
+                title={preview.nome}
+              />
+            ) : (
+              <div style={{ color: '#C8D8EC', textAlign: 'center' }}>
+                <div style={{ fontSize: 64, marginBottom: 16 }}>📎</div>
+                <div>{preview.nome}</div>
+                <a href={fileUrl(preview.id)} download={preview.nome} style={{ color: '#F5A623', marginTop: 12, display: 'block' }}>Baixar arquivo</a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export function OrdemServicoDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -479,7 +709,7 @@ export function OrdemServicoDetailPage() {
 
   const { data: os, isLoading } = (trpc as any).os.byId.useQuery({ id: osId }, { enabled: !!osId, staleTime: 0 })
 
-  const [aba, setAba] = useState<'geral' | 'agendamentos' | 'diario'>('geral')
+  const [aba, setAba] = useState<'geral' | 'agendamentos' | 'diario' | 'anexos'>('geral')
   const [showModalAg, setShowModalAg]       = useState(false)
   const [showModalMarco, setShowModalMarco] = useState(false)
   const [mudandoStatus, setMudandoStatus]   = useState(false)
@@ -514,10 +744,16 @@ export function OrdemServicoDetailPage() {
     updateStatusMut.mutate({ id: osId, status: 'cancelada' })
   }
 
+  const { data: anexos = [] } = (trpc as any).os.anexo.list.useQuery(
+    { ordemServicoId: osId },
+    { staleTime: 30_000 },
+  )
+
   const ABAS = [
     { id: 'geral',        label: '📋 Visão Geral' },
     { id: 'agendamentos', label: `📅 Agendamentos${os.agendamentos?.length ? ` (${os.agendamentos.length})` : ''}` },
     { id: 'diario',       label: `📓 Diário de Campo${os.notas?.length ? ` (${os.notas.length})` : ''}` },
+    { id: 'anexos',       label: `📎 Anexos${(anexos as any[]).length ? ` (${(anexos as any[]).length})` : ''}` },
   ]
 
   return (
@@ -586,9 +822,10 @@ export function OrdemServicoDetailPage() {
 
       {/* ── CONTEÚDO ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-        {aba === 'geral' && <AbaVisaoGeral os={os} osId={osId} onRefresh={refresh} onShowModalMarco={() => setShowModalMarco(true)} />}
+        {aba === 'geral'        && <AbaVisaoGeral os={os} osId={osId} onRefresh={refresh} onShowModalMarco={() => setShowModalMarco(true)} />}
         {aba === 'agendamentos' && <AbaAgendamentos os={os} osId={osId} onRefresh={refresh} onShowModal={() => setShowModalAg(true)} />}
-        {aba === 'diario' && <AbaDiarioCampo os={os} osId={osId} onRefresh={refresh} />}
+        {aba === 'diario'       && <AbaDiarioCampo os={os} osId={osId} onRefresh={refresh} />}
+        {aba === 'anexos'       && <AbaAnexos osId={osId} osStatus={os.status} />}
       </div>
 
       {/* Modais */}

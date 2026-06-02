@@ -638,6 +638,128 @@ app.post('/extrato/parse-ofx', upload.single('ofx'), async (req, res) => {
   }
 })
 
+// ── Migração: cria tabela os_anexo ───────────────────────────────────────────
+app.get('/run-migration-os-anexo', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_anexo (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        ordem_servico_id  INT NOT NULL,
+        empresa_id        INT NOT NULL,
+        nome              VARCHAR(255) NOT NULL,
+        tipo_mime         VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
+        tamanho           INT NOT NULL DEFAULT 0,
+        dados             MEDIUMBLOB NOT NULL,
+        created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_os_anexo_os  (ordem_servico_id),
+        INDEX idx_os_anexo_emp (empresa_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela os_anexo criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
+// ── Upload de anexo em OS ─────────────────────────────────────────────────────
+const uploadAnexo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  fileFilter: (_, file, cb) => {
+    const allowed = ['image/jpeg','image/png','image/webp','image/gif','application/pdf']
+    cb(null, allowed.includes(file.mimetype))
+  },
+})
+
+app.post('/os/:osId/anexo', uploadAnexo.single('arquivo'), async (req, res) => {
+  try {
+    const osId = parseInt(req.params.osId)
+    if (!req.file) { res.status(400).json({ ok: false, error: 'Arquivo não enviado ou tipo não permitido (JPG, PNG, PDF)' }); return }
+
+    // Autentica via JWT (mesmo padrão do createContext)
+    const token = (req.headers.authorization ?? '').replace('Bearer ', '').trim()
+    if (!token) { res.status(401).json({ ok: false, error: 'Não autorizado' }); return }
+
+    let empresaId: number | undefined
+    try {
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf-8'))
+      empresaId = payload.empresaId
+    } catch { /* token inválido */ }
+    if (!empresaId) { res.status(401).json({ ok: false, error: 'Token inválido' }); return }
+
+    const mysql2 = await import('mysql2/promise')
+    const conn   = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    // Verifica que a OS pertence à empresa
+    const [osRows]: any = await conn.execute(
+      `SELECT id FROM ordem_servico WHERE id = ? AND empresa_id = ? LIMIT 1`,
+      [osId, empresaId],
+    )
+    if (!(osRows as any[]).length) {
+      await conn.end()
+      res.status(404).json({ ok: false, error: 'OS não encontrada' })
+      return
+    }
+
+    await conn.execute(
+      `INSERT INTO os_anexo (ordem_servico_id, empresa_id, nome, tipo_mime, tamanho, dados)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [osId, empresaId, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer],
+    )
+    const [idRow]: any = await conn.execute('SELECT LAST_INSERT_ID() AS id')
+    const id = (idRow as any[])[0]?.id
+    await conn.end()
+
+    res.json({ ok: true, id, nome: req.file.originalname, tipoMime: req.file.mimetype, tamanho: req.file.size })
+  } catch (e: any) {
+    console.error('Erro upload anexo OS:', e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Servir arquivo de anexo ───────────────────────────────────────────────────
+app.get('/os-anexo/:id', async (req, res) => {
+  try {
+    const id     = parseInt(req.params.id)
+    const rawToken = (req.headers.authorization ?? '').replace('Bearer ', '').trim()
+                  || (req.query.token as string ?? '')
+
+    let empresaId: number | undefined
+    try {
+      const payload = JSON.parse(Buffer.from(rawToken.split('.')[1], 'base64').toString('utf-8'))
+      empresaId = payload.empresaId
+    } catch { /* token inválido */ }
+    if (!empresaId) { res.status(401).send('Não autorizado'); return }
+
+    const mysql2 = await import('mysql2/promise')
+    const conn   = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [rows]: any = await conn.execute(
+      `SELECT nome, tipo_mime, tamanho, dados FROM os_anexo
+       WHERE id = ? AND empresa_id = ? LIMIT 1`,
+      [id, empresaId],
+    )
+    await conn.end()
+
+    const file = (rows as any[])[0]
+    if (!file) { res.status(404).send('Arquivo não encontrado'); return }
+
+    res.setHeader('Content-Type', file.tipo_mime)
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.nome)}"`)
+    res.setHeader('Cache-Control', 'private, max-age=3600')
+    res.send(file.dados)
+  } catch (e: any) {
+    res.status(500).send('Erro: ' + e.message)
+  }
+})
+
 async function main() {
   await testConnection()
   app.listen(PORT, () => {

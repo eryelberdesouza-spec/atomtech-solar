@@ -578,4 +578,36 @@ export const osRouter = router({
         return { ok: true }
       }),
   }),
+
+  // ── Anexos (fotos e PDFs) ────────────────────────────────────────
+  anexo: router({
+    list: protectedProcedure
+      .input(z.object({ ordemServicoId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [rows]: any = await pool.execute(
+          `SELECT id, nome, tipo_mime AS tipoMime, tamanho, created_at AS createdAt
+           FROM os_anexo
+           WHERE ordem_servico_id = ? AND empresa_id = ?
+           ORDER BY created_at ASC`,
+          [input.ordemServicoId, ctx.usuario.empresaId],
+        )
+        return rows as any[]
+      }),
+
+    deletar: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [check]: any = await pool.execute(
+          `SELECT a.id FROM os_anexo a
+           JOIN ordem_servico os ON os.id = a.ordem_servico_id
+           WHERE a.id = ? AND os.empresa_id = ? LIMIT 1`,
+          [input.id, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Anexo não encontrado' })
+        await pool.execute(`DELETE FROM os_anexo WHERE id = ?`, [input.id])
+        return { ok: true }
+      }),
+  }),
 })
