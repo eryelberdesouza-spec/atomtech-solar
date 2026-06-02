@@ -8,6 +8,95 @@ import {
   PageWrapper, C, Btn, KpiCard, Table, Modal, Tabs,
   Input, InputMoeda, Select, Textarea, FormRow, Spinner, Alert,
 } from '../components/ui'
+
+// ─── CADASTRO RÁPIDO DE PESSOA (inline no modal de edição) ────────────────────
+function CadastroRapidoInline({
+  nomeInicial,
+  tipo,
+  onConfirmar,
+  onCancelar,
+}: {
+  nomeInicial: string
+  tipo: 'PAGAR' | 'RECEBER'
+  onConfirmar: (pessoaId: number, pessoaNome: string) => void
+  onCancelar: () => void
+}) {
+  const [nome,       setNome]       = useState(nomeInicial)
+  const [cpfCnpj,   setCpfCnpj]    = useState('')
+  const [tipoPessoa, setTipoPessoa] = useState<'FISICA' | 'JURIDICA'>('JURIDICA')
+  const [papel,      setPapel]      = useState<'CLIENTE' | 'FORNECEDOR' | 'AMBOS'>(
+    tipo === 'RECEBER' ? 'CLIENTE' : 'FORNECEDOR'
+  )
+  const [erro,   setErro]   = useState('')
+  const criarPessoa = (trpc as any).fin.pessoa.create.useMutation({
+    onSuccess: (data: any) => { onConfirmar(data.id, nome.trim()) },
+    onError:   (e: any)    => setErro(e.message ?? 'Erro ao criar'),
+  })
+
+  const handleSalvar = () => {
+    if (!nome.trim()) { setErro('Informe o nome'); return }
+    criarPessoa.mutate({
+      tipoPessoa,
+      nome:         nome.trim(),
+      cpfCnpj:      cpfCnpj.trim() || undefined,
+      isCliente:    papel === 'CLIENTE'    || papel === 'AMBOS',
+      isFornecedor: papel === 'FORNECEDOR' || papel === 'AMBOS',
+    })
+  }
+
+  const inputSt = {
+    width: '100%', boxSizing: 'border-box' as const,
+    background: C.bg, border: `1px solid ${C.border}`,
+    borderRadius: 7, padding: '7px 10px',
+    color: C.text, fontSize: 13, outline: 'none', fontFamily: 'inherit',
+  }
+  const selSt = { ...inputSt, cursor: 'pointer' }
+
+  return (
+    <div style={{
+      background: C.bgCard, border: `1px solid ${C.emerald}40`,
+      borderRadius: 10, padding: 14, marginTop: 8,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.emerald, marginBottom: 10 }}>
+        ＋ Cadastro Rápido — será salvo ao clicar em Confirmar
+      </div>
+      {erro && <Alert type="danger" style={{ marginBottom: 8 }}>{erro}</Alert>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div>
+          <label style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, display: 'block', marginBottom: 4 }}>Nome *</label>
+          <input value={nome} onChange={e => setNome(e.target.value)} style={inputSt} autoFocus placeholder="Nome completo / Razão Social" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div>
+            <label style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, display: 'block', marginBottom: 4 }}>Tipo</label>
+            <select value={tipoPessoa} onChange={e => setTipoPessoa(e.target.value as any)} style={selSt}>
+              <option value="JURIDICA">Jurídica (empresa)</option>
+              <option value="FISICA">Física (CPF)</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, display: 'block', marginBottom: 4 }}>Papel</label>
+            <select value={papel} onChange={e => setPapel(e.target.value as any)} style={selSt}>
+              <option value="CLIENTE">Cliente</option>
+              <option value="FORNECEDOR">Fornecedor / Prestador</option>
+              <option value="AMBOS">Ambos</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, display: 'block', marginBottom: 4 }}>CPF / CNPJ (opcional)</label>
+          <input value={cpfCnpj} onChange={e => setCpfCnpj(e.target.value)} style={inputSt} placeholder="000.000.000-00 ou 00.000.000/0001-00" />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+          <Btn variant="ghost" onClick={onCancelar}>Cancelar</Btn>
+          <Btn variant="primary" onClick={handleSalvar} disabled={criarPessoa.isLoading}>
+            {criarPessoa.isLoading ? <Spinner size={13} /> : '✓ Confirmar cadastro'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
 import { parseMoeda, fmtBRLFull, maskMoeda } from '../lib/masks'
 import { fmtData } from '../lib/utils'
 import { gerarComprovantePdf } from '../lib/gerarComprovantePdf'
@@ -99,6 +188,8 @@ function ModalEditarLancamento({
   const [form, setForm] = useState<any>(null)
   const [parcelas, setParcelas] = useState<any[]>([])
   const [erro, setErro] = useState('')
+  const [mostraCadastro, setMostraCadastro] = useState(false)
+  const utils = (trpc as any).useUtils()
 
   // Preenche form quando dados chegam
   useMemo(() => {
@@ -215,13 +306,40 @@ function ModalEditarLancamento({
           </FormRow>
 
           <FormRow>
-            <Select
-              label={tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'}
-              value={form.pessoaId}
-              onChange={e => setForm({ ...form, pessoaId: e.target.value })}
-              placeholder="— Nenhum —"
-              options={pessoasFiltradas.map((p: any) => ({ value: String(p.id), label: p.nome }))}
-            />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                <label style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>
+                  {tipo === 'PAGAR' ? 'Fornecedor / Prestador' : 'Cliente'}
+                </label>
+                {!mostraCadastro && (
+                  <button
+                    onClick={() => setMostraCadastro(true)}
+                    style={{ fontSize: 10, color: C.emerald, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}
+                  >
+                    + Novo cadastro
+                  </button>
+                )}
+              </div>
+              <Select
+                label=""
+                value={form.pessoaId}
+                onChange={e => { setForm({ ...form, pessoaId: e.target.value }); setMostraCadastro(false) }}
+                placeholder="— Nenhum —"
+                options={pessoasFiltradas.map((p: any) => ({ value: String(p.id), label: p.nome }))}
+              />
+              {mostraCadastro && (
+                <CadastroRapidoInline
+                  nomeInicial=""
+                  tipo={tipo}
+                  onConfirmar={(id, nome) => {
+                    setForm({ ...form, pessoaId: String(id) })
+                    setMostraCadastro(false)
+                    utils.fin.pessoa.list.invalidate()
+                  }}
+                  onCancelar={() => setMostraCadastro(false)}
+                />
+              )}
+            </div>
             <Select
               label="Plano de Contas"
               value={form.planoContasId}
@@ -822,10 +940,10 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
       ) : (
         <Table
           columns={[
-            { key: 'vencimento', label: 'Vencimento', width: '105px' },
+            { key: 'vencimento', label: 'Vencimento', width: '95px' },
             { key: 'pessoa',     label: tipo === 'PAGAR' ? 'Fornecedor / Prestador' : 'Cliente' },
             { key: 'descricao',  label: 'Descrição' },
-            { key: 'documento',  label: 'Documento',  width: '110px' },
+            { key: 'conta',      label: 'Conta',      width: '110px' },
             { key: 'valor',      label: 'Valor',      align: 'right', width: '115px' },
             { key: 'status',     label: 'Status',     align: 'center', width: '110px' },
             { key: 'acoes',      label: '',           align: 'right',  width: '135px' },
@@ -861,9 +979,15 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
                 )}
               </div>
             ),
-            documento: r.documento
-              ? <span style={{ color: C.textMuted, fontSize: 12 }}>{r.documento}</span>
-              : <span style={{ color: C.textDim }}>—</span>,
+            conta: r.contaNome ? (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                background: C.emerald + '18', color: C.emerald,
+                whiteSpace: 'nowrap' as const,
+              }}>
+                🏦 {r.contaNome}
+              </span>
+            ) : <span style={{ color: C.textDim, fontSize: 11 }}>—</span>,
             valor: (() => {
               const valorOrig = Number(r.valor)
               const valorPago = r.valorPago != null ? Number(r.valorPago) : null

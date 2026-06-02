@@ -430,10 +430,11 @@ const dashboardRouter = router({
       const rec  = movPorConta.find((m: any) => m.contaId === c.id && m.tipo === 'RECEBER')
       const pag  = movPorConta.find((m: any) => m.contaId === c.id && m.tipo === 'PAGAR')
       return {
-        id:    c.id,
-        nome:  c.nome,
-        tipo:  c.tipo,
-        saldo: Number(c.saldoInicial ?? 0) + Number(rec?.total ?? 0) - Number(pag?.total ?? 0),
+        id:           c.id,
+        nome:         c.nome,
+        tipo:         c.tipo,
+        saldoInicial: Number(c.saldoInicial ?? 0),
+        saldo:        Number(c.saldoInicial ?? 0) + Number(rec?.total ?? 0) - Number(pag?.total ?? 0),
       }
     })
 
@@ -506,6 +507,7 @@ const tituloRouter = router({
           desconto:       finParcela.desconto,
           formaPagamento: finParcela.formaPagamento,
           contaId:        finParcela.contaId,
+          contaNome:      finContaBancaria.nome,
           tituloId:       finTitulo.id,
           tipo:           finTitulo.tipo,
           descricao:      finTitulo.descricao,
@@ -523,9 +525,10 @@ const tituloRouter = router({
         })
         .from(finParcela)
         .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
-        .leftJoin(finPessoa,       eq(finTitulo.pessoaId,      finPessoa.id))
-        .leftJoin(finPlanoContas,  eq(finTitulo.planoContasId, finPlanoContas.id))
-        .leftJoin(finCentroCusto,  eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .leftJoin(finPessoa,        eq(finTitulo.pessoaId,      finPessoa.id))
+        .leftJoin(finPlanoContas,   eq(finTitulo.planoContasId, finPlanoContas.id))
+        .leftJoin(finCentroCusto,   eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .leftJoin(finContaBancaria, eq(finParcela.contaId,      finContaBancaria.id))
         .where(and(
           eq(finTitulo.empresaId, empId),
           eq(finTitulo.tipo, input.tipo),

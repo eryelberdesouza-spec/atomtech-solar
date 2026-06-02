@@ -97,6 +97,26 @@ export function DashboardPage() {
         <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>Situação financeira atual</p>
       </div>
 
+      {/* ── Aviso saldo inicial ── */}
+      {r.contasResume?.some((c: any) => Number(c.saldoInicial) > 0) && (
+        <div style={{
+          background: '#F59E0B14', border: '1px solid #F59E0B40',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          display: 'flex', gap: 12, alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B', marginBottom: 3 }}>
+              Verifique o Saldo Inicial das suas contas bancárias
+            </div>
+            <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
+              Se você importou lançamentos históricos (OFX/PDF), o <strong style={{ color: C.text }}>Saldo Inicial</strong> deve ser o valor da conta <em>antes do primeiro lançamento importado</em>.
+              Caso contrário o saldo ficará duplicado. Corrija em <strong style={{ color: C.text }}>Configurações → Contas Bancárias</strong>.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── KPIs ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <KpiCard label="Saldo Total"       value={fmtBRLFull(r.saldoTotal)} icon="💰" color={r.saldoTotal >= 0 ? C.emerald : C.danger} sub="Soma de todas as contas" />
