@@ -720,6 +720,12 @@ export function OrdemServicoDetailPage() {
     onSettled: () => setMudandoStatus(false),
   })
 
+  // ⚠️ Todos os hooks ANTES dos early returns (Rules of Hooks)
+  const { data: anexos = [] } = (trpc as any).os.anexo.list.useQuery(
+    { ordemServicoId: osId },
+    { staleTime: 30_000, enabled: !!osId },
+  )
+
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}><Spinner /></div>
   if (!os) return <div style={{ padding: 32, color: '#F85149', fontSize: 14 }}>OS não encontrada.</div>
 
@@ -743,11 +749,6 @@ export function OrdemServicoDetailPage() {
     setMudandoStatus(true)
     updateStatusMut.mutate({ id: osId, status: 'cancelada' })
   }
-
-  const { data: anexos = [] } = (trpc as any).os.anexo.list.useQuery(
-    { ordemServicoId: osId },
-    { staleTime: 30_000 },
-  )
 
   const ABAS = [
     { id: 'geral',        label: '📋 Visão Geral' },
