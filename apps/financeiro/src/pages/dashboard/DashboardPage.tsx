@@ -156,7 +156,7 @@ export function DashboardPage() {
                   </div>
                   <div style={{ flexShrink: 0, textAlign: 'right' }}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: '#34D399', marginBottom: 4 }}>
-                      R$ {Number(alerta.valorPendente).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {fmtBRLFull(Number(alerta.valorPendente) || 0)}
                     </div>
                     <button
                       onClick={() => marcarLido.mutate({ id: alerta.id })}

@@ -131,7 +131,7 @@ export function Layout() {
     undefined,
     { staleTime: 60_000, refetchInterval: 5 * 60 * 1000 } // revalida a cada 5 min
   )
-  const totalAlertas = (alertaCount as any)?.total ?? 0
+  const totalAlertas = Number((alertaCount as any)?.total ?? 0)
 
   const current   = NAV.find(n => location.pathname.startsWith(n.path))
   const pageTitle = current?.label ?? 'Financeiro'
