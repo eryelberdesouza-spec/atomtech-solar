@@ -571,6 +571,41 @@ app.get('/run-migration-os-nota', async (_, res) => {
   }
 })
 
+// ── Migração: cria tabela fin_alerta (alertas OS→Financeiro) ─────────────────
+app.get('/run-migration-fin-alerta', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_alerta (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id      INT NOT NULL,
+        tipo            VARCHAR(60) NOT NULL DEFAULT 'os_concluida_receber',
+        titulo          VARCHAR(200) NOT NULL,
+        descricao       TEXT,
+        proposta_id     INT,
+        os_id           INT,
+        os_numero       VARCHAR(30),
+        cliente_nome    VARCHAR(200),
+        valor_pendente  DECIMAL(12,2),
+        lido            TINYINT(1) NOT NULL DEFAULT 0,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fin_alerta_emp  (empresa_id),
+        INDEX idx_fin_alerta_lido (empresa_id, lido),
+        UNIQUE KEY uk_alerta_os (empresa_id, os_id, tipo)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela fin_alerta criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 // ── Migração: adiciona coluna extrato_fingerprint na fin_parcela ─────────────
 app.get('/run-migration-extrato-fingerprint', async (_, res) => {
   try {

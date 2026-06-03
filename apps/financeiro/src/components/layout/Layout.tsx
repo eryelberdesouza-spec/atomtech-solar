@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { C } from '../ui'
+import { trpc } from '../../lib/trpc'
 
 const NAV = [
   { path: '/dashboard',    label: 'Dashboard',     icon: '◈', color: '#34D399', desc: 'Visão geral' },
@@ -44,7 +45,7 @@ const IconLogout = () => (
   </svg>
 )
 
-function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean }) {
+function NavItem({ item, collapsed, badge }: { item: typeof NAV[0]; collapsed: boolean; badge?: number }) {
   const location = useLocation()
   const isActive = location.pathname.startsWith(item.path)
   return (
@@ -84,7 +85,26 @@ function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean 
           )}
         </div>
       )}
-      {isActive && !collapsed && (
+      {/* Badge de alertas */}
+      {badge && badge > 0 && !collapsed && (
+        <div style={{
+          minWidth: 18, height: 18, borderRadius: 9,
+          background: '#EF4444', color: '#fff',
+          fontSize: 10, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 5px', flexShrink: 0,
+          boxShadow: '0 0 8px #EF444480',
+        }}>{badge > 99 ? '99+' : badge}</div>
+      )}
+      {badge && badge > 0 && collapsed && (
+        <div style={{
+          position: 'absolute', top: 2, right: 2,
+          width: 8, height: 8, borderRadius: '50%',
+          background: '#EF4444',
+          boxShadow: '0 0 6px #EF4444',
+        }} />
+      )}
+      {isActive && !collapsed && (!badge || badge === 0) && (
         <div style={{
           width: 6, height: 6, borderRadius: '50%',
           background: item.color,
@@ -105,6 +125,13 @@ function logout() {
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
+
+  // Badge de alertas não lidos (OS concluídas com recebimento pendente)
+  const { data: alertaCount } = (trpc as any).fin.alerta.count.useQuery(
+    undefined,
+    { staleTime: 60_000, refetchInterval: 5 * 60 * 1000 } // revalida a cada 5 min
+  )
+  const totalAlertas = (alertaCount as any)?.total ?? 0
 
   const current   = NAV.find(n => location.pathname.startsWith(n.path))
   const pageTitle = current?.label ?? 'Financeiro'
@@ -180,7 +207,12 @@ export function Layout() {
             }}>Menu</div>
           )}
           {NAV.map(item => (
-            <NavItem key={item.path} item={item} collapsed={collapsed} />
+            <NavItem
+              key={item.path}
+              item={item}
+              collapsed={collapsed}
+              badge={item.path === '/dashboard' ? totalAlertas : undefined}
+            />
           ))}
         </nav>
 

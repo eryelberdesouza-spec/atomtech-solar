@@ -2195,6 +2195,58 @@ const extratoRouter = router({
     }),
 })
 
+// ─── ALERTAS (OS concluída → recebimentos pendentes) ─────────────────────────
+
+const alertaRouter = router({
+
+  // Conta alertas não lidos (para badge na sidebar)
+  count: protectedProcedure.query(async ({ ctx }) => {
+    const [rows]: any = await ctx.db.execute(
+      `SELECT COUNT(*) AS total FROM fin_alerta WHERE empresa_id = ? AND lido = 0` as any,
+      [ctx.usuario.empresaId],
+    )
+    return { total: Number((rows as any[])[0]?.total ?? 0) }
+  }),
+
+  // Lista alertas (não lidos primeiro, depois lidos)
+  list: protectedProcedure
+    .input(z.object({ apenasNaoLidos: z.boolean().default(false) }))
+    .query(async ({ ctx, input }) => {
+      const where = input.apenasNaoLidos
+        ? `WHERE empresa_id = ? AND lido = 0`
+        : `WHERE empresa_id = ?`
+      const [rows]: any = await ctx.db.execute(
+        `SELECT id, tipo, titulo, descricao, proposta_id, os_id, os_numero,
+                cliente_nome, valor_pendente, lido, created_at AS createdAt
+         FROM fin_alerta ${where}
+         ORDER BY lido ASC, created_at DESC
+         LIMIT 50` as any,
+        [ctx.usuario.empresaId],
+      )
+      return rows as any[]
+    }),
+
+  // Marca alerta como lido/resolvido
+  marcarLido: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.execute(
+        `UPDATE fin_alerta SET lido = 1 WHERE id = ? AND empresa_id = ?` as any,
+        [input.id, ctx.usuario.empresaId],
+      )
+      return { ok: true }
+    }),
+
+  // Marca todos como lidos
+  marcarTodosLidos: protectedProcedure.mutation(async ({ ctx }) => {
+    await ctx.db.execute(
+      `UPDATE fin_alerta SET lido = 1 WHERE empresa_id = ? AND lido = 0` as any,
+      [ctx.usuario.empresaId],
+    )
+    return { ok: true }
+  }),
+})
+
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────
 
 export const finRouter = router({
@@ -2213,4 +2265,5 @@ export const finRouter = router({
   extrato:       extratoRouter,
   graficos:      graficosRouter,
   relatorios:    relatoriosRouter,
+  alerta:        alertaRouter,
 })

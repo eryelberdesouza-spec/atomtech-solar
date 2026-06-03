@@ -380,6 +380,59 @@ export const osRouter = router({
          WHERE id = ? AND empresa_id = ?`,
         [input.status, ...extraParams, input.id, ctx.usuario.empresaId],
       )
+
+      // ── Ao concluir: verifica recebimentos pendentes e gera alerta financeiro ──
+      if (input.status === 'concluida') {
+        try {
+          // Busca proposta_id e dados da OS
+          const [osInfo]: any = await pool.execute(
+            `SELECT os.proposta_id, os.numero AS os_numero, c.nome AS cliente_nome
+             FROM ordem_servico os
+             LEFT JOIN proposta p ON p.id = os.proposta_id
+             LEFT JOIN cliente c ON c.id = p.cliente_id
+             WHERE os.id = ? LIMIT 1`,
+            [input.id],
+          )
+          const os = (osInfo as any[])[0]
+
+          if (os?.proposta_id) {
+            // Verifica se há parcelas ABERTAS em títulos RECEBER vinculados à proposta
+            const [pendentes]: any = await pool.execute(
+              `SELECT SUM(fp.valor) AS total_pendente, COUNT(*) AS qtd
+               FROM fin_parcela fp
+               JOIN fin_titulo ft ON ft.id = fp.titulo_id
+               WHERE ft.proposta_id = ? AND ft.tipo = 'RECEBER'
+                 AND fp.status = 'ABERTA' AND ft.empresa_id = ?`,
+              [os.proposta_id, ctx.usuario.empresaId],
+            )
+            const totalPendente = Number((pendentes as any[])[0]?.total_pendente ?? 0)
+            const qtd = Number((pendentes as any[])[0]?.qtd ?? 0)
+
+            if (totalPendente > 0) {
+              // Cria alerta (IGNORE se já existe para esta OS)
+              await pool.execute(
+                `INSERT IGNORE INTO fin_alerta
+                   (empresa_id, tipo, titulo, descricao, proposta_id, os_id, os_numero, cliente_nome, valor_pendente)
+                 VALUES (?, 'os_concluida_receber', ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  ctx.usuario.empresaId,
+                  `OS concluída — cobrança pendente: ${os.cliente_nome ?? 'Cliente'}`,
+                  `A OS ${os.os_numero} foi concluída. Há ${qtd} parcela(s) a receber no total de R$ ${totalPendente.toFixed(2).replace('.', ',')} ainda em aberto.`,
+                  os.proposta_id,
+                  input.id,
+                  os.os_numero,
+                  os.cliente_nome ?? null,
+                  totalPendente.toFixed(2),
+                ],
+              )
+            }
+          }
+        } catch (alertErr) {
+          // Não bloqueia a conclusão da OS em caso de erro no alerta
+          console.error('Erro ao criar alerta financeiro:', alertErr)
+        }
+      }
+
       return { ok: true }
     }),
 

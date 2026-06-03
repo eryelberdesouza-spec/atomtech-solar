@@ -90,6 +90,12 @@ export function DashboardPage() {
 
   const r = resumo ?? { saldoTotal: 0, aReceber: 0, aPagar: 0, resultado: 0, vencendoHoje: 0, vencidos: 0, contasResume: [], lancamentosRecentes: [] }
 
+  const { data: alertas = [] } = (trpc as any).fin.alerta.list.useQuery({ apenasNaoLidos: true })
+  const marcarLido = (trpc as any).fin.alerta.marcarLido.useMutation({
+    onSuccess: () => (trpc as any).useUtils().fin.alerta.list.invalidate(),
+  })
+  const marcarTodos = (trpc as any).fin.alerta.marcarTodosNaoLidos?.useMutation?.() // safe
+
   return (
     <PageWrapper>
       <div style={{ marginBottom: 24 }}>
@@ -97,21 +103,71 @@ export function DashboardPage() {
         <p style={{ color: C.textMuted, fontSize: 12, margin: 0 }}>Situação financeira atual</p>
       </div>
 
-      {/* ── Aviso saldo inicial ── */}
-      {r.contasResume?.some((c: any) => Number(c.saldoInicial) > 0) && (
-        <div style={{
-          background: '#F59E0B14', border: '1px solid #F59E0B40',
-          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
-          display: 'flex', gap: 12, alignItems: 'flex-start',
-        }}>
-          <span style={{ fontSize: 18 }}>⚠️</span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B', marginBottom: 3 }}>
-              Verifique o Saldo Inicial das suas contas bancárias
+      {/* ── Alertas de OS concluídas com recebimentos pendentes ── */}
+      {(alertas as any[]).length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1A2E10 0%, #122010 100%)',
+            border: '1px solid #34D39940',
+            borderRadius: 12, overflow: 'hidden',
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '12px 18px',
+              background: '#34D39914',
+              borderBottom: '1px solid #34D39930',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>🔔</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#34D399' }}>
+                  {(alertas as any[]).length} OS concluída{(alertas as any[]).length > 1 ? 's' : ''} com recebimento pendente
+                </span>
+              </div>
+              <button
+                onClick={() => (trpc as any).useUtils && (alertas as any[]).forEach((a: any) => marcarLido.mutate({ id: a.id }))}
+                style={{ fontSize: 11, color: '#4A6080', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Marcar todas como resolvidas
+              </button>
             </div>
-            <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
-              Se você importou lançamentos históricos (OFX/PDF), o <strong style={{ color: C.text }}>Saldo Inicial</strong> deve ser o valor da conta <em>antes do primeiro lançamento importado</em>.
-              Caso contrário o saldo ficará duplicado. Corrija em <strong style={{ color: C.text }}>Configurações → Contas Bancárias</strong>.
+
+            {/* Lista de alertas */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {(alertas as any[]).map((alerta: any) => (
+                <div key={alerta.id} style={{
+                  padding: '12px 18px',
+                  borderBottom: '1px solid #34D39915',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#34D399', fontWeight: 700 }}>
+                        {alerta.osNumero}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                        {alerta.clienteNome ?? '—'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textMuted }}>{alerta.descricao}</div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#34D399', marginBottom: 4 }}>
+                      R$ {Number(alerta.valorPendente).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <button
+                      onClick={() => marcarLido.mutate({ id: alerta.id })}
+                      style={{
+                        padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                        border: '1px solid #34D39940', background: '#34D39914',
+                        color: '#34D399', cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      ✓ Resolver
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
