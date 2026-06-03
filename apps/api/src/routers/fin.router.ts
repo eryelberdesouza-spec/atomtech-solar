@@ -2201,47 +2201,55 @@ const alertaRouter = router({
 
   // Conta alertas não lidos (para badge na sidebar)
   count: protectedProcedure.query(async ({ ctx }) => {
-    const [rows]: any = await ctx.db.execute(
-      `SELECT COUNT(*) AS total FROM fin_alerta WHERE empresa_id = ? AND lido = 0` as any,
-      [ctx.usuario.empresaId],
+    const empId = ctx.usuario.empresaId
+    const rows = await ctx.db.execute(
+      sql`SELECT COUNT(*) AS total FROM fin_alerta WHERE empresa_id = ${empId} AND lido = 0`
     )
-    return { total: Number((rows as any[])[0]?.total ?? 0) }
+    const data = (rows as any).rows ?? rows
+    return { total: Number((data as any[])[0]?.total ?? 0) }
   }),
 
   // Lista alertas (não lidos primeiro, depois lidos)
   list: protectedProcedure
     .input(z.object({ apenasNaoLidos: z.boolean().default(false) }))
     .query(async ({ ctx, input }) => {
-      const where = input.apenasNaoLidos
-        ? `WHERE empresa_id = ? AND lido = 0`
-        : `WHERE empresa_id = ?`
-      const [rows]: any = await ctx.db.execute(
-        `SELECT id, tipo, titulo, descricao, proposta_id, os_id, os_numero,
-                cliente_nome, valor_pendente, lido, created_at AS createdAt
-         FROM fin_alerta ${where}
-         ORDER BY lido ASC, created_at DESC
-         LIMIT 50` as any,
-        [ctx.usuario.empresaId],
-      )
-      return rows as any[]
+      const empId = ctx.usuario.empresaId
+      const rows = input.apenasNaoLidos
+        ? await ctx.db.execute(
+            sql`SELECT id, tipo, titulo, descricao, proposta_id AS propostaId,
+                       os_id AS osId, os_numero AS osNumero, cliente_nome AS clienteNome,
+                       valor_pendente AS valorPendente, lido, created_at AS createdAt
+                FROM fin_alerta
+                WHERE empresa_id = ${empId} AND lido = 0
+                ORDER BY created_at DESC LIMIT 50`
+          )
+        : await ctx.db.execute(
+            sql`SELECT id, tipo, titulo, descricao, proposta_id AS propostaId,
+                       os_id AS osId, os_numero AS osNumero, cliente_nome AS clienteNome,
+                       valor_pendente AS valorPendente, lido, created_at AS createdAt
+                FROM fin_alerta
+                WHERE empresa_id = ${empId}
+                ORDER BY lido ASC, created_at DESC LIMIT 50`
+          )
+      return ((rows as any).rows ?? rows) as any[]
     }),
 
   // Marca alerta como lido/resolvido
   marcarLido: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
       await ctx.db.execute(
-        `UPDATE fin_alerta SET lido = 1 WHERE id = ? AND empresa_id = ?` as any,
-        [input.id, ctx.usuario.empresaId],
+        sql`UPDATE fin_alerta SET lido = 1 WHERE id = ${input.id} AND empresa_id = ${empId}`
       )
       return { ok: true }
     }),
 
   // Marca todos como lidos
   marcarTodosLidos: protectedProcedure.mutation(async ({ ctx }) => {
+    const empId = ctx.usuario.empresaId
     await ctx.db.execute(
-      `UPDATE fin_alerta SET lido = 1 WHERE empresa_id = ? AND lido = 0` as any,
-      [ctx.usuario.empresaId],
+      sql`UPDATE fin_alerta SET lido = 1 WHERE empresa_id = ${empId} AND lido = 0`
     )
     return { ok: true }
   }),

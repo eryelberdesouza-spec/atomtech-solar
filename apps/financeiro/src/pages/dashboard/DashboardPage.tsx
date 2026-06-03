@@ -91,10 +91,13 @@ export function DashboardPage() {
   const r = resumo ?? { saldoTotal: 0, aReceber: 0, aPagar: 0, resultado: 0, vencendoHoje: 0, vencidos: 0, contasResume: [], lancamentosRecentes: [] }
 
   const { data: alertas = [] } = (trpc as any).fin.alerta.list.useQuery({ apenasNaoLidos: true })
+  const utils = (trpc as any).useUtils()
   const marcarLido = (trpc as any).fin.alerta.marcarLido.useMutation({
-    onSuccess: () => (trpc as any).useUtils().fin.alerta.list.invalidate(),
+    onSuccess: () => utils.fin.alerta.list.invalidate(),
   })
-  const marcarTodos = (trpc as any).fin.alerta.marcarTodosNaoLidos?.useMutation?.() // safe
+  const marcarTodosLidos = (trpc as any).fin.alerta.marcarTodosLidos.useMutation({
+    onSuccess: () => utils.fin.alerta.list.invalidate(),
+  })
 
   return (
     <PageWrapper>
@@ -125,7 +128,7 @@ export function DashboardPage() {
                 </span>
               </div>
               <button
-                onClick={() => (trpc as any).useUtils && (alertas as any[]).forEach((a: any) => marcarLido.mutate({ id: a.id }))}
+                onClick={() => marcarTodosLidos.mutate()}
                 style={{ fontSize: 11, color: '#4A6080', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 Marcar todas como resolvidas
