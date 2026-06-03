@@ -85,8 +85,8 @@ function NavItem({ item, collapsed, badge }: { item: typeof NAV[0]; collapsed: b
           )}
         </div>
       )}
-      {/* Badge de alertas */}
-      {badge && badge > 0 && !collapsed && (
+      {/* Badge de alertas — !! evita renderizar o número 0 como texto */}
+      {!!badge && badge > 0 && !collapsed && (
         <div style={{
           minWidth: 18, height: 18, borderRadius: 9,
           background: '#EF4444', color: '#fff',
@@ -96,7 +96,7 @@ function NavItem({ item, collapsed, badge }: { item: typeof NAV[0]; collapsed: b
           boxShadow: '0 0 8px #EF444480',
         }}>{badge > 99 ? '99+' : badge}</div>
       )}
-      {badge && badge > 0 && collapsed && (
+      {!!badge && badge > 0 && collapsed && (
         <div style={{
           position: 'absolute', top: 2, right: 2,
           width: 8, height: 8, borderRadius: '50%',

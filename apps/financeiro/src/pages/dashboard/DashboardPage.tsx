@@ -107,7 +107,7 @@ export function DashboardPage() {
       </div>
 
       {/* ── Alertas de OS concluídas com recebimentos pendentes ── */}
-      {(alertas as any[]).length > 0 && (
+      {(alertas as any[]).filter((a: any) => Number(a.valorPendente) > 0).length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{
             background: 'linear-gradient(135deg, #1A2E10 0%, #122010 100%)',
@@ -124,7 +124,7 @@ export function DashboardPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 16 }}>🔔</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#34D399' }}>
-                  {(alertas as any[]).length} OS concluída{(alertas as any[]).length > 1 ? 's' : ''} com recebimento pendente
+                  {(alertas as any[]).filter((a: any) => Number(a.valorPendente) > 0).length} OS concluída{(alertas as any[]).filter((a: any) => Number(a.valorPendente) > 0).length > 1 ? 's' : ''} com recebimento pendente
                 </span>
               </div>
               <button
@@ -137,7 +137,7 @@ export function DashboardPage() {
 
             {/* Lista de alertas */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {(alertas as any[]).map((alerta: any) => (
+              {(alertas as any[]).filter((a: any) => Number(a.valorPendente) > 0).map((alerta: any) => (
                 <div key={alerta.id} style={{
                   padding: '12px 18px',
                   borderBottom: '1px solid #34D39915',
