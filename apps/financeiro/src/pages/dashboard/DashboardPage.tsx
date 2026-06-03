@@ -77,19 +77,11 @@ export function DashboardPage() {
   const [mesesEvolucao, setMesesEvolucao] = useState(12)
   const [tipoStatus, setTipoStatus]       = useState('AMBOS')
 
+  // ⚠️ Todos os hooks ANTES de qualquer early return (Rules of Hooks)
   const { data: resumo, isLoading } = (trpc as any).fin.dashboard.resumo.useQuery()
   const { data: evolucao = [], isLoading: lEv } = (trpc as any).fin.graficos.evolucao.useQuery({ meses: mesesEvolucao })
   const { data: distribuicao = [], isLoading: lDist } = (trpc as any).fin.graficos.distribuicaoDespesas.useQuery({})
   const { data: statusContas = [], isLoading: lStatus } = (trpc as any).fin.graficos.statusContas.useQuery({ tipo: tipoStatus })
-
-  if (isLoading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
-      <Spinner size={32} />
-    </div>
-  )
-
-  const r = resumo ?? { saldoTotal: 0, aReceber: 0, aPagar: 0, resultado: 0, vencendoHoje: 0, vencidos: 0, contasResume: [], lancamentosRecentes: [] }
-
   const { data: alertas = [] } = (trpc as any).fin.alerta.list.useQuery({ apenasNaoLidos: true })
   const utils = (trpc as any).useUtils()
   const marcarLido = (trpc as any).fin.alerta.marcarLido.useMutation({
@@ -98,6 +90,14 @@ export function DashboardPage() {
   const marcarTodosLidos = (trpc as any).fin.alerta.marcarTodosLidos.useMutation({
     onSuccess: () => utils.fin.alerta.list.invalidate(),
   })
+
+  if (isLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
+      <Spinner size={32} />
+    </div>
+  )
+
+  const r = resumo ?? { saldoTotal: 0, aReceber: 0, aPagar: 0, resultado: 0, vencendoHoje: 0, vencidos: 0, contasResume: [], lancamentosRecentes: [] }
 
   return (
     <PageWrapper>
