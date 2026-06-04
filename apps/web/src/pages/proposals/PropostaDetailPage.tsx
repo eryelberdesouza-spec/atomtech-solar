@@ -1276,6 +1276,82 @@ function PrazoExecucaoBar({ proposta, propostaId }: { proposta: any; propostaId:
   )
 }
 
+// ─── Modal: Editar dados gerais da proposta ───────────────────────────────────
+function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }: any) {
+  const [form, setForm] = useState({
+    dataEmissao:         String(proposta.dataEmissao ?? '').slice(0, 10),
+    dataValidade:        String(proposta.dataValidade ?? '').slice(0, 10),
+    tituloServico:       proposta.tituloServico ?? '',
+    observacoesInternas: proposta.observacoesInternas ?? '',
+  })
+
+  const inpSt: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    background: '#0C1828', border: '1px solid #1E3050',
+    borderRadius: 8, padding: '8px 12px', color: '#C8D8EC',
+    fontSize: 13, outline: 'none', fontFamily: 'inherit',
+  }
+  const lblSt: React.CSSProperties = {
+    fontSize: 10, color: '#4A6080', fontWeight: 700,
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    display: 'block', marginBottom: 4,
+  }
+
+  const handleSalvar = () => {
+    if (!form.dataEmissao) { alert('Informe a data de emissão'); return }
+    onSalvar({
+      dataEmissao:         form.dataEmissao,
+      dataValidade:        form.dataValidade || null,
+      tituloServico:       isServico ? (form.tituloServico || null) : undefined,
+      observacoesInternas: form.observacoesInternas || null,
+    })
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#00000088', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#131F30', border: '1px solid #1E3050', borderRadius: 14, padding: 28, width: 480, maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <h3 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0 }}>✏ Editar Dados da Proposta</h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div>
+            <label style={lblSt}>Data de Emissão *</label>
+            <input type="date" value={form.dataEmissao} onChange={e => setForm(f => ({ ...f, dataEmissao: e.target.value }))} style={inpSt} />
+          </div>
+          <div>
+            <label style={lblSt}>Data de Validade</label>
+            <input type="date" value={form.dataValidade} onChange={e => setForm(f => ({ ...f, dataValidade: e.target.value }))} style={inpSt} />
+            <div style={{ fontSize: 10, color: '#3A5070', marginTop: 3 }}>Deixe em branco para sem validade</div>
+          </div>
+        </div>
+
+        {isServico && (
+          <div>
+            <label style={lblSt}>Título do Serviço</label>
+            <input value={form.tituloServico} onChange={e => setForm(f => ({ ...f, tituloServico: e.target.value }))} placeholder="Ex: Instalação de Sistema Fotovoltaico" style={inpSt} />
+          </div>
+        )}
+
+        <div>
+          <label style={lblSt}>Observações Internas</label>
+          <textarea value={form.observacoesInternas} onChange={e => setForm(f => ({ ...f, observacoesInternas: e.target.value }))}
+            placeholder="Notas internas — não aparecem no PDF"
+            rows={3} style={{ ...inpSt, resize: 'vertical' as const }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#4A6080', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
+            Cancelar
+          </button>
+          <button onClick={handleSalvar} disabled={isLoading} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
+            {isLoading ? '⏳ Salvando...' : '✔ Salvar Alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function PropostaDetailPage() {
   const { id }    = useParams()
   const navigate  = useNavigate()
@@ -1289,6 +1365,7 @@ export function PropostaDetailPage() {
   const [showClonar, setShowClonar]         = useState(false)
   const [showAltCliente, setShowAltCliente] = useState(false)
   const [showCapaModal, setShowCapaModal]   = useState(false)
+  const [showEditDados, setShowEditDados]   = useState(false)
   const [capaImgSelecionada, setCapaImgSelecionada] = useState('')
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
@@ -1349,9 +1426,23 @@ export function PropostaDetailPage() {
   })
 
   const clonarMutation = (trpc as any).proposta.clonar.useMutation({
-    onSuccess: (res: any) => { navigate(`/propostas/${res.propostaId}`) },
+    onSuccess: (res: any) => {
+      alert(`✓ Proposta clonada com sucesso!\nNova proposta: aguarde, abrindo...`)
+      navigate(`/propostas/${res.propostaId}`)
+    },
     onError: (e: any) => alert('Erro ao clonar: ' + (e?.message ?? 'Tente novamente')),
   })
+
+  const excluirMutation = (trpc as any).proposta.delete.useMutation({
+    onSuccess: () => { alert('Proposta excluída com sucesso.'); navigate('/propostas') },
+    onError: (e: any) => alert('Erro ao excluir: ' + (e?.message ?? 'Tente novamente')),
+  })
+
+  const updateDadosMutation = (trpc as any).proposta.updateDados.useMutation({
+    onSuccess: () => { setShowEditDados(false); utils.proposta.byId.invalidate({ id: propostaId }) },
+    onError: (e: any) => alert('Erro ao salvar: ' + (e?.message ?? 'Tente novamente')),
+  })
+
   const updateClienteMutation = (trpc as any).proposta.updateCliente.useMutation({
     onSuccess: () => { setShowAltCliente(false); utils.proposta.byId.invalidate({ id: propostaId }); (utils as any).cliente.byId.invalidate() },
     onError: (e: any) => alert('Erro ao alterar cliente: ' + (e?.message ?? 'Tente novamente')),
@@ -1512,10 +1603,27 @@ export function PropostaDetailPage() {
             )}
             <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')}
               style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
+            <Btn variant="ghost" size="sm" onClick={() => setShowEditDados(true)}
+              style={{ color: C.textMuted, borderColor: C.darkBorder }}>✏ Editar</Btn>
             <Btn variant="ghost" size="sm" onClick={() => setShowAltCliente(true)}
               style={{ color: C.textMuted, borderColor: C.darkBorder }}>👤 Alt. Cliente</Btn>
-            <Btn variant="ghost" size="sm" onClick={() => setShowClonar(true)}
-              style={{ color: C.accent, borderColor: C.accent + '50' }}>⎘ Clonar</Btn>
+            <Btn variant="ghost" size="sm"
+              onClick={() => setShowClonar(true)}
+              disabled={clonarMutation.isLoading}
+              style={{ color: C.accent, borderColor: C.accent + '50' }}>
+              {clonarMutation.isLoading ? '⏳ Clonando...' : '⎘ Clonar'}
+            </Btn>
+            {proposta.status !== 'cancelada' && (
+              <Btn variant="ghost" size="sm"
+                onClick={() => { if (window.confirm('Cancelar esta proposta? Ela continuará visível mas marcada como cancelada.')) handleStatus('cancelada') }}
+                style={{ color: C.danger, borderColor: C.danger + '30' }}>⊘ Cancelar</Btn>
+            )}
+            <Btn variant="ghost" size="sm"
+              onClick={() => { if (window.confirm(`EXCLUIR PERMANENTEMENTE a proposta ${proposta.numero}?\n\nEsta ação não pode ser desfeita.`)) excluirMutation.mutate({ id: propostaId }) }}
+              disabled={excluirMutation.isLoading}
+              style={{ color: C.danger, borderColor: C.danger + '50', background: C.danger + '08' }}>
+              {excluirMutation.isLoading ? '⏳...' : '🗑 Excluir'}
+            </Btn>
             <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
               style={{ borderColor: C.green + '60', color: C.green }}>
               {gerandoContrato ? '⏳...' : '📄 Gerar Contrato'}
@@ -1638,6 +1746,17 @@ export function PropostaDetailPage() {
           onChange={setCapaImgSelecionada}
           onConfirm={() => handleGerarPdfComCapa(capaImgSelecionada)}
           onClose={() => setShowCapaModal(false)}
+        />
+      )}
+
+      {/* ── MODAL: EDITAR DADOS DA PROPOSTA ─────────────────────── */}
+      {showEditDados && (
+        <ModalEditarDados
+          proposta={proposta}
+          isServico={isServico}
+          isLoading={updateDadosMutation.isLoading}
+          onClose={() => setShowEditDados(false)}
+          onSalvar={(dados) => updateDadosMutation.mutate({ id: propostaId, ...dados })}
         />
       )}
 

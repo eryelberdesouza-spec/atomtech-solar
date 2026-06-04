@@ -814,11 +814,40 @@ export const propostaRouter = router({
       return { ok: true }
     }),
 
+  // Atualiza dados gerais da proposta (datas, título, observações)
+  updateDados: protectedProcedure
+    .input(z.object({
+      id:                   z.number().int().positive(),
+      dataEmissao:          z.string().optional(),
+      dataValidade:         z.string().optional().nullable(),
+      tituloServico:        z.string().optional().nullable(),
+      observacoesInternas:  z.string().optional().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const set: any = {}
+      if (input.dataEmissao !== undefined)         set.dataEmissao         = input.dataEmissao
+      if (input.dataValidade !== undefined)         set.dataValidade        = input.dataValidade
+      if (input.tituloServico !== undefined)        set.tituloServico       = input.tituloServico
+      if (input.observacoesInternas !== undefined)  set.observacoesInternas = input.observacoesInternas
+
+      await ctx.db.update(proposta).set(set)
+        .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, empresaId)))
+        .execute()
+
+      return { ok: true }
+    }),
+
   // Atualiza status
   updateStatus: protectedProcedure
     .input(z.object({
       id: z.number().int().positive(),
-      status: z.enum(['rascunho', 'enviada', 'aceita', 'recusada', 'expirada']),
+      status: z.enum(['rascunho', 'enviada', 'aceita', 'recusada', 'expirada', 'cancelada']),
     }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
