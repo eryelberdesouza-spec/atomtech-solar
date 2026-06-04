@@ -17,6 +17,7 @@ const ALLOWED_ORIGINS = [
   'https://atomtech-solar-web.vercel.app',
   'https://atomtech-financeiro.vercel.app',
   'https://financeiro-two-mu.vercel.app',
+  'https://web-seven-pi-60.vercel.app',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_FIN_URL,
 ].filter(Boolean) as string[]
@@ -24,7 +25,8 @@ const ALLOWED_ORIGINS = [
 app.use(cors({
   origin: (origin, callback) => {
     // Permite qualquer porta localhost em desenvolvimento
-    if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || ALLOWED_ORIGINS.includes(origin)) {
+    const isVercelPreview = origin ? /^https:\/\/[\w-]+-eryelberdesouza-specs-projects\.vercel\.app$/.test(origin) : false
+    if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || ALLOWED_ORIGINS.includes(origin) || isVercelPreview) {
       callback(null, true)
     } else {
       callback(new Error('Not allowed by CORS'))
