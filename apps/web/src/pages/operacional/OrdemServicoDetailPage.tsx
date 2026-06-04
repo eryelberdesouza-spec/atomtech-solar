@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
@@ -486,8 +486,9 @@ function fmtTamanho(bytes: number) {
 function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
   const [uploading,    setUploading]    = useState(false)
   const [erro,         setErro]         = useState('')
-  const [preview,      setPreview]      = useState<{ id: number; nome: string; tipoMime: string } | null>(null)
+  const [previewIdx,   setPreviewIdx]   = useState<number | null>(null)
   const [dragOver,     setDragOver]     = useState(false)
+  const [hoveredId,    setHoveredId]    = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const utils  = (trpc as any).useUtils()
@@ -502,6 +503,17 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
     onSuccess: refresh,
     onError: (e: any) => alert('Erro: ' + e.message),
   })
+
+  useEffect(() => {
+    if (previewIdx === null) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft')  setPreviewIdx(i => (i! > 0 ? i! - 1 : i))
+      if (e.key === 'ArrowRight') setPreviewIdx(i => (i! < (anexos as any[]).length - 1 ? i! + 1 : i))
+      if (e.key === 'Escape')     setPreviewIdx(null)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [previewIdx, anexos])
 
   const uploadFile = async (file: File) => {
     setErro('')
@@ -532,6 +544,9 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
 
   const fileUrl = (id: number) =>
     `${API_BASE}/os-anexo/${id}?token=${encodeURIComponent(getToken())}`
+
+  const downloadUrl = (id: number) =>
+    `${API_BASE}/os-anexo/${id}?token=${encodeURIComponent(getToken())}&download=1`
 
   const isImage = (mime: string) => mime.startsWith('image/')
   const isPDF   = (mime: string) => mime === 'application/pdf'
@@ -591,28 +606,45 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-          {(anexos as any[]).map((a: any) => (
+          {(anexos as any[]).map((a: any, idx: number) => (
             <div
               key={a.id}
               style={{
-                background: '#111D2E', border: '1px solid #1E3050', borderRadius: 10,
+                background: '#111D2E', border: `1px solid ${hoveredId === a.id ? '#F5A623' : '#1E3050'}`, borderRadius: 10,
                 overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s', position: 'relative',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#F5A623'}
-              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = '#1E3050'}
+              onMouseEnter={() => setHoveredId(a.id)}
+              onMouseLeave={() => setHoveredId(null)}
             >
               {/* Thumbnail / preview */}
               <div
-                onClick={() => setPreview({ id: a.id, nome: a.nome, tipoMime: a.tipoMime })}
-                style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#0C1828' }}
+                onClick={() => setPreviewIdx(idx)}
+                style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#0C1828', position: 'relative' }}
               >
                 {isImage(a.tipoMime) ? (
-                  <img
-                    src={fileUrl(a.id)}
-                    alt={a.nome}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    loading="lazy"
-                  />
+                  <>
+                    <img
+                      src={fileUrl(a.id)}
+                      alt={a.nome}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      loading="lazy"
+                    />
+                    {/* Overlay de download no hover */}
+                    {hoveredId === a.id && (
+                      <a
+                        href={downloadUrl(a.id)}
+                        download={a.nome}
+                        onClick={e => e.stopPropagation()}
+                        title="Baixar"
+                        style={{
+                          position: 'absolute', top: 6, right: 6,
+                          background: '#000000BB', borderRadius: 6, padding: '4px 8px',
+                          color: '#fff', fontSize: 14, textDecoration: 'none',
+                          lineHeight: 1, display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >⬇</a>
+                    )}
+                  </>
                 ) : isPDF(a.tipoMime) ? (
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 48 }}>📄</div>
@@ -631,11 +663,11 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
                 <div style={{ fontSize: 10, color: '#4A6080', marginTop: 2 }}>{fmtTamanho(a.tamanho)}</div>
                 <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                   <button
-                    onClick={() => setPreview({ id: a.id, nome: a.nome, tipoMime: a.tipoMime })}
+                    onClick={() => setPreviewIdx(idx)}
                     style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#8A9BB5', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit' }}
                   >👁 Ver</button>
                   <a
-                    href={fileUrl(a.id)}
+                    href={downloadUrl(a.id)}
                     download={a.nome}
                     style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#8A9BB5', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >⬇</a>
@@ -653,47 +685,76 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
       )}
 
       {/* Modal de Preview */}
-      {preview && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: '#000000CC', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
-          onClick={e => e.target === e.currentTarget && setPreview(null)}
-        >
-          {/* Barra de controles */}
-          <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 8 }}>
-            <a href={fileUrl(preview.id)} download={preview.nome} style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>⬇ Baixar</a>
-            <a href={fileUrl(preview.id)} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>↗ Abrir</a>
-            <button onClick={() => setPreview(null)} style={{ padding: '8px 14px', borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕ Fechar</button>
-          </div>
+      {previewIdx !== null && (() => {
+        const allAnexos = anexos as any[]
+        const cur = allAnexos[previewIdx]
+        if (!cur) return null
+        const canPrev = previewIdx > 0
+        const canNext = previewIdx < allAnexos.length - 1
+        const navBtn = (disabled: boolean, onClick: () => void, label: string) => (
+          <button
+            onClick={onClick}
+            disabled={disabled}
+            style={{
+              position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+              background: disabled ? '#1E305060' : '#1E3050DD',
+              border: 'none', borderRadius: 8, color: disabled ? '#4A6080' : '#C8D8EC',
+              fontSize: 22, fontWeight: 700, cursor: disabled ? 'default' : 'pointer',
+              padding: '12px 16px', zIndex: 10, fontFamily: 'inherit', lineHeight: 1,
+              ...(label === '‹' ? { left: 12 } : { right: 12 }),
+            }}
+          >{label}</button>
+        )
+        return (
+          <div
+            style={{ position: 'fixed', inset: 0, background: '#000000CC', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+            onClick={e => e.target === e.currentTarget && setPreviewIdx(null)}
+          >
+            {/* Barra de controles */}
+            <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 8 }}>
+              <a href={downloadUrl(cur.id)} download={cur.nome} style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>⬇ Baixar</a>
+              <a href={fileUrl(cur.id)} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>↗ Abrir</a>
+              <button onClick={() => setPreviewIdx(null)} style={{ padding: '8px 14px', borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕ Fechar</button>
+            </div>
 
-          {/* Nome do arquivo */}
-          <div style={{ position: 'absolute', top: 16, left: 16, color: '#C8D8EC', fontSize: 13, fontWeight: 600, maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            📎 {preview.nome}
-          </div>
+            {/* Nome do arquivo + contador */}
+            <div style={{ position: 'absolute', top: 16, left: 16, color: '#C8D8EC', fontSize: 13, fontWeight: 600, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              📎 {cur.nome}
+            </div>
+            <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', color: '#4A6080', fontSize: 12 }}>
+              {previewIdx + 1} / {allAnexos.length}
+            </div>
 
-          {/* Conteúdo */}
-          <div style={{ maxWidth: '90vw', maxHeight: '80vh', marginTop: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {isImage(preview.tipoMime) ? (
-              <img
-                src={fileUrl(preview.id)}
-                alt={preview.nome}
-                style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.8)', objectFit: 'contain' }}
-              />
-            ) : isPDF(preview.tipoMime) ? (
-              <iframe
-                src={fileUrl(preview.id)}
-                style={{ width: '80vw', height: '78vh', borderRadius: 8, border: 'none', background: '#fff' }}
-                title={preview.nome}
-              />
-            ) : (
-              <div style={{ color: '#C8D8EC', textAlign: 'center' }}>
-                <div style={{ fontSize: 64, marginBottom: 16 }}>📎</div>
-                <div>{preview.nome}</div>
-                <a href={fileUrl(preview.id)} download={preview.nome} style={{ color: '#F5A623', marginTop: 12, display: 'block' }}>Baixar arquivo</a>
-              </div>
-            )}
+            {/* Setas de navegação */}
+            {navBtn(!canPrev, () => setPreviewIdx(i => i! - 1), '‹')}
+            {navBtn(!canNext, () => setPreviewIdx(i => i! + 1), '›')}
+
+            {/* Conteúdo */}
+            <div style={{ maxWidth: '80vw', maxHeight: '80vh', marginTop: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isImage(cur.tipoMime) ? (
+                <img
+                  key={cur.id}
+                  src={fileUrl(cur.id)}
+                  alt={cur.nome}
+                  style={{ maxWidth: '80vw', maxHeight: '80vh', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.8)', objectFit: 'contain' }}
+                />
+              ) : isPDF(cur.tipoMime) ? (
+                <iframe
+                  src={fileUrl(cur.id)}
+                  style={{ width: '80vw', height: '78vh', borderRadius: 8, border: 'none', background: '#fff' }}
+                  title={cur.nome}
+                />
+              ) : (
+                <div style={{ color: '#C8D8EC', textAlign: 'center' }}>
+                  <div style={{ fontSize: 64, marginBottom: 16 }}>📎</div>
+                  <div>{cur.nome}</div>
+                  <a href={downloadUrl(cur.id)} download={cur.nome} style={{ color: '#F5A623', marginTop: 12, display: 'block', textDecoration: 'none' }}>Baixar arquivo</a>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
