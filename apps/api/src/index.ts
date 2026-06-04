@@ -788,8 +788,9 @@ app.get('/os-anexo/:id', async (req, res) => {
     const file = (rows as any[])[0]
     if (!file) { res.status(404).send('Arquivo não encontrado'); return }
 
+    const download = req.query.download === '1'
     res.setHeader('Content-Type', file.tipo_mime)
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.nome)}"`)
+    res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${encodeURIComponent(file.nome)}"`)
     res.setHeader('Cache-Control', 'private, max-age=3600')
     res.send(file.dados)
   } catch (e: any) {
