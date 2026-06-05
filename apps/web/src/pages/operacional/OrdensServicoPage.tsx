@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
@@ -24,8 +24,284 @@ function ProgressBar({ feitos, total }: { feitos: number; total: number }) {
   )
 }
 
+// ─── Modal Contratos Históricos ──────────────────────────────────────────────
+
+const LINHA_VAZIA = () => ({
+  clienteNome: '', valorContrato: '', descricao: '', dataInicio: '',
+  dataConclusao: '', status: 'concluida' as const, tecnicoResponsavel: '',
+  numeroContratoExterno: '', observacoes: '',
+})
+
+function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso: () => void }) {
+  const [aba, setAba] = useState<'individual' | 'lote'>('individual')
+  const [enviando, setEnviando] = useState(false)
+  const [resultado, setResultado] = useState<any>(null)
+  const [erro, setErro] = useState('')
+
+  // ── Individual ──
+  const [form, setForm] = useState({
+    clienteNome: '', valorContrato: '', descricao: '', dataInicio: '',
+    dataConclusao: '', status: 'em_execucao' as 'aberta' | 'em_execucao' | 'concluida',
+    tecnicoResponsavel: '', numeroContratoExterno: '', observacoes: '',
+  })
+
+  // ── Lote ──
+  const [linhas, setLinhas] = useState([LINHA_VAZIA(), LINHA_VAZIA(), LINHA_VAZIA()])
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const utils = (trpc as any).useUtils()
+  const criarHistorico      = (trpc as any).os.criarHistorico.useMutation()
+  const importarLote        = (trpc as any).os.importarLoteHistorico.useMutation()
+
+  const fmtValor = (v: string) => v.replace(/[^\d,\.]/g, '').replace(',', '.')
+  const parseValor = (v: string) => parseFloat(fmtValor(v)) || 0
+
+  const inputStyle = {
+    padding: '7px 10px', borderRadius: 7, border: '1px solid #1E3050',
+    background: '#0C1828', color: '#C8D8EC', fontSize: 12, fontFamily: 'inherit',
+    outline: 'none', width: '100%', boxSizing: 'border-box' as const,
+  }
+  const labelStyle = { fontSize: 11, color: '#4A6080', fontWeight: 700, display: 'block' as const, marginBottom: 3 }
+
+  const setLinha = (i: number, field: string, val: string) =>
+    setLinhas(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l))
+
+  const adicionarLinhas = (n = 5) =>
+    setLinhas(prev => [...prev, ...Array.from({ length: n }, LINHA_VAZIA)])
+
+  const removerLinha = (i: number) =>
+    setLinhas(prev => prev.filter((_, idx) => idx !== i))
+
+  const enviarIndividual = async () => {
+    setErro(''); setResultado(null)
+    if (!form.clienteNome.trim()) { setErro('Informe o nome do cliente'); return }
+    if (!form.dataInicio)         { setErro('Informe a data de início'); return }
+    if (!parseValor(form.valorContrato)) { setErro('Informe o valor do contrato'); return }
+    setEnviando(true)
+    try {
+      const res = await criarHistorico.mutateAsync({
+        clienteNome:           form.clienteNome.trim(),
+        valorContrato:         parseValor(form.valorContrato),
+        descricao:             form.descricao || undefined,
+        dataInicio:            form.dataInicio,
+        dataConclusao:         form.dataConclusao || undefined,
+        status:                form.status,
+        tecnicoResponsavel:    form.tecnicoResponsavel || undefined,
+        numeroContratoExterno: form.numeroContratoExterno || undefined,
+        observacoes:           form.observacoes || undefined,
+      })
+      setResultado({ tipo: 'individual', numero: res.numero })
+      utils.os.list.invalidate()
+    } catch (e: any) { setErro(e.message) }
+    finally { setEnviando(false) }
+  }
+
+  const enviarLote = async () => {
+    setErro(''); setResultado(null)
+    const validas = linhas.filter(l => l.clienteNome.trim() && l.dataInicio && parseValor(l.valorContrato) > 0)
+    if (!validas.length) { setErro('Preencha ao menos uma linha completa (cliente, data e valor)'); return }
+    setEnviando(true)
+    try {
+      const res = await importarLote.mutateAsync({
+        contratos: validas.map(l => ({
+          clienteNome:           l.clienteNome.trim(),
+          valorContrato:         parseValor(l.valorContrato),
+          descricao:             l.descricao || undefined,
+          dataInicio:            l.dataInicio,
+          dataConclusao:         l.dataConclusao || undefined,
+          status:                l.status,
+          tecnicoResponsavel:    l.tecnicoResponsavel || undefined,
+          numeroContratoExterno: l.numeroContratoExterno || undefined,
+          observacoes:           l.observacoes || undefined,
+        })),
+      })
+      setResultado({ tipo: 'lote', ...res })
+      utils.os.list.invalidate()
+    } catch (e: any) { setErro(e.message) }
+    finally { setEnviando(false) }
+  }
+
+  const S = { // estilos reutilizados
+    overlay: { position: 'fixed' as const, inset: 0, background: '#000000CC', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
+    box:     { background: '#0F1A29', border: '1px solid #1E3050', borderRadius: 14, width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
+    header:  { padding: '18px 24px', borderBottom: '1px solid #1E3050', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    body:    { padding: '20px 24px', overflowY: 'auto' as const, flex: 1 },
+    footer:  { padding: '14px 24px', borderTop: '1px solid #1E3050', display: 'flex', justifyContent: 'flex-end', gap: 8 },
+  }
+
+  return (
+    <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={S.box}>
+        {/* Header */}
+        <div style={S.header}>
+          <div>
+            <h2 style={{ color: '#C8D8EC', fontSize: 15, fontWeight: 800, margin: 0 }}>📦 Registrar Contratos Históricos</h2>
+            <p style={{ color: '#4A6080', fontSize: 11, margin: '2px 0 0' }}>Contratos firmados antes da plataforma — serão geradas OS automaticamente</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4A6080', fontSize: 18, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Abas */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #1E3050', padding: '0 24px' }}>
+          {([['individual', '📝 Cadastro Individual'], ['lote', '📋 Importação em Lote']] as const).map(([id, label]) => (
+            <button key={id} onClick={() => { setAba(id); setErro(''); setResultado(null) }}
+              style={{ padding: '10px 16px', border: 'none', borderBottom: `2px solid ${aba === id ? '#F5A623' : 'transparent'}`, background: 'none', color: aba === id ? '#F5A623' : '#4A6080', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={S.body}>
+          {/* ── Resultado ── */}
+          {resultado && (
+            <div style={{ background: '#3EBB7A18', border: '1px solid #3EBB7A40', borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
+              {resultado.tipo === 'individual' ? (
+                <div style={{ color: '#3EBB7A', fontSize: 13, fontWeight: 700 }}>
+                  ✅ OS <span style={{ fontFamily: 'monospace' }}>{resultado.numero}</span> criada com sucesso!
+                  <button onClick={onSucesso} style={{ marginLeft: 12, padding: '4px 12px', borderRadius: 6, background: '#3EBB7A', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>Ver na lista</button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ color: '#3EBB7A', fontSize: 13, fontWeight: 700 }}>✅ {resultado.importados} contrato(s) importado(s) com sucesso!</div>
+                  {resultado.erros > 0 && <div style={{ color: '#F5A623', fontSize: 12, marginTop: 4 }}>⚠️ {resultado.erros} linha(s) com erro</div>}
+                  {resultado.resultados?.filter((r: any) => !r.ok).map((r: any) => (
+                    <div key={r.linha} style={{ color: '#F85149', fontSize: 11, marginTop: 2 }}>Linha {r.linha}: {r.erro}</div>
+                  ))}
+                  <button onClick={onSucesso} style={{ marginTop: 8, padding: '4px 12px', borderRadius: 6, background: '#3EBB7A', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>Ver na lista</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {erro && (
+            <div style={{ background: '#F8514912', border: '1px solid #F8514940', borderRadius: 8, padding: '10px 14px', marginBottom: 14, color: '#F85149', fontSize: 12 }}>{erro}</div>
+          )}
+
+          {/* ── ABA: Individual ── */}
+          {aba === 'individual' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Cliente *</label>
+                <input style={inputStyle} placeholder="Nome do cliente" value={form.clienteNome} onChange={e => setForm(f => ({ ...f, clienteNome: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Valor do Contrato (R$) *</label>
+                <input style={inputStyle} placeholder="Ex: 25000" value={form.valorContrato} onChange={e => setForm(f => ({ ...f, valorContrato: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Nº Contrato Externo</label>
+                <input style={inputStyle} placeholder="Ex: CT-2024-001" value={form.numeroContratoExterno} onChange={e => setForm(f => ({ ...f, numeroContratoExterno: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Data de Início *</label>
+                <input type="date" style={inputStyle} value={form.dataInicio} onChange={e => setForm(f => ({ ...f, dataInicio: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Data de Conclusão</label>
+                <input type="date" style={inputStyle} value={form.dataConclusao} onChange={e => setForm(f => ({ ...f, dataConclusao: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Status Atual *</label>
+                <select style={inputStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}>
+                  <option value="em_execucao">🔧 Em Execução</option>
+                  <option value="concluida">✅ Concluído</option>
+                  <option value="aberta">📋 Aberto (aguardando início)</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Técnico Responsável</label>
+                <input style={inputStyle} placeholder="Nome do técnico" value={form.tecnicoResponsavel} onChange={e => setForm(f => ({ ...f, tecnicoResponsavel: e.target.value }))} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Descrição do Serviço</label>
+                <textarea style={{ ...inputStyle, height: 70, resize: 'vertical' }} placeholder="Ex: Instalação de sistema fotovoltaico 8,25 kWp" value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Observações</label>
+                <textarea style={{ ...inputStyle, height: 55, resize: 'vertical' }} placeholder="Informações adicionais, pendências, garantias..." value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
+              </div>
+            </div>
+          )}
+
+          {/* ── ABA: Lote ── */}
+          {aba === 'lote' && (
+            <div>
+              <div style={{ background: '#58A6FF10', border: '1px solid #58A6FF30', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 11, color: '#58A6FF' }}>
+                💡 Preencha uma linha por contrato. Campos obrigatórios: <strong>Cliente</strong>, <strong>Data Início</strong> e <strong>Valor</strong>. Linhas em branco são ignoradas.
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #1E3050' }}>
+                      {['#', 'Cliente *', 'Nº Contrato', 'Valor R$ *', 'Data Início *', 'Data Conclusão', 'Status', 'Técnico', ''].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: '#4A6080', fontWeight: 700, whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linhas.map((l, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #1E305030' }}>
+                        <td style={{ padding: '4px 8px', color: '#4A6080', fontSize: 10 }}>{i + 1}</td>
+                        <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 150 }} placeholder="Nome" value={l.clienteNome} onChange={e => setLinha(i, 'clienteNome', e.target.value)} /></td>
+                        <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 100 }} placeholder="CT-0001" value={l.numeroContratoExterno} onChange={e => setLinha(i, 'numeroContratoExterno', e.target.value)} /></td>
+                        <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 90 }} placeholder="25000" value={l.valorContrato} onChange={e => setLinha(i, 'valorContrato', e.target.value)} /></td>
+                        <td style={{ padding: '3px 4px' }}><input type="date" style={{ ...inputStyle, minWidth: 130 }} value={l.dataInicio} onChange={e => setLinha(i, 'dataInicio', e.target.value)} /></td>
+                        <td style={{ padding: '3px 4px' }}><input type="date" style={{ ...inputStyle, minWidth: 130 }} value={l.dataConclusao} onChange={e => setLinha(i, 'dataConclusao', e.target.value)} /></td>
+                        <td style={{ padding: '3px 4px' }}>
+                          <select style={{ ...inputStyle, minWidth: 110 }} value={l.status} onChange={e => setLinha(i, 'status', e.target.value)}>
+                            <option value="em_execucao">Em Execução</option>
+                            <option value="concluida">Concluído</option>
+                            <option value="aberta">Aberto</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 110 }} placeholder="Técnico" value={l.tecnicoResponsavel} onChange={e => setLinha(i, 'tecnicoResponsavel', e.target.value)} /></td>
+                        <td style={{ padding: '3px 4px' }}>
+                          <button onClick={() => removerLinha(i)} style={{ background: 'none', border: 'none', color: '#F85149', cursor: 'pointer', fontSize: 14, padding: '2px 6px' }}>✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button onClick={() => adicionarLinhas(5)} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                  + 5 linhas
+                </button>
+                <button onClick={() => adicionarLinhas(10)} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                  + 10 linhas
+                </button>
+                <span style={{ fontSize: 11, color: '#4A6080', alignSelf: 'center', marginLeft: 4 }}>
+                  {linhas.filter(l => l.clienteNome.trim() && l.dataInicio && parseValor(l.valorContrato) > 0).length} linha(s) válida(s)
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={S.footer}>
+          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+            Fechar
+          </button>
+          <button
+            onClick={aba === 'individual' ? enviarIndividual : enviarLote}
+            disabled={enviando}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: enviando ? '#F5A62360' : '#F5A623', color: '#0C1421', cursor: enviando ? 'default' : 'pointer', fontSize: 12, fontWeight: 800, fontFamily: 'inherit' }}
+          >
+            {enviando ? '⏳ Processando...' : aba === 'individual' ? '✅ Registrar Contrato' : '📦 Importar Lote'}
+          </button>
+        </div>
+        <input ref={fileRef} type="file" style={{ display: 'none' }} />
+      </div>
+    </div>
+  )
+}
+
 function OSCard({ os, onClick }: { os: any; onClick: () => void }) {
   const status = STATUS_OS.find(s => s.id === os.status) ?? STATUS_OS[0]
+  const isHistorico = os.origem === 'historico'
   return (
     <div
       onClick={onClick}
@@ -39,7 +315,12 @@ function OSCard({ os, onClick }: { os: any; onClick: () => void }) {
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#1E3050'; (e.currentTarget as HTMLDivElement).style.borderLeftColor = status.color; (e.currentTarget as HTMLDivElement).style.background = '#111D2E' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <span style={{ fontSize: 11, fontFamily: 'monospace', color: status.color, fontWeight: 700 }}>{os.numero}</span>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: status.color, fontWeight: 700 }}>{os.numero}</span>
+          {isHistorico && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#8A9BB520', color: '#8A9BB5', border: '1px solid #8A9BB540' }}>HIST</span>
+          )}
+        </div>
         {os.totalAgendamentos > 0 && (
           <span style={{ fontSize: 10, color: '#58A6FF' }}>📅 {os.totalAgendamentos}</span>
         )}
@@ -71,6 +352,7 @@ export function OrdensServicoPage() {
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [view, setView] = useState<'kanban' | 'lista'>('kanban')
+  const [showModalHistorico, setShowModalHistorico] = useState(false)
 
   const { data, isLoading } = (trpc as any).os.list.useQuery(
     { porPagina: 200 },
@@ -114,6 +396,11 @@ export function OrdensServicoPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Botão histórico */}
+          <button
+            onClick={() => setShowModalHistorico(true)}
+            style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
+          >📦 Contratos Históricos</button>
           {/* Busca */}
           <input
             value={busca}
@@ -252,6 +539,14 @@ export function OrdensServicoPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ── Modal Histórico ── */}
+      {showModalHistorico && (
+        <ModalHistorico
+          onClose={() => setShowModalHistorico(false)}
+          onSucesso={() => setShowModalHistorico(false)}
+        />
       )}
     </div>
   )

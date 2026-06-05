@@ -111,7 +111,8 @@ export const osRouter = router({
 
       const [rows]: any = await pool.execute(
         `SELECT
-           os.id, os.numero, os.status, os.titulo,
+           os.id, os.numero, os.status, os.titulo, os.origem,
+           os.numero_contrato_externo AS numeroContratoExterno,
            os.tecnico_responsavel  AS tecnicoResponsavel,
            os.data_prevista_inicio AS dataPrevistaInicio,
            os.data_prevista_fim    AS dataPrevistaFim,
@@ -663,4 +664,205 @@ export const osRouter = router({
         return { ok: true }
       }),
   }),
+
+  // ─── CONTRATOS HISTÓRICOS ─────────────────────────────────────────
+
+  // Schema compartilhado para um contrato histórico
+  criarHistorico: protectedProcedure
+    .input(z.object({
+      clienteNome:           z.string().min(1).max(200),
+      clienteId:             z.number().int().positive().optional(), // se já existe no cadastro
+      valorContrato:         z.number().positive(),
+      descricao:             z.string().max(500).optional(),
+      dataInicio:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      dataConclusao:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      status:                z.enum(['aberta', 'em_execucao', 'concluida']).default('em_execucao'),
+      tecnicoResponsavel:    z.string().max(100).optional(),
+      numeroContratoExterno: z.string().max(50).optional(),
+      observacoes:           z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getRawPool()
+      const empId   = ctx.usuario.empresaId
+      const usuId   = ctx.usuario.id
+
+      // 1. Resolve ou cria o cliente
+      let clienteId = input.clienteId
+      if (!clienteId) {
+        const [existing]: any = await pool.execute(
+          `SELECT id FROM cliente WHERE empresa_id = ? AND nome LIKE ? LIMIT 1`,
+          [empId, input.clienteNome.trim()],
+        )
+        if ((existing as any[]).length) {
+          clienteId = (existing as any[])[0].id
+        } else {
+          const [ins]: any = await pool.execute(
+            `INSERT INTO cliente (empresa_id, nome, created_at) VALUES (?, ?, NOW())`,
+            [empId, input.clienteNome.trim()],
+          )
+          clienteId = (ins as any).insertId
+        }
+      }
+
+      // 2. Gera número de proposta histórica: HIST-YYYY-XXXX
+      const [cntRows]: any = await pool.execute(
+        `SELECT COUNT(*) AS total FROM proposta WHERE empresa_id = ? AND origem = 'historico'`,
+        [empId],
+      )
+      const seq = (Number((cntRows as any[])[0]?.total ?? 0) + 1).toString().padStart(4, '0')
+      const numProposta = `HIST-${new Date().getFullYear()}-${seq}`
+
+      // 3. Cria proposta histórica (status aceita, origem historico)
+      const [propRes]: any = await pool.execute(
+        `INSERT INTO proposta
+           (empresa_id, numero, cliente_id, status, origem,
+            titulo_servico, data_emissao, data_validade,
+            usuario_id, created_by, versao, created_at)
+         VALUES (?, ?, ?, 'aceita', 'historico', ?, ?, DATE_ADD(?, INTERVAL 1 YEAR), ?, ?, 1, NOW())`,
+        [
+          empId, numProposta, clienteId,
+          input.descricao ?? `Contrato histórico — ${input.clienteNome}`,
+          input.dataInicio, input.dataInicio,
+          usuId, usuId,
+        ],
+      )
+      const propostaId = (propRes as any).insertId
+
+      // 4. Cria condicao_comercial mínima para o valor
+      await pool.execute(
+        `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total, created_at)
+         VALUES (?, 'Contrato histórico', 'a_vista', ?, NOW())`,
+        [propostaId, input.valorContrato],
+      )
+
+      // 5. Gera número OS
+      const numero = await gerarNumeroOS(empId)
+
+      // 6. Cria OS histórica
+      const [osRes]: any = await pool.execute(
+        `INSERT INTO ordem_servico
+           (empresa_id, proposta_id, numero, status, origem,
+            numero_contrato_externo, descricao, tecnico_responsavel,
+            data_inicio, data_conclusao, tem_agendamento, observacoes, created_at)
+         VALUES (?, ?, ?, ?, 'historico', ?, ?, ?, ?, ?, 0, ?, NOW())`,
+        [
+          empId, propostaId, numero, input.status,
+          input.numeroContratoExterno ?? null,
+          input.descricao ?? null,
+          input.tecnicoResponsavel ?? null,
+          input.dataInicio,
+          input.dataConclusao ?? null,
+          input.observacoes ?? null,
+        ],
+      )
+      const osId = (osRes as any).insertId
+
+      // 7. Marcos padrão
+      for (let i = 0; i < MARCOS_PADRAO.length; i++) {
+        await pool.execute(
+          `INSERT INTO os_marco (ordem_servico_id, titulo, ordem, concluido)
+           VALUES (?, ?, ?, ?)`,
+          [osId, MARCOS_PADRAO[i], i, input.status === 'concluida' ? 1 : 0],
+        )
+      }
+
+      return { ok: true, osId, numero, propostaId }
+    }),
+
+  importarLoteHistorico: protectedProcedure
+    .input(z.object({
+      contratos: z.array(z.object({
+        clienteNome:           z.string().min(1).max(200),
+        valorContrato:         z.number().positive(),
+        descricao:             z.string().max(500).optional(),
+        dataInicio:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        dataConclusao:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        status:                z.enum(['aberta', 'em_execucao', 'concluida']).default('em_execucao'),
+        tecnicoResponsavel:    z.string().max(100).optional(),
+        numeroContratoExterno: z.string().max(50).optional(),
+        observacoes:           z.string().optional(),
+      })).min(1).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getRawPool()
+      const empId = ctx.usuario.empresaId
+      const usuId = ctx.usuario.id
+      const resultados: { linha: number; ok: boolean; numero?: string; erro?: string }[] = []
+
+      for (let i = 0; i < input.contratos.length; i++) {
+        const c = input.contratos[i]
+        try {
+          // Resolve/cria cliente
+          const [existing]: any = await pool.execute(
+            `SELECT id FROM cliente WHERE empresa_id = ? AND nome LIKE ? LIMIT 1`,
+            [empId, c.clienteNome.trim()],
+          )
+          let clienteId: number
+          if ((existing as any[]).length) {
+            clienteId = (existing as any[])[0].id
+          } else {
+            const [ins]: any = await pool.execute(
+              `INSERT INTO cliente (empresa_id, nome, created_at) VALUES (?, ?, NOW())`,
+              [empId, c.clienteNome.trim()],
+            )
+            clienteId = (ins as any).insertId
+          }
+
+          const [cntRows]: any = await pool.execute(
+            `SELECT COUNT(*) AS total FROM proposta WHERE empresa_id = ? AND origem = 'historico'`,
+            [empId],
+          )
+          const seq = (Number((cntRows as any[])[0]?.total ?? 0) + 1).toString().padStart(4, '0')
+          const numProposta = `HIST-${new Date().getFullYear()}-${seq}`
+
+          const [propRes]: any = await pool.execute(
+            `INSERT INTO proposta
+               (empresa_id, numero, cliente_id, status, origem,
+                titulo_servico, data_emissao, data_validade,
+                usuario_id, created_by, versao, created_at)
+             VALUES (?, ?, ?, 'aceita', 'historico', ?, ?, DATE_ADD(?, INTERVAL 1 YEAR), ?, ?, 1, NOW())`,
+            [empId, numProposta, clienteId,
+             c.descricao ?? `Contrato histórico — ${c.clienteNome}`,
+             c.dataInicio, c.dataInicio, usuId, usuId],
+          )
+          const propostaId = (propRes as any).insertId
+
+          await pool.execute(
+            `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total, created_at)
+             VALUES (?, 'Contrato histórico', 'a_vista', ?, NOW())`,
+            [propostaId, c.valorContrato],
+          )
+
+          const numero = await gerarNumeroOS(empId)
+
+          const [osRes]: any = await pool.execute(
+            `INSERT INTO ordem_servico
+               (empresa_id, proposta_id, numero, status, origem,
+                numero_contrato_externo, descricao, tecnico_responsavel,
+                data_inicio, data_conclusao, tem_agendamento, observacoes, created_at)
+             VALUES (?, ?, ?, ?, 'historico', ?, ?, ?, ?, ?, 0, ?, NOW())`,
+            [empId, propostaId, numero, c.status,
+             c.numeroContratoExterno ?? null, c.descricao ?? null,
+             c.tecnicoResponsavel ?? null, c.dataInicio,
+             c.dataConclusao ?? null, c.observacoes ?? null],
+          )
+          const osId = (osRes as any).insertId
+
+          for (let m = 0; m < MARCOS_PADRAO.length; m++) {
+            await pool.execute(
+              `INSERT INTO os_marco (ordem_servico_id, titulo, ordem, concluido) VALUES (?, ?, ?, ?)`,
+              [osId, MARCOS_PADRAO[m], m, c.status === 'concluida' ? 1 : 0],
+            )
+          }
+
+          resultados.push({ linha: i + 1, ok: true, numero })
+        } catch (e: any) {
+          resultados.push({ linha: i + 1, ok: false, erro: e.message })
+        }
+      }
+
+      const importados = resultados.filter(r => r.ok).length
+      const erros      = resultados.filter(r => !r.ok).length
+      return { ok: true, importados, erros, resultados }
+    }),
 })

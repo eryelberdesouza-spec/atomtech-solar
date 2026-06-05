@@ -546,6 +546,26 @@ app.get('/reverter-proposta/:id', async (req, res) => {
 })
 
 // ── Migração: cria tabela os_nota (Diário de Campo) ──────────────────────────
+// ── Migração: colunas origem + numero_contrato_externo (histórico) ───────────
+app.get('/run-migration-historico', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const ops = [
+      `ALTER TABLE proposta ADD COLUMN IF NOT EXISTS \`origem\` ENUM('plataforma','historico') NOT NULL DEFAULT 'plataforma'`,
+      `ALTER TABLE ordem_servico ADD COLUMN IF NOT EXISTS \`origem\` ENUM('plataforma','historico') NOT NULL DEFAULT 'plataforma'`,
+      `ALTER TABLE ordem_servico ADD COLUMN IF NOT EXISTS \`numero_contrato_externo\` VARCHAR(50) NULL`,
+    ]
+    for (const sql of ops) {
+      try { await conn.execute(sql) } catch (e: any) { if (!e.message.includes('Duplicate column')) throw e }
+    }
+    await conn.end()
+    res.json({ ok: true, message: 'Colunas de histórico criadas com sucesso' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/run-migration-os-nota', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
