@@ -551,14 +551,20 @@ app.get('/run-migration-historico', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
     const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
-    const ops = [
-      `ALTER TABLE proposta ADD COLUMN IF NOT EXISTS \`origem\` ENUM('plataforma','historico') NOT NULL DEFAULT 'plataforma'`,
-      `ALTER TABLE ordem_servico ADD COLUMN IF NOT EXISTS \`origem\` ENUM('plataforma','historico') NOT NULL DEFAULT 'plataforma'`,
-      `ALTER TABLE ordem_servico ADD COLUMN IF NOT EXISTS \`numero_contrato_externo\` VARCHAR(50) NULL`,
-    ]
-    for (const sql of ops) {
-      try { await conn.execute(sql) } catch (e: any) { if (!e.message.includes('Duplicate column')) throw e }
+    // MySQL não suporta ADD COLUMN IF NOT EXISTS — verificamos INFORMATION_SCHEMA antes
+    const addIfMissing = async (table: string, column: string, definition: string) => {
+      const [rows]: any = await conn.execute(
+        `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [table, column]
+      )
+      if (Number((rows as any[])[0].cnt) === 0) {
+        await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`)
+      }
     }
+    await addIfMissing('proposta',      'origem',                   `ENUM('plataforma','historico') NOT NULL DEFAULT 'plataforma'`)
+    await addIfMissing('ordem_servico', 'origem',                   `ENUM('plataforma','historico') NOT NULL DEFAULT 'plataforma'`)
+    await addIfMissing('ordem_servico', 'numero_contrato_externo',  `VARCHAR(50) NULL`)
     await conn.end()
     res.json({ ok: true, message: 'Colunas de histórico criadas com sucesso' })
   } catch (e: any) {
