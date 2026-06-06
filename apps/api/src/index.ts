@@ -552,33 +552,58 @@ app.get('/fix-historicos', async (_, res) => {
     const mysql2 = await import('mysql2/promise')
     const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
 
-    // Encontra propostas históricas sem parcela_pagamento
+    // Encontra propostas históricas sem fin_titulo
     const [props]: any = await conn.execute(
-      `SELECT cc.id AS condicaoId, cc.valor_total AS valorTotal, p.id AS propostaId, p.data_emissao AS dataEmissao
+      `SELECT p.id AS propostaId, p.numero, p.empresa_id AS empresaId,
+              p.data_emissao AS dataEmissao, c.nome AS clienteNome, c.id AS clienteId,
+              cc.id AS condicaoId, cc.valor_total AS valorTotal,
+              os.status AS osStatus, os.data_conclusao AS dataConclusao
        FROM proposta p
+       JOIN cliente c ON c.id = p.cliente_id
        JOIN condicao_comercial cc ON cc.proposta_id = p.id
+       JOIN ordem_servico os ON os.proposta_id = p.id
+       LEFT JOIN fin_titulo ft ON ft.proposta_id = p.id
        LEFT JOIN parcela_pagamento pp ON pp.condicao_id = cc.id
-       WHERE p.origem = 'historico' AND pp.id IS NULL`
+       WHERE p.origem = 'historico' AND ft.id IS NULL`
     )
     let corrigidos = 0
     for (const row of (props as any[])) {
-      // Cria parcela_pagamento
-      await conn.execute(
-        `INSERT INTO parcela_pagamento
-           (condicao_id, numero_parcela, descricao_evento, valor,
-            percentual_do_total, prazo_dias, tipo_prazo, referencia_evento, meios_pagamento)
-         VALUES (?, 1, 'Pagamento do contrato', ?, 100, 0, 'corridos', 'contrato', '[]')`,
-        [row.condicaoId, row.valorTotal]
-      )
-      // Formaliza proposta
+      const empId = row.empresaId
+      // 1. parcela_pagamento se não existir
+      const [ppCheck]: any = await conn.execute(`SELECT id FROM parcela_pagamento WHERE condicao_id = ? LIMIT 1`, [row.condicaoId])
+      if (!(ppCheck as any[]).length) {
+        await conn.execute(
+          `INSERT INTO parcela_pagamento (condicao_id, numero_parcela, descricao_evento, valor, percentual_do_total, prazo_dias, tipo_prazo, referencia_evento, meios_pagamento)
+           VALUES (?, 1, 'Pagamento do contrato', ?, 100, 0, 'corridos', 'contrato', '[]')`,
+          [row.condicaoId, row.valorTotal]
+        )
+      }
+      // 2. Formaliza proposta
       await conn.execute(
         `UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = COALESCE(data_emissao, CURDATE()) WHERE id = ?`,
         [row.propostaId]
       )
-      // Corrige fin_titulo com valorOriginal = 0
+      // 3. fin_pessoa
+      const [fpRows]: any = await conn.execute(`SELECT id FROM fin_pessoa WHERE empresa_id = ? AND nome = ? LIMIT 1`, [empId, row.clienteNome])
+      let fpId: number
+      if ((fpRows as any[]).length) { fpId = (fpRows as any[])[0].id }
+      else {
+        const [fpIns]: any = await conn.execute(`INSERT INTO fin_pessoa (empresa_id, nome, tipo_pessoa, is_cliente, is_fornecedor) VALUES (?, ?, 'FISICA', 1, 0)`, [empId, row.clienteNome])
+        fpId = (fpIns as any).insertId
+      }
+      // 4. fin_titulo
+      const descTit = `Contrato histórico — ${row.clienteNome} (${row.numero})`
+      const [tIns]: any = await conn.execute(
+        `INSERT INTO fin_titulo (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id, valor_original, emissao, ativo) VALUES (?, 'RECEBER', ?, ?, ?, ?, ?, ?, 1)`,
+        [empId, descTit, row.numero, fpId, row.propostaId, String(row.valorTotal), row.dataEmissao ?? new Date().toISOString().slice(0,10)]
+      )
+      const tituloId = (tIns as any).insertId
+      // 5. fin_parcela
+      const stParcela = row.osStatus === 'concluida' ? 'PAGA' : 'ABERTA'
+      const venc = row.dataConclusao ?? row.dataEmissao ?? new Date().toISOString().slice(0,10)
       await conn.execute(
-        `UPDATE fin_titulo SET valor_original = ? WHERE proposta_id = ? AND valor_original = '0.00'`,
-        [row.valorTotal, row.propostaId]
+        `INSERT INTO fin_parcela (titulo_id, numero, valor, vencimento, status, data_pagamento) VALUES (?, 1, ?, ?, ?, ?)`,
+        [tituloId, String(row.valorTotal), venc, stParcela, stParcela === 'PAGA' ? venc : null]
       )
       corrigidos++
     }

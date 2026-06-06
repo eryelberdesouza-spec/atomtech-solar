@@ -749,7 +749,52 @@ export const osRouter = router({
         [input.dataInicio, propostaId],
       )
 
-      // 5. Gera número OS
+      // 5. Cria automaticamente o título a receber no financeiro
+      // 5a. Resolve fin_pessoa (busca por nome, cria se não existir)
+      const [pessoaRows]: any = await pool.execute(
+        `SELECT id FROM fin_pessoa WHERE empresa_id = ? AND nome = ? LIMIT 1`,
+        [empId, input.clienteNome.trim()],
+      )
+      let finPessoaId: number
+      if ((pessoaRows as any[]).length) {
+        finPessoaId = (pessoaRows as any[])[0].id
+      } else {
+        const [pIns]: any = await pool.execute(
+          `INSERT INTO fin_pessoa (empresa_id, nome, tipo_pessoa, is_cliente, is_fornecedor)
+           VALUES (?, ?, 'FISICA', 1, 0)`,
+          [empId, input.clienteNome.trim()],
+        )
+        finPessoaId = (pIns as any).insertId
+      }
+      // 5b. Cria fin_titulo RECEBER
+      const descTitulo = `${input.descricao ?? 'Contrato histórico'} — ${input.clienteNome} (${numProposta})`
+      const [tituloIns]: any = await pool.execute(
+        `INSERT INTO fin_titulo
+           (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id,
+            valor_original, emissao, observacoes, ativo)
+         VALUES (?, 'RECEBER', ?, ?, ?, ?, ?, ?, ?, 1)`,
+        [
+          empId, descTitulo, numProposta, finPessoaId, propostaId,
+          String(input.valorContrato), input.dataInicio,
+          input.observacoes ?? null,
+        ],
+      )
+      const finTituloId = (tituloIns as any).insertId
+      // 5c. Cria fin_parcela — PAGA se concluído, ABERTA se em execução
+      const statusParcela = input.status === 'concluida' ? 'PAGA' : 'ABERTA'
+      const vencimento = input.dataConclusao ?? input.dataInicio
+      await pool.execute(
+        `INSERT INTO fin_parcela
+           (titulo_id, numero, valor, vencimento, status, data_pagamento)
+         VALUES (?, 1, ?, ?, ?, ?)`,
+        [
+          finTituloId, String(input.valorContrato), vencimento,
+          statusParcela,
+          statusParcela === 'PAGA' ? (input.dataConclusao ?? input.dataInicio) : null,
+        ],
+      )
+
+      // 6. Gera número OS
       const numero = await gerarNumeroOS(empId)
 
       // 6. Cria OS histórica
@@ -858,6 +903,37 @@ export const osRouter = router({
           await pool.execute(
             `UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = ? WHERE id = ?`,
             [c.dataInicio, propostaId],
+          )
+
+          // Cria fin_titulo RECEBER automaticamente
+          const [pRows2]: any = await pool.execute(
+            `SELECT id FROM fin_pessoa WHERE empresa_id = ? AND nome = ? LIMIT 1`,
+            [empId, c.clienteNome.trim()],
+          )
+          let fp2Id: number
+          if ((pRows2 as any[]).length) {
+            fp2Id = (pRows2 as any[])[0].id
+          } else {
+            const [p2Ins]: any = await pool.execute(
+              `INSERT INTO fin_pessoa (empresa_id, nome, tipo_pessoa, is_cliente, is_fornecedor) VALUES (?, ?, 'FISICA', 1, 0)`,
+              [empId, c.clienteNome.trim()],
+            )
+            fp2Id = (p2Ins as any).insertId
+          }
+          const descTit2 = `${c.descricao ?? 'Contrato histórico'} — ${c.clienteNome} (${numProposta})`
+          const [tIns2]: any = await pool.execute(
+            `INSERT INTO fin_titulo (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id, valor_original, emissao, ativo)
+             VALUES (?, 'RECEBER', ?, ?, ?, ?, ?, ?, 1)`,
+            [empId, descTit2, numProposta, fp2Id, propostaId, String(c.valorContrato), c.dataInicio],
+          )
+          const finTitId2 = (tIns2 as any).insertId
+          const stParcela2 = c.status === 'concluida' ? 'PAGA' : 'ABERTA'
+          const venc2 = c.dataConclusao ?? c.dataInicio
+          await pool.execute(
+            `INSERT INTO fin_parcela (titulo_id, numero, valor, vencimento, status, data_pagamento)
+             VALUES (?, 1, ?, ?, ?, ?)`,
+            [finTitId2, String(c.valorContrato), venc2, stParcela2,
+             stParcela2 === 'PAGA' ? venc2 : null],
           )
 
           const numero = await gerarNumeroOS(empId)
