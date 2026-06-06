@@ -614,34 +614,27 @@ app.get('/fix-historicos', async (_, res) => {
   }
 })
 
-// ── Cria fin_parcela para fin_titulos históricos sem parcelas ────────────────
+// ── Remove fin_parcela duplicadas de títulos históricos (evita duplicidade c/ extrato) ──
 app.get('/fix-historicos-parcelas', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
     const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
-    // Títulos históricos sem fin_parcela
+    // Remove fin_parcela geradas por contratos históricos
+    // (o fluxo de caixa real vem do extrato bancário importado)
     const [rows]: any = await conn.execute(
-      `SELECT ft.id AS tituloId, ft.valor_original AS valor, ft.emissao,
-              os.status AS osStatus, os.data_conclusao AS dataConclusao
-       FROM fin_titulo ft
+      `SELECT fp.id AS parcelaId
+       FROM fin_parcela fp
+       JOIN fin_titulo ft ON ft.id = fp.titulo_id
        JOIN proposta p ON p.id = ft.proposta_id
-       JOIN ordem_servico os ON os.proposta_id = p.id
-       LEFT JOIN fin_parcela fp ON fp.titulo_id = ft.id
-       WHERE p.origem = 'historico' AND fp.id IS NULL`
+       WHERE p.origem = 'historico'`
     )
-    let criados = 0
+    let removidos = 0
     for (const row of (rows as any[])) {
-      const stParcela = row.osStatus === 'concluida' ? 'PAGA' : 'ABERTA'
-      const venc = row.dataConclusao ?? row.emissao ?? new Date().toISOString().slice(0,10)
-      await conn.execute(
-        `INSERT INTO fin_parcela (titulo_id, numero, valor, vencimento, status, data_pagamento)
-         VALUES (?, 1, ?, ?, ?, ?)`,
-        [row.tituloId, String(row.valor), venc, stParcela, stParcela === 'PAGA' ? venc : null]
-      )
-      criados++
+      await conn.execute(`DELETE FROM fin_parcela WHERE id = ?`, [row.parcelaId])
+      removidos++
     }
     await conn.end()
-    res.json({ ok: true, criados, message: `${criados} parcela(s) criada(s) para títulos históricos` })
+    res.json({ ok: true, removidos, message: `${removidos} parcela(s) histórica(s) removida(s) — sem duplicidade com extrato` })
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e.message })
   }

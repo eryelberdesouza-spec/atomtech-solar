@@ -766,9 +766,12 @@ export const osRouter = router({
         )
         finPessoaId = (pIns as any).insertId
       }
-      // 5b. Cria fin_titulo RECEBER
-      const descTitulo = `${input.descricao ?? 'Contrato histórico'} — ${input.clienteNome} (${numProposta})`
-      const [tituloIns]: any = await pool.execute(
+      // 5b. Cria fin_titulo RECEBER — apenas como referência (sem fin_parcela)
+      // Não criamos fin_parcela pois o fluxo de caixa real já está registrado
+      // pelo extrato bancário importado. O fin_titulo serve de âncora para
+      // vincular OS ↔ Proposta ↔ Cliente no módulo financeiro.
+      const descTitulo = `📦 ${input.descricao ?? 'Contrato histórico'} — ${input.clienteNome} (${numProposta})`
+      await pool.execute(
         `INSERT INTO fin_titulo
            (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id,
             valor_original, emissao, observacoes, ativo)
@@ -777,20 +780,6 @@ export const osRouter = router({
           empId, descTitulo, numProposta, finPessoaId, propostaId,
           String(input.valorContrato), input.dataInicio,
           input.observacoes ?? null,
-        ],
-      )
-      const finTituloId = (tituloIns as any).insertId
-      // 5c. Cria fin_parcela — PAGA se concluído, ABERTA se em execução
-      const statusParcela = input.status === 'concluida' ? 'PAGA' : 'ABERTA'
-      const vencimento = input.dataConclusao ?? input.dataInicio
-      await pool.execute(
-        `INSERT INTO fin_parcela
-           (titulo_id, numero, valor, vencimento, status, data_pagamento)
-         VALUES (?, 1, ?, ?, ?, ?)`,
-        [
-          finTituloId, String(input.valorContrato), vencimento,
-          statusParcela,
-          statusParcela === 'PAGA' ? (input.dataConclusao ?? input.dataInicio) : null,
         ],
       )
 
@@ -920,20 +909,12 @@ export const osRouter = router({
             )
             fp2Id = (p2Ins as any).insertId
           }
-          const descTit2 = `${c.descricao ?? 'Contrato histórico'} — ${c.clienteNome} (${numProposta})`
-          const [tIns2]: any = await pool.execute(
+          // fin_titulo como referência apenas — sem fin_parcela (evita duplicidade com extrato)
+          const descTit2 = `📦 ${c.descricao ?? 'Contrato histórico'} — ${c.clienteNome} (${numProposta})`
+          await pool.execute(
             `INSERT INTO fin_titulo (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id, valor_original, emissao, ativo)
              VALUES (?, 'RECEBER', ?, ?, ?, ?, ?, ?, 1)`,
             [empId, descTit2, numProposta, fp2Id, propostaId, String(c.valorContrato), c.dataInicio],
-          )
-          const finTitId2 = (tIns2 as any).insertId
-          const stParcela2 = c.status === 'concluida' ? 'PAGA' : 'ABERTA'
-          const venc2 = c.dataConclusao ?? c.dataInicio
-          await pool.execute(
-            `INSERT INTO fin_parcela (titulo_id, numero, valor, vencimento, status, data_pagamento)
-             VALUES (?, 1, ?, ?, ?, ?)`,
-            [finTitId2, String(c.valorContrato), venc2, stParcela2,
-             stParcela2 === 'PAGA' ? venc2 : null],
           )
 
           const numero = await gerarNumeroOS(empId)
