@@ -697,7 +697,7 @@ export const osRouter = router({
           clienteId = (existing as any[])[0].id
         } else {
           const [ins]: any = await pool.execute(
-            `INSERT INTO cliente (empresa_id, nome, created_at) VALUES (?, ?, NOW())`,
+            `INSERT INTO cliente (empresa_id, nome) VALUES (?, ?)`,
             [empId, input.clienteNome.trim()],
           )
           clienteId = (ins as any).insertId
@@ -802,7 +802,7 @@ export const osRouter = router({
             clienteId = (existing as any[])[0].id
           } else {
             const [ins]: any = await pool.execute(
-              `INSERT INTO cliente (empresa_id, nome, created_at) VALUES (?, ?, NOW())`,
+              `INSERT INTO cliente (empresa_id, nome) VALUES (?, ?)`,
               [empId, c.clienteNome.trim()],
             )
             clienteId = (ins as any).insertId
