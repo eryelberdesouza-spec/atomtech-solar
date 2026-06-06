@@ -546,6 +546,49 @@ app.get('/reverter-proposta/:id', async (req, res) => {
 })
 
 // ── Migração: cria tabela os_nota (Diário de Campo) ──────────────────────────
+// ── Corrige contratos históricos: adiciona parcela_pagamento + formaliza ────
+app.get('/fix-historicos', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    // Encontra propostas históricas sem parcela_pagamento
+    const [props]: any = await conn.execute(
+      `SELECT cc.id AS condicaoId, cc.valor_total AS valorTotal, p.id AS propostaId, p.data_emissao AS dataEmissao
+       FROM proposta p
+       JOIN condicao_comercial cc ON cc.proposta_id = p.id
+       LEFT JOIN parcela_pagamento pp ON pp.condicao_id = cc.id
+       WHERE p.origem = 'historico' AND pp.id IS NULL`
+    )
+    let corrigidos = 0
+    for (const row of (props as any[])) {
+      // Cria parcela_pagamento
+      await conn.execute(
+        `INSERT INTO parcela_pagamento
+           (condicao_id, numero_parcela, descricao_evento, valor,
+            percentual_do_total, prazo_dias, tipo_prazo, referencia_evento, meios_pagamento)
+         VALUES (?, 1, 'Pagamento do contrato', ?, 100, 0, 'corridos', 'contrato', '[]')`,
+        [row.condicaoId, row.valorTotal]
+      )
+      // Formaliza proposta
+      await conn.execute(
+        `UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = COALESCE(data_emissao, CURDATE()) WHERE id = ?`,
+        [row.propostaId]
+      )
+      // Corrige fin_titulo com valorOriginal = 0
+      await conn.execute(
+        `UPDATE fin_titulo SET valor_original = ? WHERE proposta_id = ? AND valor_original = '0.00'`,
+        [row.valorTotal, row.propostaId]
+      )
+      corrigidos++
+    }
+    await conn.end()
+    res.json({ ok: true, corrigidos, message: `${corrigidos} contrato(s) histórico(s) corrigido(s)` })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: colunas origem + numero_contrato_externo (histórico) ───────────
 app.get('/run-migration-historico', async (_, res) => {
   try {

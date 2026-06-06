@@ -728,11 +728,25 @@ export const osRouter = router({
       )
       const propostaId = (propRes as any).insertId
 
-      // 4. Cria condicao_comercial mínima para o valor
-      await pool.execute(
+      // 4. Cria condicao_comercial + parcela_pagamento
+      const [condRes]: any = await pool.execute(
         `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total)
          VALUES (?, 'Contrato histórico', 'avista', ?)`,
         [propostaId, input.valorContrato],
+      )
+      const condicaoId = (condRes as any).insertId
+      await pool.execute(
+        `INSERT INTO parcela_pagamento
+           (condicao_id, numero_parcela, descricao_evento, valor,
+            percentual_do_total, prazo_dias, tipo_prazo,
+            referencia_evento, meios_pagamento)
+         VALUES (?, 1, 'Pagamento do contrato', ?, 100, 0, 'corridos', 'contrato', '[]')`,
+        [condicaoId, input.valorContrato],
+      )
+      // Formaliza proposta para aparecer no módulo financeiro
+      await pool.execute(
+        `UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = ? WHERE id = ?`,
+        [input.dataInicio, propostaId],
       )
 
       // 5. Gera número OS
@@ -827,10 +841,23 @@ export const osRouter = router({
           )
           const propostaId = (propRes as any).insertId
 
-          await pool.execute(
+          const [condRes2]: any = await pool.execute(
             `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total)
              VALUES (?, 'Contrato histórico', 'avista', ?)`,
             [propostaId, c.valorContrato],
+          )
+          const condicaoId2 = (condRes2 as any).insertId
+          await pool.execute(
+            `INSERT INTO parcela_pagamento
+               (condicao_id, numero_parcela, descricao_evento, valor,
+                percentual_do_total, prazo_dias, tipo_prazo,
+                referencia_evento, meios_pagamento)
+             VALUES (?, 1, 'Pagamento do contrato', ?, 100, 0, 'corridos', 'contrato', '[]')`,
+            [condicaoId2, c.valorContrato],
+          )
+          await pool.execute(
+            `UPDATE proposta SET contrato_formalizado = 1, data_formalizacao = ? WHERE id = ?`,
+            [c.dataInicio, propostaId],
           )
 
           const numero = await gerarNumeroOS(empId)
