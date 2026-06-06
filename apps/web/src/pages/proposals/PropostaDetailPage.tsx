@@ -500,7 +500,7 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
     if (c.tipo === 'avista') {
       setFormAvista({ desconto: 0, prazoDias: c.parcelas?.[0]?.prazoDias ?? 0, tipoPrazo: c.parcelas?.[0]?.tipoPrazo ?? 'corridos' })
     } else {
-      setFormParcelas((c.parcelas ?? []).map((p: any) => ({ id: p.id, numeroParcela: p.numeroParcela, descricaoEvento: p.descricaoEvento, percentualDoTotal: Number(p.percentualDoTotal), prazoDias: p.prazoDias ?? 0, tipoPrazo: p.tipoPrazo ?? 'corridos', valor: Number(p.valor) })))
+      setFormParcelas((c.parcelas ?? []).map((p: any) => ({ id: p.id, numeroParcela: p.numeroParcela, descricaoEvento: p.descricaoEvento ?? '', percentualDoTotal: Number(p.percentualDoTotal) || 0, prazoDias: Number(p.prazoDias) || 0, tipoPrazo: p.tipoPrazo ?? 'corridos', valor: Number(p.valor) || 0 })))
     }
     setEditandoId(c.id)
   }
@@ -669,14 +669,24 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
                   </div>
                 ))}
                 <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                  <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => [...f, { numeroParcela: f.length + 1, descricaoEvento: `Parcela ${f.length + 1}`, percentualDoTotal: 0, prazoDias: 0, tipoPrazo: 'corridos' }])}>+ Parcela</Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => [...f, { numeroParcela: f.length + 1, descricaoEvento: `Parcela ${f.length + 1}`, percentualDoTotal: 0, valor: 0, prazoDias: 0, tipoPrazo: 'corridos' }])}>+ Parcela</Btn>
                   {formParcelas.length > 1 && <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => f.slice(0, -1))}>- Remover</Btn>}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: `1px solid ${C.darkBorder}` }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: Math.abs(totalPct - 100) < 0.01 ? C.green : C.danger }}>Total: {totalPct.toFixed(0)}% {Math.abs(totalPct - 100) < 0.01 ? '✔' : '⚠ deve ser 100%'}</span>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Btn variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                    <Btn disabled={Math.abs(totalPct - 100) > 0.01 || updateCond.isLoading} onClick={() => updateCond.mutate({ propostaId, condicaoId: c.id, parcelas: formParcelas })}>
+                    <Btn disabled={Math.abs(totalPct - 100) > 0.01 || updateCond.isLoading} onClick={() => updateCond.mutate({
+                      propostaId,
+                      condicaoId: c.id,
+                      parcelas: formParcelas.map((p, idx) => ({
+                        ...p,
+                        numeroParcela: idx + 1,
+                        valor: parseFloat(((p.percentualDoTotal / 100) * Number(c.valorTotal)).toFixed(2)),
+                        percentualDoTotal: Number(p.percentualDoTotal) || 0,
+                        prazoDias: Number(p.prazoDias) || 0,
+                      })),
+                    })}>
                       {updateCond.isLoading ? '⏳ Salvando...' : '✔ Salvar'}
                     </Btn>
                   </div>
