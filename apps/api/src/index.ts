@@ -614,6 +614,39 @@ app.get('/fix-historicos', async (_, res) => {
   }
 })
 
+// ── Cria fin_parcela para fin_titulos históricos sem parcelas ────────────────
+app.get('/fix-historicos-parcelas', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    // Títulos históricos sem fin_parcela
+    const [rows]: any = await conn.execute(
+      `SELECT ft.id AS tituloId, ft.valor_original AS valor, ft.emissao,
+              os.status AS osStatus, os.data_conclusao AS dataConclusao
+       FROM fin_titulo ft
+       JOIN proposta p ON p.id = ft.proposta_id
+       JOIN ordem_servico os ON os.proposta_id = p.id
+       LEFT JOIN fin_parcela fp ON fp.titulo_id = ft.id
+       WHERE p.origem = 'historico' AND fp.id IS NULL`
+    )
+    let criados = 0
+    for (const row of (rows as any[])) {
+      const stParcela = row.osStatus === 'concluida' ? 'PAGA' : 'ABERTA'
+      const venc = row.dataConclusao ?? row.emissao ?? new Date().toISOString().slice(0,10)
+      await conn.execute(
+        `INSERT INTO fin_parcela (titulo_id, numero, valor, vencimento, status, data_pagamento)
+         VALUES (?, 1, ?, ?, ?, ?)`,
+        [row.tituloId, String(row.valor), venc, stParcela, stParcela === 'PAGA' ? venc : null]
+      )
+      criados++
+    }
+    await conn.end()
+    res.json({ ok: true, criados, message: `${criados} parcela(s) criada(s) para títulos históricos` })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: colunas origem + numero_contrato_externo (histórico) ───────────
 app.get('/run-migration-historico', async (_, res) => {
   try {
