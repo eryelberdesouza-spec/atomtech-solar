@@ -730,8 +730,8 @@ export const osRouter = router({
 
       // 4. Cria condicao_comercial mínima para o valor
       await pool.execute(
-        `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total, created_at)
-         VALUES (?, 'Contrato histórico', 'a_vista', ?, NOW())`,
+        `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total)
+         VALUES (?, 'Contrato histórico', 'a_vista', ?)`,
         [propostaId, input.valorContrato],
       )
 
@@ -828,8 +828,8 @@ export const osRouter = router({
           const propostaId = (propRes as any).insertId
 
           await pool.execute(
-            `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total, created_at)
-             VALUES (?, 'Contrato histórico', 'a_vista', ?, NOW())`,
+            `INSERT INTO condicao_comercial (proposta_id, descricao, tipo, valor_total)
+             VALUES (?, 'Contrato histórico', 'a_vista', ?)`,
             [propostaId, c.valorContrato],
           )
 
