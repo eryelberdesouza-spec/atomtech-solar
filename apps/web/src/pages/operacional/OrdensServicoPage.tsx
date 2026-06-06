@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Spinner } from '../../components/ui'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const STATUS_OS = [
   { id: 'aberta',       label: 'Aberta',       color: '#58A6FF', icon: '📋' },
@@ -33,6 +34,7 @@ const LINHA_VAZIA = () => ({
 })
 
 function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso: () => void }) {
+  const isMobile = useIsMobile()
   const [aba, setAba] = useState<'individual' | 'lote'>('individual')
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<any>(null)
@@ -122,11 +124,11 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
   }
 
   const S = { // estilos reutilizados
-    overlay: { position: 'fixed' as const, inset: 0, background: '#000000CC', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
-    box:     { background: '#0F1A29', border: '1px solid #1E3050', borderRadius: 14, width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
-    header:  { padding: '18px 24px', borderBottom: '1px solid #1E3050', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    body:    { padding: '20px 24px', overflowY: 'auto' as const, flex: 1 },
-    footer:  { padding: '14px 24px', borderTop: '1px solid #1E3050', display: 'flex', justifyContent: 'flex-end', gap: 8 },
+    overlay: { position: 'fixed' as const, inset: 0, background: '#000000CC', zIndex: 3000, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 24 },
+    box:     { background: '#0F1A29', border: '1px solid #1E3050', borderRadius: isMobile ? '16px 16px 0 0' : 14, width: '100%', maxWidth: isMobile ? '100%' : 860, maxHeight: isMobile ? '92vh' : '90vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
+    header:  { padding: isMobile ? '16px 18px' : '18px 24px', borderBottom: '1px solid #1E3050', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    body:    { padding: isMobile ? '16px 14px' : '20px 24px', overflowY: 'auto' as const, flex: 1 },
+    footer:  { padding: isMobile ? '12px 14px' : '14px 24px', borderTop: '1px solid #1E3050', display: 'flex', justifyContent: 'flex-end', gap: 8 },
   }
 
   return (
@@ -179,7 +181,7 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
 
           {/* ── ABA: Individual ── */}
           {aba === 'individual' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Cliente *</label>
                 <input style={inputStyle} placeholder="Nome do cliente" value={form.clienteNome} onChange={e => setForm(f => ({ ...f, clienteNome: e.target.value }))} />
@@ -349,9 +351,11 @@ function OSCard({ os, onClick }: { os: any; onClick: () => void }) {
 }
 
 export function OrdensServicoPage() {
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const isMobile  = useIsMobile()
   const [busca, setBusca] = useState('')
-  const [view, setView] = useState<'kanban' | 'lista'>('kanban')
+  const [view, setView]   = useState<'kanban' | 'lista'>(isMobile ? 'lista' : 'kanban')
+  const [kanbanCol, setKanbanCol] = useState(0) // coluna ativa no kanban mobile
   const [showModalHistorico, setShowModalHistorico] = useState(false)
 
   const { data, isLoading } = (trpc as any).os.list.useQuery(
@@ -385,119 +389,109 @@ export function OrdensServicoPage() {
   )
 
   return (
-    <div style={{ padding: '24px 28px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: isMobile ? '16px 14px' : '24px 28px', height: '100%', display: 'flex', flexDirection: 'column' }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h1 style={{ color: '#E2EAF5', fontSize: 20, fontWeight: 800, margin: 0 }}>Operacional</h1>
-          <p style={{ color: '#4A6080', fontSize: 12, margin: '3px 0 0' }}>
-            {total} ordem{total !== 1 ? 's' : ''} de serviço
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* Botão histórico */}
-          <button
-            onClick={() => setShowModalHistorico(true)}
-            style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
-          >📦 Contratos Históricos</button>
-          {/* Busca */}
-          <input
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar OS, cliente..."
-            style={{
-              padding: '7px 12px', borderRadius: 8, border: '1px solid #1E3050',
-              background: '#0C1828', color: '#C8D8EC', fontSize: 13, outline: 'none',
-              width: 220, fontFamily: 'inherit',
-            }}
-          />
-          {/* Toggle view */}
-          <div style={{ display: 'flex', border: '1px solid #1E3050', borderRadius: 8, overflow: 'hidden' }}>
-            {[
-              { id: 'kanban', label: '⊞ Kanban' },
-              { id: 'lista',  label: '☰ Lista' },
-            ].map(v => (
-              <button
-                key={v.id}
-                onClick={() => setView(v.id as any)}
-                style={{
-                  padding: '6px 12px', border: 'none', cursor: 'pointer',
-                  background: view === v.id ? '#F5A623' : 'transparent',
-                  color: view === v.id ? '#0C1421' : '#4A6080',
-                  fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-                }}
-              >{v.label}</button>
-            ))}
+      <div style={{ marginBottom: 16 }}>
+        {/* Linha 1: título + ações principais */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? 10 : 0 }}>
+          <div>
+            <h1 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: 0 }}>Operacional</h1>
+            <p style={{ color: '#4A6080', fontSize: 11, margin: '2px 0 0' }}>
+              {total} ordem{total !== 1 ? 's' : ''} de serviço
+            </p>
           </div>
+          {/* Botões lado direito — desktop */}
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={() => setShowModalHistorico(true)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>📦 Contratos Históricos</button>
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar OS, cliente..."
+                style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #1E3050', background: '#0C1828', color: '#C8D8EC', fontSize: 13, outline: 'none', width: 220, fontFamily: 'inherit' }} />
+              <div style={{ display: 'flex', border: '1px solid #1E3050', borderRadius: 8, overflow: 'hidden' }}>
+                {[{ id: 'kanban', label: '⊞ Kanban' }, { id: 'lista', label: '☰ Lista' }].map(v => (
+                  <button key={v.id} onClick={() => setView(v.id as any)}
+                    style={{ padding: '6px 12px', border: 'none', cursor: 'pointer', background: view === v.id ? '#F5A623' : 'transparent', color: view === v.id ? '#0C1421' : '#4A6080', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
+                  >{v.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Mobile: só o botão histórico como ícone */}
+          {isMobile && (
+            <button onClick={() => setShowModalHistorico(true)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>📦</button>
+          )}
         </div>
+
+        {/* Linha 2 mobile: busca + toggle */}
+        {isMobile && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar OS ou cliente..."
+              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #1E3050', background: '#0C1828', color: '#C8D8EC', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', border: '1px solid #1E3050', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+              {[{ id: 'kanban', label: '⊞' }, { id: 'lista', label: '☰' }].map(v => (
+                <button key={v.id} onClick={() => setView(v.id as any)}
+                  style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', background: view === v.id ? '#F5A623' : 'transparent', color: view === v.id ? '#0C1421' : '#4A6080', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}
+                >{v.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Resumo KPIs ── */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 10, marginBottom: isMobile ? 14 : 20 }}>
         {resumo.map(s => (
-          <div key={s.id} style={{
-            flex: 1, background: '#111D2E', border: `1px solid ${s.color}30`,
-            borderRadius: 10, padding: '10px 14px',
-            borderTop: `2px solid ${s.color}`,
-          }}>
-            <div style={{ fontSize: 11, color: '#4A6080', fontWeight: 700, marginBottom: 2 }}>{s.icon} {s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.count}</div>
+          <div key={s.id} style={{ background: '#111D2E', border: `1px solid ${s.color}30`, borderRadius: 10, padding: isMobile ? '8px 12px' : '10px 14px', borderTop: `2px solid ${s.color}` }}>
+            <div style={{ fontSize: isMobile ? 10 : 11, color: '#4A6080', fontWeight: 700, marginBottom: 2 }}>{s.icon} {s.label}</div>
+            <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: s.color }}>{s.count}</div>
           </div>
         ))}
       </div>
 
       {/* ── KANBAN ── */}
-      {view === 'kanban' && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 14, flex: 1, overflowY: 'auto',
-          alignItems: 'flex-start',
-        }}>
+      {view === 'kanban' && !isMobile && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, flex: 1, overflowY: 'auto', alignItems: 'flex-start' }}>
           {colunas.map(col => (
             <div key={col.id}>
-              {/* Cabeçalho da coluna */}
-              <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginBottom: 10,
-                padding: '8px 12px', borderRadius: 8,
-                background: col.color + '12',
-                border: `1px solid ${col.color}30`,
-              }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: col.color }}>
-                  {col.icon} {col.label}
-                </span>
-                <span style={{
-                  fontSize: 11, fontWeight: 800, color: col.color,
-                  background: col.color + '20', borderRadius: 12,
-                  padding: '1px 8px',
-                }}>
-                  {col.itens.length}
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: col.color + '12', border: `1px solid ${col.color}30` }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: col.color }}>{col.icon} {col.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: col.color, background: col.color + '20', borderRadius: 12, padding: '1px 8px' }}>{col.itens.length}</span>
               </div>
-
-              {/* Cards */}
               {col.itens.length === 0 ? (
-                <div style={{
-                  border: `1px dashed ${col.color}30`, borderRadius: 10,
-                  padding: '20px', textAlign: 'center',
-                  color: '#2A3F55', fontSize: 12,
-                }}>
-                  Nenhuma OS
-                </div>
+                <div style={{ border: `1px dashed ${col.color}30`, borderRadius: 10, padding: '20px', textAlign: 'center', color: '#2A3F55', fontSize: 12 }}>Nenhuma OS</div>
               ) : (
-                col.itens.map((os: any) => (
-                  <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />
-                ))
+                col.itens.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />)
               )}
             </div>
           ))}
         </div>
       )}
 
-      {/* ── LISTA ── */}
-      {view === 'lista' && (
+      {/* ── KANBAN MOBILE — abas por coluna ── */}
+      {view === 'kanban' && isMobile && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Seletor de colunas */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', paddingBottom: 4 }}>
+            {colunas.map((col, i) => (
+              <button key={col.id} onClick={() => setKanbanCol(i)}
+                style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${col.color}${kanbanCol === i ? 'AA' : '30'}`, background: kanbanCol === i ? col.color + '20' : 'transparent', color: kanbanCol === i ? col.color : '#4A6080', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {col.icon} {col.label} <span style={{ background: col.color + '30', borderRadius: 10, padding: '0 6px', marginLeft: 3 }}>{col.itens.length}</span>
+              </button>
+            ))}
+          </div>
+          {/* Cards da coluna ativa */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {colunas[kanbanCol]?.itens.length === 0 ? (
+              <div style={{ border: `1px dashed ${colunas[kanbanCol].color}30`, borderRadius: 10, padding: '32px', textAlign: 'center', color: '#2A3F55', fontSize: 13 }}>Nenhuma OS nesta etapa</div>
+            ) : (
+              colunas[kanbanCol]?.itens.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />)
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── LISTA desktop ── */}
+      {view === 'lista' && !isMobile && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -511,33 +505,33 @@ export function OrdensServicoPage() {
               {filtradas.map((os: any) => {
                 const status = STATUS_OS.find(s => s.id === os.status) ?? STATUS_OS[0]
                 return (
-                  <tr
-                    key={os.id}
-                    onClick={() => navigate(`/ordens-servico/${os.id}`)}
+                  <tr key={os.id} onClick={() => navigate(`/ordens-servico/${os.id}`)}
                     style={{ borderBottom: '1px solid #1E305050', cursor: 'pointer', transition: 'background 0.1s' }}
                     onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#131F30'}
-                    onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}
-                  >
+                    onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
                     <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 12, color: status.color, fontWeight: 700 }}>{os.numero}</td>
                     <td style={{ padding: '10px 12px', fontSize: 13, color: '#C8D8EC' }}>{os.clienteNome ?? '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>{os.titulo ?? '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>{os.tecnicoResponsavel ?? '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: status.color + '18', color: status.color }}>
-                        {status.icon} {status.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px', width: 120 }}>
-                      <ProgressBar feitos={os.marcosFeitos ?? 0} total={os.totalMarcos ?? 0} />
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>
-                      {os.dataPrevistaFim ? formatDate(String(os.dataPrevistaFim).slice(0, 10)) : '—'}
-                    </td>
+                    <td style={{ padding: '10px 12px' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: status.color + '18', color: status.color }}>{status.icon} {status.label}</span></td>
+                    <td style={{ padding: '10px 12px', width: 120 }}><ProgressBar feitos={os.marcosFeitos ?? 0} total={os.totalMarcos ?? 0} /></td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>{os.dataPrevistaFim ? formatDate(String(os.dataPrevistaFim).slice(0, 10)) : '—'}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── LISTA mobile — cards empilhados ── */}
+      {view === 'lista' && isMobile && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {filtradas.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#4A6080', padding: 40, fontSize: 13 }}>Nenhuma OS encontrada</div>
+          ) : (
+            filtradas.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />)
+          )}
         </div>
       )}
 

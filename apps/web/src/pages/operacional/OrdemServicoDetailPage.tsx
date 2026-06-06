@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Btn, Spinner, C } from '../../components/ui'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const STATUS_COLOR: Record<string, string> = {
   aberta:      '#58A6FF',
@@ -484,6 +485,7 @@ function fmtTamanho(bytes: number) {
 }
 
 function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
+  const isMobile = useIsMobile()
   const [uploading,    setUploading]    = useState(false)
   const [erro,         setErro]         = useState('')
   const [previewIdx,   setPreviewIdx]   = useState<number | null>(null)
@@ -605,7 +607,7 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
           <div style={{ color: '#2A3F55', fontSize: 12, marginTop: 4 }}>Adicione fotos ou PDFs do serviço.</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(160px, 1fr))', gap: isMobile ? 10 : 12 }}>
           {(anexos as any[]).map((a: any, idx: number) => (
             <div
               key={a.id}
@@ -697,11 +699,11 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
             disabled={disabled}
             style={{
               position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-              background: disabled ? '#1E305060' : '#1E3050DD',
+              background: disabled ? '#1E305060' : '#1E3050EE',
               border: 'none', borderRadius: 8, color: disabled ? '#4A6080' : '#C8D8EC',
-              fontSize: 22, fontWeight: 700, cursor: disabled ? 'default' : 'pointer',
-              padding: '12px 16px', zIndex: 10, fontFamily: 'inherit', lineHeight: 1,
-              ...(label === '‹' ? { left: 12 } : { right: 12 }),
+              fontSize: isMobile ? 28 : 22, fontWeight: 700, cursor: disabled ? 'default' : 'pointer',
+              padding: isMobile ? '14px 18px' : '12px 16px', zIndex: 10, fontFamily: 'inherit', lineHeight: 1,
+              ...(label === '‹' ? { left: isMobile ? 4 : 12 } : { right: isMobile ? 4 : 12 }),
             }}
           >{label}</button>
         )
@@ -711,10 +713,10 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
             onClick={e => e.target === e.currentTarget && setPreviewIdx(null)}
           >
             {/* Barra de controles */}
-            <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 8 }}>
-              <a href={downloadUrl(cur.id)} download={cur.nome} style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>⬇ Baixar</a>
-              <a href={fileUrl(cur.id)} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>↗ Abrir</a>
-              <button onClick={() => setPreviewIdx(null)} style={{ padding: '8px 14px', borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕ Fechar</button>
+            <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 6 }}>
+              <a href={downloadUrl(cur.id)} download={cur.nome} style={{ padding: isMobile ? '8px 10px' : '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: isMobile ? 14 : 12, fontWeight: 700, textDecoration: 'none' }}>{isMobile ? '⬇' : '⬇ Baixar'}</a>
+              {!isMobile && <a href={fileUrl(cur.id)} target="_blank" rel="noreferrer" style={{ padding: '8px 14px', borderRadius: 8, background: '#1E3050', color: '#C8D8EC', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>↗ Abrir</a>}
+              <button onClick={() => setPreviewIdx(null)} style={{ padding: isMobile ? '8px 12px' : '8px 14px', borderRadius: 8, background: '#F85149', color: '#fff', fontSize: isMobile ? 14 : 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
             </div>
 
             {/* Nome do arquivo + contador */}
@@ -730,13 +732,13 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
             {navBtn(!canNext, () => setPreviewIdx(i => i! + 1), '›')}
 
             {/* Conteúdo */}
-            <div style={{ maxWidth: '80vw', maxHeight: '80vh', marginTop: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ maxWidth: isMobile ? '100vw' : '80vw', maxHeight: isMobile ? '75vh' : '80vh', marginTop: isMobile ? 52 : 60, display: 'flex', alignItems: 'center', justifyContent: 'center', width: isMobile ? '100%' : undefined }}>
               {isImage(cur.tipoMime) ? (
                 <img
                   key={cur.id}
                   src={fileUrl(cur.id)}
                   alt={cur.nome}
-                  style={{ maxWidth: '80vw', maxHeight: '80vh', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.8)', objectFit: 'contain' }}
+                  style={{ maxWidth: isMobile ? '100vw' : '80vw', maxHeight: isMobile ? '75vh' : '80vh', borderRadius: isMobile ? 0 : 8, boxShadow: '0 8px 40px rgba(0,0,0,0.8)', objectFit: 'contain', width: isMobile ? '100%' : undefined }}
                 />
               ) : isPDF(cur.tipoMime) ? (
                 <iframe
@@ -763,7 +765,8 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
 export function OrdemServicoDetailPage() {
   const { id } = useParams<{ id: string }>()
   const osId = Number(id)
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const isMobile  = useIsMobile()
 
   const utils = (trpc as any).useUtils()
   const refresh = () => utils.os.byId.invalidate({ id: osId })
@@ -822,60 +825,74 @@ export function OrdemServicoDetailPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {/* ── HEADER ── */}
-      <div style={{ padding: '14px 24px', borderBottom: '1px solid #1E3050', background: '#111D2E', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-          <button onClick={() => navigate('/ordens-servico')} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: '#1E305030', color: '#4A6080', cursor: 'pointer', fontSize: 12 }}>← Voltar</button>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-              <span style={{ color: cor, fontFamily: 'monospace', fontSize: 16, fontWeight: 800 }}>{os.numero}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: cor + '18', color: cor, border: `1px solid ${cor}40` }}>{STATUS_LABEL[os.status] ?? os.status}</span>
-              {progresso > 0 && <span style={{ fontSize: 11, color: '#4A6080' }}>{marcosFeitos}/{totalMarcos} etapas · {progresso}%</span>}
+      <div style={{ padding: isMobile ? '12px 14px' : '14px 24px', borderBottom: '1px solid #1E3050', background: '#111D2E', flexShrink: 0 }}>
+
+        {/* Linha 1: voltar + número + status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 16, marginBottom: 10 }}>
+          <button onClick={() => navigate('/ordens-servico')} style={{ padding: isMobile ? '6px 10px' : '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: '#1E305030', color: '#4A6080', cursor: 'pointer', fontSize: isMobile ? 13 : 12, flexShrink: 0 }}>←</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+              <span style={{ color: cor, fontFamily: 'monospace', fontSize: isMobile ? 13 : 16, fontWeight: 800 }}>{os.numero}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: cor + '18', color: cor, border: `1px solid ${cor}40`, whiteSpace: 'nowrap' }}>{STATUS_LABEL[os.status] ?? os.status}</span>
+              {!isMobile && progresso > 0 && <span style={{ fontSize: 11, color: '#4A6080' }}>{marcosFeitos}/{totalMarcos} etapas · {progresso}%</span>}
             </div>
-            <div style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 600 }}>
+            <div style={{ color: '#C8D8EC', fontSize: isMobile ? 12 : 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {os.clienteNome ?? '—'}
-              {os.titulo && <span style={{ color: '#4A6080', fontWeight: 400, marginLeft: 8 }}>· {os.titulo}</span>}
+              {!isMobile && os.titulo && <span style={{ color: '#4A6080', fontWeight: 400, marginLeft: 8 }}>· {os.titulo}</span>}
             </div>
           </div>
 
-          {/* Pipeline de status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {['aberta', 'em_execucao', 'concluida'].map((s, i) => {
-              const ativo = os.status === s
-              const passado = ['aberta', 'em_execucao', 'concluida'].indexOf(os.status) > i
-              const c = STATUS_COLOR[s]
-              return (
-                <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {i > 0 && <div style={{ width: 20, height: 1, background: passado ? c : '#1E3050' }} />}
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: (ativo || passado) ? c : '#1E3050', boxShadow: ativo ? `0 0 8px ${c}` : 'none' }} />
-                </div>
-              )
-            })}
-          </div>
+          {/* Pipeline de status — só desktop */}
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {['aberta', 'em_execucao', 'concluida'].map((s, i) => {
+                const ativo = os.status === s
+                const passado = ['aberta', 'em_execucao', 'concluida'].indexOf(os.status) > i
+                const c = STATUS_COLOR[s]
+                return (
+                  <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {i > 0 && <div style={{ width: 20, height: 1, background: passado ? c : '#1E3050' }} />}
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: (ativo || passado) ? c : '#1E3050', boxShadow: ativo ? `0 0 8px ${c}` : 'none' }} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Ações */}
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {(os.status === 'aberta' || os.status === 'em_execucao') && (
-              <>
+          {(os.status === 'aberta' || os.status === 'em_execucao') && (
+            <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
+              {!isMobile && (
                 <button onClick={() => { setAba('agendamentos'); setShowModalAg(true) }} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #58A6FF50', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   📅 Agendar
                 </button>
-                {proximoStatus && (
-                  <button onClick={handleAvancarStatus} disabled={mudandoStatus} style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${cor}60`, background: cor + '18', color: cor, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                    {mudandoStatus ? '⏳...' : proximoStatus === 'em_execucao' ? '▶ Iniciar' : '✔ Concluir'}
-                  </button>
-                )}
-                <button onClick={handleCancelar} disabled={mudandoStatus} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #F8514960', background: '#F8514918', color: '#F85149', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                  ✕ Cancelar
+              )}
+              {proximoStatus && (
+                <button onClick={handleAvancarStatus} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: `1px solid ${cor}60`, background: cor + '18', color: cor, cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 700 }}>
+                  {mudandoStatus ? '⏳' : proximoStatus === 'em_execucao' ? (isMobile ? '▶' : '▶ Iniciar') : (isMobile ? '✔' : '✔ Concluir')}
                 </button>
-              </>
-            )}
-          </div>
+              )}
+              <button onClick={handleCancelar} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: '1px solid #F8514960', background: '#F8514918', color: '#F85149', cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 600 }}>
+                {isMobile ? '✕' : '✕ Cancelar'}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Abas */}
-        <div style={{ display: 'flex', gap: 4, borderBottom: 'none' }}>
+        {/* Progresso mobile */}
+        {isMobile && progresso > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div style={{ flex: 1, height: 4, background: '#1E3050', borderRadius: 2 }}>
+              <div style={{ width: `${progresso}%`, height: '100%', background: cor, borderRadius: 2 }} />
+            </div>
+            <span style={{ fontSize: 11, color: '#4A6080', flexShrink: 0 }}>{marcosFeitos}/{totalMarcos} · {progresso}%</span>
+          </div>
+        )}
+
+        {/* Abas — scroll horizontal no mobile */}
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none' as any }}>
           {ABAS.map(a => (
-            <button key={a.id} onClick={() => setAba(a.id as any)} style={{ padding: '7px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: aba === a.id ? 700 : 400, color: aba === a.id ? cor : '#4A6080', borderBottom: aba === a.id ? `2px solid ${cor}` : '2px solid transparent', transition: 'all 0.15s' }}>
+            <button key={a.id} onClick={() => setAba(a.id as any)} style={{ padding: isMobile ? '6px 12px' : '7px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: isMobile ? 11 : 12, fontWeight: aba === a.id ? 700 : 400, color: aba === a.id ? cor : '#4A6080', borderBottom: aba === a.id ? `2px solid ${cor}` : '2px solid transparent', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {a.label}
             </button>
           ))}
@@ -883,7 +900,7 @@ export function OrdemServicoDetailPage() {
       </div>
 
       {/* ── CONTEÚDO ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 14px' : '20px 24px' }}>
         {aba === 'geral'        && <AbaVisaoGeral os={os} osId={osId} onRefresh={refresh} onShowModalMarco={() => setShowModalMarco(true)} />}
         {aba === 'agendamentos' && <AbaAgendamentos os={os} osId={osId} onRefresh={refresh} onShowModal={() => setShowModalAg(true)} />}
         {aba === 'diario'       && <AbaDiarioCampo os={os} osId={osId} onRefresh={refresh} />}
