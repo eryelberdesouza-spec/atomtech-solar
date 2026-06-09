@@ -4,7 +4,7 @@
 //        (evita bugs do Drizzle v0.30 com colunas boolean/date)
 // ═══════════════════════════════════════════════════════════════════
 
-import { z } from 'zod'
+import { z } from 'zod'h
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
 
@@ -770,7 +770,7 @@ export const osRouter = router({
       // Não criamos fin_parcela pois o fluxo de caixa real já está registrado
       // pelo extrato bancário importado. O fin_titulo serve de âncora para
       // vincular OS ↔ Proposta ↔ Cliente no módulo financeiro.
-      const descTitulo = `📦 ${input.descricao ?? 'Contrato histórico'} — ${input.clienteNome} (${numProposta})`
+      const descTitulo = `📦 ${input.descricao ?? 'Contrato histórico'} — ${input.clienteNome} (${numProposta})`.substring(0, 190)
       await pool.execute(
         `INSERT INTO fin_titulo
            (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id,
@@ -870,7 +870,7 @@ export const osRouter = router({
                 usuario_id, created_by, versao, created_at)
              VALUES (?, ?, ?, 'aceita', 'historico', ?, ?, DATE_ADD(?, INTERVAL 1 YEAR), ?, ?, 1, NOW())`,
             [empId, numProposta, clienteId,
-             c.descricao ?? `Contrato histórico — ${c.clienteNome}`,
+                       (c.descricao ?? `Contrato histórico — ${c.clienteNome}`).substring(0, 190),
              c.dataInicio, c.dataInicio, usuId, usuId],
           )
           const propostaId = (propRes as any).insertId
@@ -941,7 +941,7 @@ export const osRouter = router({
 
           resultados.push({ linha: i + 1, ok: true, numero })
         } catch (e: any) {
-          resultados.push({ linha: i + 1, ok: false, erro: e.message })
+          resultados.push({ linha: i + 1, ok: false, erro: e.meshsage })
         }
       }
 
