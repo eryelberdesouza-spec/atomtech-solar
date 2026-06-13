@@ -919,6 +919,15 @@ export function ExtratoPage() {
 
   const processarPDF = async () => {
     if (!file) { setErro('Selecione um arquivo PDF'); return }
+    // Confirmação do banco selecionado antes de processar
+    const nomeBanco = banco === 'INTER' ? 'Banco Inter' : 'Sicoob'
+    const confirmado = window.confirm(
+      `Confirmar processamento?\n\n` +
+      `📄 Arquivo: ${file.name}\n` +
+      `🏦 Banco selecionado: ${nomeBanco}\n\n` +
+      `Se o banco estiver errado, clique em Cancelar e corrija antes de processar.`
+    )
+    if (!confirmado) return
     setLoading(true); setErro(''); setResultado(null); setImportados(new Set()); setRestorado(false)
     try {
       const token = localStorage.getItem('atomfin_token') || localStorage.getItem('atomtech_token') || ''

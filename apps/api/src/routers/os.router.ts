@@ -4,7 +4,7 @@
 //        (evita bugs do Drizzle v0.30 com colunas boolean/date)
 // ═══════════════════════════════════════════════════════════════════
 
-import { z } from 'zod'h
+import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
 
