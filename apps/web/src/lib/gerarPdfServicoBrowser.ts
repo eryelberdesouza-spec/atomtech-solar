@@ -282,7 +282,7 @@ function sec(titulo: string, conteudo: string): string {
 
 // ─── GERADOR PRINCIPAL ───────────────────────────────────────────────────────
 
-export function abrirPdfServicoNoNavegador(data: any): void {
+export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null): void {
   const { proposta, itensServico, condicoesComerciais, blocos, empresa, textos, cliente } = data
 
   const cor1 = empresa?.corPrimaria ?? '#F5A623'
@@ -591,7 +591,7 @@ export function abrirPdfServicoNoNavegador(data: any): void {
 </body>
 </html>`
 
-  const win = window.open('', '_blank')
+  const win = winParam ?? window.open('', '_blank')
   if (!win) { alert('Permita popups para este site e tente novamente.'); return }
   win.document.write(fullHtml)
   win.document.close()

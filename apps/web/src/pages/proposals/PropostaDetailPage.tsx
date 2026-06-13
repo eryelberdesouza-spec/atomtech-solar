@@ -1482,6 +1482,10 @@ export function PropostaDetailPage() {
 
   const handleGerarPdfComCapa = (capaImg: string) => {
     setShowCapaModal(false)
+    // Abre a janela SINCRONAMENTE dentro do gesto de clique. Se for adiada para
+    // dentro do setTimeout, o navegador bloqueia o popup (sem ícone de desbloqueio).
+    const win = window.open('', '_blank')
+    if (!win) { alert('Popups bloqueados. Permita popups para este site e gere o PDF novamente.'); return }
     setGerandoPdf(true)
     setTimeout(() => {
       try {
@@ -1489,12 +1493,13 @@ export function PropostaDetailPage() {
         if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
         const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData, capaImg }
         if ((data as any).proposta?.tipoProposta === 'servico_geral') {
-          abrirPdfServicoNoNavegador(dadosPdf)
+          abrirPdfServicoNoNavegador(dadosPdf, win)
         } else {
-          abrirPdfNoNavegador(dadosPdf)
+          abrirPdfNoNavegador(dadosPdf, win)
         }
-      } catch (e) {
-        alert('Erro ao gerar PDF. Verifique se popups estão permitidos neste site.')
+      } catch (e: any) {
+        try { win.close() } catch {}
+        alert('Erro ao gerar PDF: ' + (e?.message ?? String(e)))
         console.error(e)
       } finally { setGerandoPdf(false) }
     }, 100)

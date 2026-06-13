@@ -585,11 +585,13 @@ function gerarHTML(data: any): string {
 </html>`
 }
 
-export function abrirPdfNoNavegador(data: any): void {
+export function abrirPdfNoNavegador(data: any, winParam?: Window | null): void {
   const html = gerarHTML(data)
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url  = URL.createObjectURL(blob)
-  const win  = window.open(url, '_blank')
-  if (!win) alert('Popups bloqueados. Permita popups para este site e tente novamente.')
+  const win  = winParam ?? window.open(url, '_blank')
+  if (!win) { alert('Popups bloqueados. Permita popups para este site e tente novamente.'); return }
+  // Quando a janela foi pré-aberta (no clique), navega-la para o blob
+  if (winParam) winParam.location.href = url
   setTimeout(() => URL.revokeObjectURL(url), 10000)
 }
