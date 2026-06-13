@@ -159,13 +159,15 @@ const CSS = `
   .running-header .logo-text { font-size: 14pt; font-weight: 900; letter-spacing: -1px; color: #fff; }
 
   @media print {
-    @page { size: A4; margin: 0; }
+    /* margin-top/bottom no @page reserva espaço do cabeçalho em TODAS as páginas,
+       evitando que o texto das páginas seguintes comece em cima do logo. */
+    @page { size: A4; margin: 20mm 0 14mm; }
     body  { margin: 0; }
 
-    /* Cabeçalho fixo — aparece no topo de TODAS as páginas impressas */
+    /* Cabeçalho fixo — aparece no topo de TODAS as páginas impressas, dentro da margem reservada */
     .running-header {
       position: fixed;
-      top: 8mm;
+      top: 7mm;
       left: 16mm;
       right: 16mm;
       background: transparent !important;
@@ -177,9 +179,9 @@ const CSS = `
     .running-header img       { height: 26px; filter: brightness(0); }
     .running-header .logo-text { color: #000 !important; }
 
-    /* Conteúdo afastado do topo para não sobrepor o cabeçalho fixo */
+    /* Margens verticais agora vêm do @page; aqui só as laterais */
     .doc-body {
-      padding: 22mm 16mm 14mm;
+      padding: 0 16mm;
     }
 
     /* Quebras de página entre seções */
@@ -191,6 +193,8 @@ const CSS = `
     /* Evita quebra no meio de cláusulas e listas */
     .clausula, .paragrafo, .parte-bloco { page-break-inside: avoid; }
     .lista-clausula { page-break-inside: avoid; }
+    /* Mantém cada bloco de assinatura/testemunhas íntegro (sem orfanar a metade numa página) */
+    .assinatura-wrapper { page-break-inside: avoid; }
   }
 
   @media screen {
@@ -299,7 +303,7 @@ const CSS = `
     margin: 0 12px;
     vertical-align: bottom;
   }
-  .assinatura-espaco { height: 12mm; }
+  .assinatura-espaco { height: 36mm; }
   .assinatura-linha {
     border-top: 1px solid #000;
     padding-top: 2px;
@@ -706,7 +710,7 @@ function buildHtml(dados: any, formaPagamento: string): string {
       </div>
     </div>
 
-    <div style="margin-top:8mm;">
+    <div style="margin-top:8mm;page-break-inside:avoid;break-inside:avoid;">
       <p style="font-size:9.5pt;margin-bottom:3mm;text-align:center;font-weight:700;">Testemunhas:</p>
       <div>
         <div class="assinatura-wrapper">

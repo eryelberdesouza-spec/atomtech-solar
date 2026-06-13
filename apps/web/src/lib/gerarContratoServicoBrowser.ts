@@ -194,9 +194,9 @@ const CSS = `
     text-align: left; font-weight: 700; font-size: 9.5pt;
   }
   .tabela-pagamento td { border: 1px solid #ccc; padding: 4px 8px; vertical-align: top; }
-  .assinaturas-bloco { margin-top: 8mm; text-align: center; }
+  .assinaturas-bloco { margin-top: 8mm; text-align: center; page-break-inside: avoid; break-inside: avoid; }
   .assinatura-wrapper { display: inline-block; width: 220px; margin: 0 16px; vertical-align: bottom; }
-  .assinatura-espaco { height: 14mm; }
+  .assinatura-espaco { height: 42mm; }
   .assinatura-linha {
     border-top: 1px solid #000; padding-top: 3px;
     font-size: 10pt; text-align: center;
@@ -457,15 +457,15 @@ function buildHtml(dados: any): string {
       </div>
 
       <!-- Testemunhas -->
-      <div style="margin-top:12mm;">
+      <div style="margin-top:12mm;page-break-inside:avoid;break-inside:avoid;">
         <div class="secao-titulo" style="font-size:10pt;">Testemunhas</div>
         <div style="display:flex;gap:40px;margin-top:8mm;">
           <div style="flex:1;">
-            <div style="height:12mm;"></div>
+            <div style="height:36mm;"></div>
             <div style="border-top:1px solid #000;padding-top:4px;font-size:9.5pt;text-align:center;">1ª Testemunha — Nome / CPF</div>
           </div>
           <div style="flex:1;">
-            <div style="height:12mm;"></div>
+            <div style="height:36mm;"></div>
             <div style="border-top:1px solid #000;padding-top:4px;font-size:9.5pt;text-align:center;">2ª Testemunha — Nome / CPF</div>
           </div>
         </div>
