@@ -478,9 +478,6 @@ function buildHtml(dados: any, formaPagamento: string): string {
     <strong>PARÁGRAFO SEGUNDO</strong> — Em caso de cobrança judicial, serão acrescidos custas processuais e honorários advocatícios de no mínimo 5% (cinco por cento) sobre o valor da causa.
   </p>
 
-  <!-- ── QUEBRA DE PÁGINA 2 ── -->
-  <div class="page-break"></div>
-
   <!-- ── PRAZO DE ENTREGA ── -->
   <p class="secao-titulo">Do Prazo de Entrega</p>
   <p class="clausula">
@@ -542,9 +539,6 @@ function buildHtml(dados: any, formaPagamento: string): string {
     <strong>CLÁUSULA 8ª</strong> - A instalação iniciará somente após entrega dos equipamentos pelo Fornecedor e aprovação da homologação junto à Concessionária.
   </p>
 
-  <!-- ── QUEBRA DE PÁGINA 3 ── -->
-  <div class="page-break"></div>
-
   <!-- ── DAS RESPONSABILIDADES ── -->
   <p class="secao-titulo">Das Responsabilidades das Partes</p>
   <p class="clausula"><strong>CLÁUSULA 9ª</strong> — É de responsabilidade do <strong>CONTRATANTE</strong>:</p>
@@ -600,9 +594,6 @@ function buildHtml(dados: any, formaPagamento: string): string {
   <p class="paragrafo">
     <strong>PARÁGRAFO TERCEIRO</strong> — A manutenção preventiva deve ser realizada às expensas do <strong>CONTRATANTE</strong> no mínimo 1 (uma) vez a cada 12 (doze) meses.
   </p>
-
-  <!-- ── QUEBRA DE PÁGINA 4 ── -->
-  <div class="page-break"></div>
 
   <!-- ── DAS RESPONSABILIDADES TRIBUTÁRIAS ── -->
   <p class="secao-titulo">Das Responsabilidades Tributárias</p>
@@ -722,6 +713,23 @@ function buildHtml(dados: any, formaPagamento: string): string {
 
 </td></tr></tbody>
 </table>
+<script>
+  window.onload = function(){
+    setTimeout(function(){
+      try{
+        var b=document.querySelector('.doc-body'),h=document.querySelector('.doc-table thead'),f=document.querySelector('.doc-table tfoot');
+        if(b&&h&&f){
+          var pageH=Math.round(297*96/25.4), avail=pageH-h.offsetHeight-f.offsetHeight;
+          if(avail>0){
+            var c=b.scrollHeight, rem=c%avail, fill=rem>0?(avail-rem):0;
+            if(fill>24){ b.style.paddingBottom=(parseFloat(getComputedStyle(b).paddingBottom)+fill-12)+'px'; }
+          }
+        }
+      }catch(e){}
+      window.print();
+    },500);
+  };
+</script>
 </body>
 </html>`
 }
@@ -739,5 +747,5 @@ export function abrirContratoNoNavegador(dados: any, formaPagamento: string = ''
   janela.document.write(html)
   janela.document.close()
   janela.focus()
-  setTimeout(() => janela.print(), 600)
+  // A impressão é disparada pelo script interno do HTML após ajustar o rodapé ao pé da página
 }
