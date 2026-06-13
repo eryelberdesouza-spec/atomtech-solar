@@ -1569,44 +1569,121 @@ export function PropostaDetailPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ── HEADER ──────────────────────────────────────────────────── */}
-      <div style={{ padding: isMobile ? '10px 14px' : '14px 24px', borderBottom: `1px solid ${C.darkBorder}`, background: C.darkMid, display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 10 : 16, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-        <button onClick={() => navigate('/propostas')} style={{
-          padding: '6px 12px', borderRadius: 8, border: `1px solid ${C.darkBorder}`,
-          background: `${C.darkBorder}30`, color: C.textMuted, cursor: 'pointer', fontSize: 12,
-          display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
-        }}>←{!isMobile && ' Voltar'}</button>
+      <div style={{ borderBottom: `1px solid ${C.darkBorder}`, background: C.darkMid }}>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-            <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: isMobile ? 13 : 14, fontWeight: 800 }}>{proposta.numero}</span>
-            <Badge status={proposta.status} />
-            {!isMobile && <span style={{ fontSize: 11, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 7px' }}>v{proposta.versao}</span>}
-            {isFormalizado ? (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}>
-                ✔ Formalizado{!isMobile && (dataFormalizacaoLocal || proposta.dataFormalizacao) ? ` · ${formatDate(dataFormalizacaoLocal || proposta.dataFormalizacao)}` : ''}
-              </span>
-            ) : proposta.status === 'aceita' ? (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40' }}>⏳ Aguardando</span>
-            ) : null}
-            {osExistente && (
-              <span onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
-                style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#FB923C20', color: '#FB923C', border: '1px solid #FB923C40', cursor: 'pointer' }}>
-                ⚙ {osExistente.numero}
-              </span>
-            )}
+        {/* Linha 1: Voltar + Info + PDF */}
+        <div style={{ padding: isMobile ? '10px 14px 8px' : '12px 24px 10px', display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14 }}>
+          <button onClick={() => navigate('/propostas')} style={{
+            padding: '5px 11px', borderRadius: 8, border: `1px solid ${C.darkBorder}`,
+            background: `${C.darkBorder}30`, color: C.textMuted, cursor: 'pointer', fontSize: 12,
+            display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, whiteSpace: 'nowrap',
+          }}>← Voltar</button>
+
+          {/* Info: número + badges + nome */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+              <span style={{ color: C.accent, fontFamily: 'monospace', fontSize: isMobile ? 12 : 13, fontWeight: 800, whiteSpace: 'nowrap' }}>{proposta.numero}</span>
+              <Badge status={proposta.status} />
+              <span style={{ fontSize: 10, color: C.textDim, background: `${C.darkBorder}40`, borderRadius: 5, padding: '1px 6px' }}>v{proposta.versao}</span>
+              {isFormalizado ? (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#10B98120', color: '#10B981', border: '1px solid #10B98140', whiteSpace: 'nowrap' }}>
+                  ✔ Formalizado{!isMobile && (dataFormalizacaoLocal || proposta.dataFormalizacao) ? ` · ${formatDate(dataFormalizacaoLocal || proposta.dataFormalizacao)}` : ''}
+                </span>
+              ) : proposta.status === 'aceita' ? (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40' }}>⏳ Aguardando</span>
+              ) : null}
+              {osExistente && (
+                <span onClick={() => navigate(`/ordens-servico/${osExistente.id}`)}
+                  style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FB923C20', color: '#FB923C', border: '1px solid #FB923C40', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  ⚙ {osExistente.numero}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              {clienteData && (
+                <span style={{ color: C.text, fontSize: isMobile ? 12 : 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: isMobile ? 180 : 320 }}>
+                  {clienteData.nome}
+                </span>
+              )}
+              {isServico && proposta.tituloServico && (
+                <span style={{ color: C.textDim, fontSize: 11, background: `${C.green}15`, borderRadius: 5, padding: '1px 7px', border: `1px solid ${C.green}30`, flexShrink: 0 }}>🔧 {proposta.tituloServico}</span>
+              )}
+              {!isMobile && (
+                <span style={{ color: C.textDim, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  Emissão: {formatDate(proposta.dataEmissao)}{proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}
+                </span>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {clienteData && <span style={{ color: C.text, fontSize: isMobile ? 13 : 14, fontWeight: 700 }}>{clienteData.nome}</span>}
-            {isServico && proposta.tituloServico && (
-              <span style={{ color: C.textDim, fontSize: 11, background: `${C.green}15`, borderRadius: 5, padding: '1px 8px', border: `1px solid ${C.green}30` }}>🔧 {proposta.tituloServico}</span>
-            )}
-            {!isMobile && <span style={{ color: C.textDim, fontSize: 12 }}>Emissão: {formatDate(proposta.dataEmissao)}{proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}</span>}
-          </div>
+
+          {/* PDF sempre visível */}
+          <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf} style={{ flexShrink: 0 }}>
+            {gerandoPdf ? '⏳...' : '↯ PDF'}
+          </Btn>
+
+          {/* Mobile: menu "⋯" */}
+          {isMobile && (
+            <div style={{ position: 'relative', flexShrink: 0 }} ref={mobileMenuRef}>
+              <button
+                onClick={() => setShowMobileMenu(v => !v)}
+                style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.darkBorder}`, background: `${C.darkBorder}30`, color: C.text, cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>
+                ⋯
+              </button>
+              {showMobileMenu && (
+                <div style={{ position: 'absolute', top: '110%', right: 0, background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 200, minWidth: 220, overflow: 'hidden' }}>
+                  {proposta.status !== 'aceita' && (
+                    <button onClick={() => { handleStatus(next.status); setShowMobileMenu(false) }}
+                      style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: next.color, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                      {next.label}
+                    </button>
+                  )}
+                  <button onClick={() => { handleStatus('recusada'); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.danger, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    ✕ Recusar Proposta
+                  </button>
+                  <button onClick={() => { setShowEditDados(true); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.textMuted, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    ✏ Editar Proposta
+                  </button>
+                  <button onClick={() => { handleGerarContrato(); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.green, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    📄 Gerar Contrato
+                  </button>
+                  {proposta.status === 'aceita' && !isFormalizado && (
+                    <button onClick={() => { handleFormalizar(); setShowMobileMenu(false) }}
+                      style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#10B981', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                      ✔ Formalizar Contrato
+                    </button>
+                  )}
+                  {isFormalizado && !osExistente && (
+                    <button onClick={() => { handleGerarOS(); setShowMobileMenu(false) }}
+                      style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FB923C', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                      ⚙ Gerar OS
+                    </button>
+                  )}
+                  {isFormalizado && osExistente && (
+                    <button onClick={() => { navigate(`/ordens-servico/${osExistente.id}`); setShowMobileMenu(false) }}
+                      style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FB923C', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                      ⚙ Ver OS {osExistente.numero}
+                    </button>
+                  )}
+                  <button onClick={() => { setShowClonar(true); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.accent, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                    ⎘ Clonar Proposta
+                  </button>
+                  <button onClick={() => { setShowAltCliente(true); setShowMobileMenu(false) }}
+                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>
+                    👤 Alterar Cliente
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Desktop: botões em linha */}
+        {/* Linha 2 (desktop only): barra de ações — wraps naturalmente */}
         {!isMobile && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ padding: '0 24px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', borderTop: `1px solid ${C.darkBorder}30` }}>
             {proposta.status !== 'aceita' && (
               <Btn variant="ghost" size="sm" onClick={() => handleStatus(next.status)}
                 style={{ color: next.color, borderColor: next.color + '50' }}>{next.label}</Btn>
@@ -1656,67 +1733,6 @@ export function PropostaDetailPage() {
                   {gerandoOS ? '⏳...' : '⚙ Gerar OS'}
                 </Btn>
               )
-            )}
-            <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
-              {gerandoPdf ? '⏳...' : '↯ PDF'}
-            </Btn>
-          </div>
-        )}
-
-        {/* Mobile: apenas PDF + menu "⋯" */}
-        {isMobile && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, position: 'relative' }} ref={mobileMenuRef}>
-            <Btn size="sm" onClick={handleGerarPdf} disabled={gerandoPdf}>
-              {gerandoPdf ? '⏳' : '↯ PDF'}
-            </Btn>
-            <button
-              onClick={() => setShowMobileMenu(v => !v)}
-              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${C.darkBorder}`, background: `${C.darkBorder}30`, color: C.text, cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>
-              ⋯
-            </button>
-            {showMobileMenu && (
-              <div style={{ position: 'absolute', top: '110%', right: 0, background: C.darkCard, border: `1px solid ${C.darkBorder}`, borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 200, minWidth: 220, overflow: 'hidden' }}>
-                {proposta.status !== 'aceita' && (
-                  <button onClick={() => { handleStatus(next.status); setShowMobileMenu(false) }}
-                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: next.color, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                    {next.label}
-                  </button>
-                )}
-                <button onClick={() => { handleStatus('recusada'); setShowMobileMenu(false) }}
-                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.danger, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                  ✕ Recusar Proposta
-                </button>
-                <button onClick={() => { handleGerarContrato(); setShowMobileMenu(false) }}
-                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.green, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                  📄 Gerar Contrato
-                </button>
-                {proposta.status === 'aceita' && !isFormalizado && (
-                  <button onClick={() => { handleFormalizar(); setShowMobileMenu(false) }}
-                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#10B981', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                    ✔ Formalizar Contrato
-                  </button>
-                )}
-                {isFormalizado && !osExistente && (
-                  <button onClick={() => { handleGerarOS(); setShowMobileMenu(false) }}
-                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FB923C', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                    ⚙ Gerar OS
-                  </button>
-                )}
-                {isFormalizado && osExistente && (
-                  <button onClick={() => { navigate(`/ordens-servico/${osExistente.id}`); setShowMobileMenu(false) }}
-                    style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FB923C', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                    ⚙ Ver OS {osExistente.numero}
-                  </button>
-                )}
-                <button onClick={() => { setShowClonar(true); setShowMobileMenu(false) }}
-                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.accent, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
-                  ⎘ Clonar Proposta
-                </button>
-                <button onClick={() => { setShowAltCliente(true); setShowMobileMenu(false) }}
-                  style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>
-                  👤 Alterar Cliente
-                </button>
-              </div>
             )}
           </div>
         )}

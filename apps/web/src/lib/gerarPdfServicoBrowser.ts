@@ -35,39 +35,31 @@ function renderTexto(txt: string | undefined | null): string {
   }).join('')
 }
 
-// Grupo linhas em itens: linha com bullet ou numeração própria inicia item; demais são corpo
-function agruparItens(txt: string): { titulo: string; corpo: string[] }[] {
-  const items: { titulo: string; corpo: string[] }[] = []
-  for (const line of txt.split('\n').map(l => l.trim())) {
-    if (!line) continue
-    // Início de item: bullet (- •), numeração (1. 2.), letra (a. b. c.) ou linha toda em maiúsculas
-    const isTitle = /^[-•]\s/.test(line)
-      || /^\d+\.\s/.test(line)
-      || /^[a-zA-Z]\.\s/.test(line)
-      || (line === line.toUpperCase() && line.length > 3 && /[A-ZÁÉÍÓÚÃÕÇ]/.test(line))
-    if (isTitle || items.length === 0) {
-      items.push({ titulo: line, corpo: [] })
-    } else {
-      items[items.length - 1].corpo.push(line)
-    }
-  }
-  return items
-}
-
-const stripPrefix = (s: string) => s.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*|^[a-zA-Z]\.\s*/, '')
-
 function renderListaNumerada(txt: string, cor1: string): string {
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  return agruparItens(txt).map(({ titulo, corpo }, idx) => {
-    const tituloHtml = bold(stripPrefix(titulo))
-    const corpoHtml  = corpo.map(l => bold(l)).join('<br>')
-    return `<div style="display:flex;gap:12px;margin-bottom:5px;align-items:flex-start;padding-bottom:5px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
-      <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx + 1}</span>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:300;color:#333;line-height:1.85">${tituloHtml}</div>
-        ${corpoHtml ? `<div style="font-size:12.5px;color:#555;margin-top:2px;line-height:1.75">${corpoHtml}</div>` : ''}
-      </div>
-    </div>`
+  const linhas = txt.split('\n').map(l => l.trim()).filter(Boolean)
+  let idx = 0
+  return linhas.map(linha => {
+    // "-" ou "•" puro → item numerado. "- a. texto" → texto corrido (preserva "a.")
+    const ehItem = /^[-•]/.test(linha) && !/^[-•]\s*[a-zA-Z]\.\s/.test(linha)
+    if (ehItem) {
+      idx++
+      const texto = bold(linha.replace(/^[-•]\s*/, ''))
+      return `<div style="display:flex;gap:12px;margin-bottom:40px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
+        <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx}</span>
+        <div style="flex:1;font-size:13px;font-weight:300;color:#333;line-height:1.85">${texto}</div>
+      </div>`
+    } else {
+      const linhaStrip = linha.replace(/^[-•]\s*/, '') // remove "-" de "- a. texto"
+      const texto = bold(linhaStrip)
+      const ehSubtitulo = /^\*\*[^*]+\*\*\s*$/.test(linhaStrip.trim()) ||
+        (linhaStrip === linhaStrip.toUpperCase() && linhaStrip.length > 3 && /[A-ZÁÉÍÓÚÃÕÇ]/.test(linhaStrip))
+      if (ehSubtitulo) {
+        return `<div style="font-size:15px;font-weight:600;color:#0E2040;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid ${cor1}50">${texto}</div>`
+      } else {
+        return `<p style="font-size:13px;font-weight:300;color:#333;line-height:1.85;margin:0 0 8px 4px">${texto}</p>`
+      }
+    }
   }).join('')
 }
 
@@ -176,11 +168,12 @@ const CSS_SERVICO = `
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
   .doc-content { padding: 0 36px 16px; }
-  .section { margin-bottom: 14px; }
+  .section { margin-bottom: 32px; }
+  .section + .section { margin-top: 8px; }
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
-    margin-bottom: 10px; line-height: 1.2;
+    margin-bottom: 14px; line-height: 1.2;
     page-break-after: avoid; break-after: avoid;
   }
   .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 12px 0; }
@@ -224,7 +217,7 @@ const CSS_SERVICO = `
 
   /* ─── ACEITE ───────────────────────────────────────────────────── */
   .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 8px; }
-  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 120px; }
+  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 100mm; }
   .assinatura-linha {
     border-top: 1px solid #333; padding-top: 10px; text-align: center;
     font-size: 12px; font-weight: 300; color: #555;
@@ -504,26 +497,8 @@ export function abrirPdfServicoNoNavegador(data: any): void {
   const temAceite  = blocoAtivo(blocos, 'aceite')
   const temContato = blocoAtivo(blocos, 'contato')
   if (temAceite) {
-    sections += sec('Aceite e Assinatura', `
-      <div class="aceite-box">
-        <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
-        <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
-        <p><strong>Cliente:</strong> ${nomeCliente}</p>
-        <div class="assinatura-grid">
-          <div>
-            <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
-            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
-          </div>
-          <div>
-            <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
-            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
-          </div>
-        </div>
-      </div>`)
-  }
-  if (temContato) {
-    sections += sec('Entre em Contato', `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:4px">
+    const contatoInline = temContato ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
         ${empresa?.telefone ? `<div>
           <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
@@ -540,6 +515,27 @@ export function abrirPdfServicoNoNavegador(data: any): void {
           <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
+      </div>` : ''
+    // Bloco inteiro (texto + assinaturas + contato) não pode quebrar entre páginas:
+    // garante que a assinatura e as informações da empresa fiquem juntas na mesma página.
+    sections += sec('Aceite e Assinatura', `
+      <div style="break-inside:avoid;page-break-inside:avoid">
+        <div class="aceite-box">
+          <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
+          <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
+          <p><strong>Cliente:</strong> ${nomeCliente}</p>
+        </div>
+        <div class="assinatura-grid">
+          <div>
+            <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
+            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
+          </div>
+          <div>
+            <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
+            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
+          </div>
+        </div>
+        ${contatoInline}
       </div>`)
   }
 
