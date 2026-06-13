@@ -576,13 +576,14 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
             var theadH  = thead.offsetHeight;
             var tfootH  = tfoot.offsetHeight;
             var availH  = pageH - theadH - tfootH;
-            var contentH = content.scrollHeight; // já inclui o padding-bottom de 28px
+            var contentH = content.scrollHeight;
             if (availH > 0) {
-              var pages   = Math.ceil(contentH / availH) || 1;
-              var extra   = (pages * availH) - contentH;
-              // Só aplica se o ganho for significativo (> 20px) para evitar ruído
-              if (extra > 20) {
-                content.style.paddingBottom = (28 + extra) + 'px';
+              // Espaco vazio sobrando na ULTIMA pagina = quanto empurrar o rodape ate o pe
+              var remainder = contentH % availH;
+              var fill = remainder > 0 ? (availH - remainder) : 0;
+              // -12px de margem de seguranca evita transbordar e gerar pagina em branco
+              if (fill > 24) {
+                content.style.paddingBottom = (16 + fill - 12) + 'px';
               }
             }
           }
