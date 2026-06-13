@@ -63,6 +63,9 @@ function renderListaNumerada(txt: string, cor1: string): string {
   }).join('')
 }
 
+// Remove prefixos de lista (-, •, *, 1., a.) para o badge de letra substituir
+const stripPrefix = (s: string) => s.replace(/^[-•]\s*|^\*(?!\*)\s+|^\d+\.\s*|^[a-zA-Z]\.\s*/, '')
+
 // Cada linha não-vazia = um item independente com badge de letra (a, b, c…)
 // NÃO usa agruparItens — garante que linhas sem prefixo virem itens distintos
 function renderListaLetras(txt: string): string {
