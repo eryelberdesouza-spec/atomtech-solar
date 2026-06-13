@@ -145,66 +145,44 @@ const CSS = `
     line-height: 1.4;
   }
 
-  /* ── CABEÇALHO FIXO (aparece em TODAS as páginas na impressão) ── */
+  /* ── CABEÇALHO/RODAPÉ via tabela: thead/tfoot repetem em TODAS as páginas
+        impressas, e o conteúdo flui no tbody SEM sobrepor (sem position:fixed) ── */
+  .doc-table { width: 100%; border-collapse: collapse; }
+  .doc-table thead { display: table-header-group; }
+  .doc-table tfoot { display: table-footer-group; }
+  .doc-head-cell, .doc-foot-cell, .doc-body-cell { padding: 0; border: 0; }
+
   .running-header {
-    display: flex;
-    align-items: center;
-    padding: 5px 0;
-    margin-bottom: 5mm;
-    background: #1a2744;
-    border-radius: 3px;
-    padding: 5px 10px;
+    display: flex; align-items: center;
+    padding: 6mm 16mm 2mm;
+    border-bottom: 1.5px solid #1a2744;
   }
   .running-header img  { height: 30px; }
-  .running-header .logo-text { font-size: 14pt; font-weight: 900; letter-spacing: -1px; color: #fff; }
+  .running-header .logo-text { font-size: 14pt; font-weight: 900; letter-spacing: -1px; color: #1a2744; }
+
+  .running-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 2mm 16mm 5mm;
+    border-top: 1px solid #1a2744;
+    font-size: 8pt; color: #555;
+  }
+  .running-footer .rf-site { font-weight: 700; color: #1a2744; }
+
+  .doc-body { padding: 4mm 16mm 4mm; }
 
   @media print {
-    /* margin-top/bottom no @page reserva espaço do cabeçalho em TODAS as páginas,
-       evitando que o texto das páginas seguintes comece em cima do logo. */
-    @page { size: A4; margin: 20mm 0 14mm; }
+    @page { size: A4; margin: 0; }
     body  { margin: 0; }
-
-    /* Cabeçalho fixo — aparece no topo de TODAS as páginas impressas, dentro da margem reservada */
-    .running-header {
-      position: fixed;
-      top: 7mm;
-      left: 16mm;
-      right: 16mm;
-      background: transparent !important;
-      border-bottom: 1.5px solid #1a2744;
-      border-radius: 0;
-      padding: 0 0 3px 0;
-      margin: 0;
-    }
-    .running-header img       { height: 26px; filter: brightness(0); }
+    .running-header img        { filter: brightness(0); }
     .running-header .logo-text { color: #000 !important; }
-
-    /* Margens verticais agora vêm do @page; aqui só as laterais */
-    .doc-body {
-      padding: 0 16mm;
-    }
-
-    /* Quebras de página entre seções */
-    .page-break {
-      page-break-before: always;
-      padding-top: 0;
-    }
-
-    /* Evita quebra no meio de cláusulas e listas */
+    .page-break { page-break-before: always; }
     .clausula, .paragrafo, .parte-bloco { page-break-inside: avoid; }
     .lista-clausula { page-break-inside: avoid; }
-    /* Mantém cada bloco de assinatura/testemunhas íntegro (sem orfanar a metade numa página) */
     .assinatura-wrapper { page-break-inside: avoid; }
   }
 
   @media screen {
-    .doc-body {
-      width: 210mm;
-      min-height: 297mm;
-      padding: 14mm 16mm 14mm;
-      background: #fff;
-      margin: 0 auto;
-    }
+    .doc-table { width: 210mm; margin: 0 auto; background: #fff; }
     .page-break {
       border-top: 2px dashed #ccc;
       margin: 8mm 0 6mm;
@@ -241,28 +219,28 @@ const CSS = `
     font-weight: 700;
     text-decoration: underline;
     text-transform: uppercase;
-    margin: 3mm 0 1mm;
+    margin: 4.5mm 0 1.8mm;
   }
 
   .clausula {
     text-align: justify;
-    margin-bottom: 1.5mm;
+    margin-bottom: 2.5mm;
     hyphens: auto;
   }
   .clausula strong { font-weight: 700; }
 
   .paragrafo {
     text-align: justify;
-    margin-bottom: 1mm;
+    margin-bottom: 2mm;
     padding-left: 5mm;
     hyphens: auto;
   }
 
   .lista-clausula {
-    margin: 1mm 0 1.5mm 8mm;
+    margin: 1.5mm 0 2.5mm 8mm;
   }
   .lista-clausula li {
-    margin-bottom: 0.8mm;
+    margin-bottom: 1.3mm;
     text-align: justify;
   }
 
@@ -450,10 +428,17 @@ function buildHtml(dados: any, formaPagamento: string): string {
 </head>
 <body>
 
-<!-- Cabeçalho fixo: aparece em TODAS as páginas na impressão (position:fixed em @media print) -->
-<div class="running-header">
-  ${logoTag(empresa?.logoUrl)}
-</div>
+<table class="doc-table">
+<thead><tr><td class="doc-head-cell">
+  <div class="running-header">${logoTag(empresa?.logoUrl)}</div>
+</td></tr></thead>
+<tfoot><tr><td class="doc-foot-cell">
+  <div class="running-footer">
+    <span class="rf-site">${empresa?.site ?? 'www.atomtech.tec.br'}</span>
+    <span>${[empNome, empEmail, empresa?.telefone].filter(Boolean).join(' · ')}</span>
+  </div>
+</td></tr></tfoot>
+<tbody><tr><td class="doc-body-cell">
 
 <!-- Corpo do documento -->
 <div class="doc-body">
@@ -734,6 +719,9 @@ function buildHtml(dados: any, formaPagamento: string): string {
   </div>
 
 </div><!-- fim doc-body -->
+
+</td></tr></tbody>
+</table>
 </body>
 </html>`
 }

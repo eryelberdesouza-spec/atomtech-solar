@@ -136,25 +136,31 @@ const CSS = `
     background: #fff;
     line-height: 1.55;
   }
-  .page {
-    width: 210mm;
-    min-height: 297mm;
-    padding: 18mm 22mm 20mm;
-    background: #fff;
-    position: relative;
-    page-break-after: always;
-  }
-  .page:last-child { page-break-after: avoid; }
+  /* Cabeçalho/rodapé via tabela: thead/tfoot repetem em TODAS as páginas;
+     conteúdo flui no tbody sem sobrepor. */
+  .doc-table { width: 100%; border-collapse: collapse; }
+  .doc-table thead { display: table-header-group; }
+  .doc-table tfoot { display: table-footer-group; }
+  .doc-head-cell, .doc-foot-cell, .doc-body-cell { padding: 0; border: 0; }
+  .doc-body { padding: 6mm 22mm 6mm; }
+
   .header {
     display: flex; align-items: center;
-    margin-bottom: 6mm;
     background: #1a2744;
-    border-radius: 4px;
-    padding: 6px 12px;
+    padding: 8px 22mm;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .header img { height: 36px; }
   .header span { color: #fff; }
   .header-line { flex: 1; }
+
+  .running-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: #1a2744; color: rgba(255,255,255,0.85);
+    padding: 6px 22mm; font-size: 8pt;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .running-footer .rf-site { font-weight: 700; color: #fff; }
   .titulo-contrato {
     text-align: center; font-size: 14pt; font-weight: 700;
     text-decoration: underline; text-transform: uppercase;
@@ -205,10 +211,7 @@ const CSS = `
   @media print {
     @page { size: A4; margin: 0; }
     body { margin: 0; }
-    .page { margin: 0; }
-    .header { background: none !important; border-bottom: 2px solid #1a2744; padding-bottom: 4px; }
-    .header img { filter: brightness(0); }
-    .header span { color: #000 !important; }
+    .clausula, .paragrafo, .parte-bloco { page-break-inside: avoid; }
   }
 `
 
@@ -321,9 +324,9 @@ function buildHtml(dados: any): string {
       <style>${CSS}</style>
     </head>
     <body>
-    <div class="page">
-
-      <!-- Cabeçalho -->
+    <table class="doc-table">
+    <thead><tr><td class="doc-head-cell">
+      <!-- Cabeçalho (repete em todas as páginas) -->
       <div class="header">
         ${logo}
         <div class="header-line" style="margin-left:12px;">
@@ -336,6 +339,15 @@ function buildHtml(dados: any): string {
           <div style="font-size:10pt;font-weight:700;color:#fff;">${proposta.numero}</div>
         </div>
       </div>
+    </td></tr></thead>
+    <tfoot><tr><td class="doc-foot-cell">
+      <div class="running-footer">
+        <span class="rf-site">${empresa?.site ?? 'www.atomtech.tec.br'}</span>
+        <span>${[nomeEmpresa, empresa?.email, empresa?.telefone].filter(Boolean).join(' · ')}</span>
+      </div>
+    </td></tr></tfoot>
+    <tbody><tr><td class="doc-body-cell">
+      <div class="doc-body">
 
       <div class="titulo-contrato">Contrato de Prestação de Serviços</div>
       <div class="subtitulo-contrato">${tituloServico}</div>
@@ -471,7 +483,9 @@ function buildHtml(dados: any): string {
         </div>
       </div>
 
-    </div>
+      </div><!-- fim doc-body -->
+    </td></tr></tbody>
+    </table>
     </body>
     </html>
   `
