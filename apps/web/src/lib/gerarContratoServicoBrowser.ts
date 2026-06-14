@@ -486,22 +486,6 @@ function buildHtml(dados: any): string {
       </div><!-- fim doc-body -->
     </td></tr></tbody>
     </table>
-    <script>
-      window.onload = function(){
-        setTimeout(function(){
-          try{
-            var b=document.querySelector('.doc-body'),h=document.querySelector('.doc-table thead'),f=document.querySelector('.doc-table tfoot');
-            if(b&&h&&f){
-              var pageH=Math.round(297*96/25.4), avail=pageH-h.offsetHeight-f.offsetHeight;
-              if(avail>0){
-                var c=b.scrollHeight, rem=c%avail, fill=rem>0?(avail-rem):0;
-                if(fill>24){ b.style.paddingBottom=(parseFloat(getComputedStyle(b).paddingBottom)+fill-12)+'px'; }
-              }
-            }
-          }catch(e){}
-        },400);
-      };
-    </script>
     </body>
     </html>
   `

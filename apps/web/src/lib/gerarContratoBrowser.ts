@@ -153,12 +153,13 @@ const CSS = `
   .doc-head-cell, .doc-foot-cell, .doc-body-cell { padding: 0; border: 0; }
 
   .running-header {
-    display: flex; align-items: center;
+    display: flex; align-items: center; justify-content: space-between;
     padding: 6mm 16mm 2mm;
     border-bottom: 1.5px solid #1a2744;
   }
   .running-header img  { height: 30px; }
   .running-header .logo-text { font-size: 14pt; font-weight: 900; letter-spacing: -1px; color: #1a2744; }
+  .running-header .rh-num { font-size: 9.5pt; font-weight: 700; color: #1a2744; white-space: nowrap; }
 
   .running-footer {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -430,7 +431,10 @@ function buildHtml(dados: any, formaPagamento: string): string {
 
 <table class="doc-table">
 <thead><tr><td class="doc-head-cell">
-  <div class="running-header">${logoTag(empresa?.logoUrl)}</div>
+  <div class="running-header">
+    <div class="rh-logo">${logoTag(empresa?.logoUrl)}</div>
+    <div class="rh-num">Contrato nº ${numProposta}</div>
+  </div>
 </td></tr></thead>
 <tfoot><tr><td class="doc-foot-cell">
   <div class="running-footer">
@@ -714,21 +718,7 @@ function buildHtml(dados: any, formaPagamento: string): string {
 </td></tr></tbody>
 </table>
 <script>
-  window.onload = function(){
-    setTimeout(function(){
-      try{
-        var b=document.querySelector('.doc-body'),h=document.querySelector('.doc-table thead'),f=document.querySelector('.doc-table tfoot');
-        if(b&&h&&f){
-          var pageH=Math.round(297*96/25.4), avail=pageH-h.offsetHeight-f.offsetHeight;
-          if(avail>0){
-            var c=b.scrollHeight, rem=c%avail, fill=rem>0?(avail-rem):0;
-            if(fill>24){ b.style.paddingBottom=(parseFloat(getComputedStyle(b).paddingBottom)+fill-12)+'px'; }
-          }
-        }
-      }catch(e){}
-      window.print();
-    },500);
-  };
+  window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };
 </script>
 </body>
 </html>`
