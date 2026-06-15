@@ -740,6 +740,43 @@ export const propostaRouter = router({
       }
       // ─────────────────────────────────────────────────────────────────────
 
+      // ── Recalcula fluxo de caixa com o novo precoFinal ───────────────────
+      const [dim] = await ctx.db.select().from(dimTable)
+        .where(eq(dimTable.propostaId, propostaId)).limit(1)
+      const [snap] = await ctx.db.select().from(premissasSnapshot)
+        .where(eq(premissasSnapshot.propostaId, propostaId)).limit(1)
+
+      if (dim && snap) {
+        const prem = snap.dadosJson as any
+        const novoFinanceiro = calcularFinanceiro({
+          investimentoTotal: precoFinal,
+          geracaoAnualKwh: Number(dim.geracaoAnualKwh),
+          tarifaInicialKwh: Number(dim.tarifaUsada) || 1.0684,
+          premissas: {
+            inflacaoEnergetica: Number(prem.inflacaoEnergetica),
+            taxaDescontoVpl: Number(prem.taxaDescontoVpl),
+            perdaEficienciaAnualTradicional: Number(prem.perdaEficienciaAnualTradicional),
+            trocaInversorAnosTradicional: Number(prem.trocaInversorAnosTradicional),
+            custoTrocaInversorTrad: Number(prem.custoTrocaInversorTrad),
+          },
+          topologia: (dim.topologia as any) ?? 'tradicional',
+        })
+
+        await ctx.db.update(afTable).set({
+          investimentoTotal: String(precoFinal),
+          economiaMensalAno1: String(novoFinanceiro.economiaMensalAno1),
+          economiaAnualAno1: String(novoFinanceiro.economiaAnualAno1),
+          paybackSimplesMeses: novoFinanceiro.paybackSimplesMeses,
+          paybackDescontadoMeses: novoFinanceiro.paybackDescontadoMeses,
+          vpl: String(novoFinanceiro.vpl),
+          tir: String(novoFinanceiro.tir),
+          rendimentoPrimeiroAnoPct: String(novoFinanceiro.rendimentoPrimeiroAnoPct),
+          saldo25Anos: String(novoFinanceiro.saldo25Anos),
+          fluxoCaixaJson: novoFinanceiro.fluxoCaixa as any,
+        }).where(eq(afTable.propostaId, propostaId)).execute()
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       return { ok: true, precoFinal }
     }),
 
@@ -1030,6 +1067,71 @@ export const propostaRouter = router({
 
       return { ok: true, sizing: novoSizing }
     }),
+
+  // ─── MIGRAÇÃO: CORRIGE SNAPSHOTS COM TROCA INVERSOR ZERADA ──────────────
+  // Executa UMA vez para retroagir a correção das premissas de troca de inversor
+  // em propostas criadas antes do ajuste nas premissas_config.
+  fixSnapshotsTrocaInversor: protectedProcedure
+    .input(z.object({
+      anosTroca: z.number().int().positive().default(12),
+      pctCusto: z.number().positive().default(15),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const snaps = await ctx.db.select().from(premissasSnapshot)
+
+      let corrigidos = 0
+      for (const snap of snaps) {
+        const dados = snap.dadosJson as any
+        if (Number(dados.trocaInversorAnosTradicional) > 0) continue // já ok
+
+        const novosDados = {
+          ...dados,
+          trocaInversorAnosTradicional: input.anosTroca,
+          custoTrocaInversorTrad: input.pctCusto,
+        }
+
+        await ctx.db.update(premissasSnapshot)
+          .set({ dadosJson: novosDados as any })
+          .where(eq(premissasSnapshot.propostaId, snap.propostaId))
+          .execute()
+
+        // Recalcula o fluxo de caixa com as premissas corrigidas
+        const [dim] = await ctx.db.select().from(dimTable)
+          .where(eq(dimTable.propostaId, snap.propostaId)).limit(1)
+        const [af] = await ctx.db.select().from(afTable)
+          .where(eq(afTable.propostaId, snap.propostaId)).limit(1)
+
+        if (dim && af) {
+          const novoFinanceiro = calcularFinanceiro({
+            investimentoTotal: Number(af.investimentoTotal),
+            geracaoAnualKwh: Number(dim.geracaoAnualKwh),
+            tarifaInicialKwh: Number(dim.tarifaUsada) || 1.0684,
+            premissas: {
+              inflacaoEnergetica: Number(novosDados.inflacaoEnergetica),
+              taxaDescontoVpl: Number(novosDados.taxaDescontoVpl),
+              perdaEficienciaAnualTradicional: Number(novosDados.perdaEficienciaAnualTradicional),
+              trocaInversorAnosTradicional: input.anosTroca,
+              custoTrocaInversorTrad: input.pctCusto,
+            },
+            topologia: (dim.topologia as any) ?? 'tradicional',
+          })
+
+          await ctx.db.update(afTable).set({
+            paybackSimplesMeses: novoFinanceiro.paybackSimplesMeses,
+            paybackDescontadoMeses: novoFinanceiro.paybackDescontadoMeses,
+            vpl: String(novoFinanceiro.vpl),
+            tir: String(novoFinanceiro.tir),
+            saldo25Anos: String(novoFinanceiro.saldo25Anos),
+            fluxoCaixaJson: novoFinanceiro.fluxoCaixa as any,
+          }).where(eq(afTable.propostaId, snap.propostaId)).execute()
+        }
+
+        corrigidos++
+      }
+
+      return { ok: true, corrigidos }
+    }),
+
 // ─── CRIAR PROPOSTA DE SERVIÇO GERAL ─────────────────────────────────────────
   createServico: protectedProcedure
     .input(
