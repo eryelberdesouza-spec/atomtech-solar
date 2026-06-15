@@ -109,7 +109,8 @@ export function calcularFinanceiro(input: FinancialInput): FinancialResult {
   const taxaInflacao   = Number(inflacaoEnergetica) / 100
   const taxaDesconto   = Number(taxaDescontoVpl) / 100
   const perdaEfic      = Number(perdaEficienciaAnualTradicional) / 100
-  const anoTroca       = Number(trocaInversorAnosTradicional)
+  // Microinversor tem garantia de 25 anos — não há troca no horizonte da análise
+  const anoTroca       = input.topologia === 'microinversor' ? 0 : Number(trocaInversorAnosTradicional)
   const pctTroca       = Number(custoTrocaInversorTrad) / 100
 
   // ── Fio B ────────────────────────────────────────────────────────────────
@@ -175,10 +176,11 @@ export function calcularFinanceiro(input: FinancialInput): FinancialResult {
     // Economia total do ano
     const economia = economiaInst + economiaInj
 
-    // Custo de troca do inversor (se configurado)
+    // Custo de troca do inversor corrigido pela inflação energética até o ano da troca
+    // (o inversor será comprado no futuro — o preço sobe com a inflação)
     const custoTroca =
       anoTroca > 0 && ano === anoTroca
-        ? input.investimentoTotal * pctTroca
+        ? input.investimentoTotal * pctTroca * Math.pow(1 + taxaInflacao, anoTroca)
         : 0
 
     // Fluxo líquido do ano
