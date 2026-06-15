@@ -624,7 +624,7 @@ export const propostaRouter = router({
 
       const precoVenda = custoTotal * (1 + margem / 100)
       const comissaoValor = precoVenda * (comissao / 100)
-      const precoFinal = Number((precoVenda + comissaoValor).toFixed(2))
+      const precoFinal = Number((precoVenda + comissaoValor - desconto).toFixed(2))
 
       // 1. Atualiza tabela de precificação principal
       await ctx.db.update(precTable).set({
