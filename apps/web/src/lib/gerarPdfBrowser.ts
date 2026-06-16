@@ -415,39 +415,53 @@ function gerarHTML(data: any): string {
   const fluxoCaixa = tem('fluxo_caixa') ? (() => {
     const fluxo: any[] = af?.fluxoCaixaJson ?? af?.fluxoCaixa ?? []
     if (!fluxo.length) return ''
+
+    const thead = `<thead><tr>
+      <th style="width:30px">Ano</th>
+      <th>Gera&ccedil;&atilde;o (kWh)</th>
+      <th>Tarifa R$/kWh</th>
+      <th>Economia Anual</th>
+      <th>Troca Inversor</th>
+      <th>Fluxo L&iacute;quido</th>
+      <th>Saldo Acumulado</th>
+    </tr></thead>`
+
+    const renderLinhas = (linhas: any[]) => linhas.map((f: any) => {
+      const saldo = Number(f.saldoAcumulado ?? 0)
+      const fluxoLiq = Number(f.fluxoLiquido ?? 0)
+      const troca = Number(f.custoTrocaInversor ?? 0)
+      return `<tr>
+        <td style="font-weight:700;color:#0E2040">${f.ano}</td>
+        <td>${Number(f.geracaoKwh ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
+        <td>R$ ${Number(f.tarifa ?? 0).toFixed(4)}</td>
+        <td style="color:#2D9C4E;font-weight:600">${f.ano === 0 ? '&mdash;' : formatCurrency(f.economiaAnual)}</td>
+        <td style="color:${troca > 0 ? '#e53e3e' : '#888'}">${troca > 0 ? formatCurrency(troca) : '&mdash;'}</td>
+        <td class="${fluxoLiq >= 0 ? 'fluxo-positivo' : 'fluxo-negativo'}">${formatCurrency(fluxoLiq)}</td>
+        <td class="${saldo >= 0 ? 'fluxo-positivo' : 'fluxo-negativo'}" style="font-weight:700">${formatCurrency(saldo)}</td>
+      </tr>`
+    }).join('')
+
+    const highlight = `<div class="highlight-box"><p>Proje&ccedil;&atilde;o anual com infla&ccedil;&atilde;o energ&eacute;tica de 9,5% a.a. | Investimento: <strong>${formatCurrency(precoFinal)}</strong></p></div>`
+    const p1 = fluxo.slice(0, 13)   // Anos 0–12
+    const p2 = fluxo.slice(13)       // Anos 13–25
+
     return `<div class="page">
     ${headerInterno(numero, logoUrl)}
     <div class="section">
       <div class="section-title">Fluxo de Caixa &mdash; 25 Anos</div>
-      <div class="highlight-box"><p>Proje&ccedil;&atilde;o anual com infla&ccedil;&atilde;o energ&eacute;tica de 9,5% a.a. | Investimento: <strong>${formatCurrency(precoFinal)}</strong></p></div>
-      <table style="font-size:12px">
-        <thead>
-          <tr>
-            <th style="width:30px">Ano</th>
-            <th>Gera&ccedil;&atilde;o (kWh)</th>
-            <th>Tarifa R$/kWh</th>
-            <th>Economia Anual</th>
-            <th>Troca Inversor</th>
-            <th>Fluxo L&iacute;quido</th>
-            <th>Saldo Acumulado</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${fluxo.map((f: any) => {
-            const saldo = Number(f.saldoAcumulado ?? 0)
-            const fluxoLiq = Number(f.fluxoLiquido ?? 0)
-            return `<tr>
-              <td style="font-weight:700;color:#0E2040">${f.ano}</td>
-              <td>${Number(f.geracaoKwh ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
-              <td>R$ ${Number(f.tarifa ?? 0).toFixed(4)}</td>
-              <td style="color:#2D9C4E;font-weight:600">${formatCurrency(f.economiaAnual)}</td>
-              <td style="color:${Number(f.custoTrocaInversor ?? 0) > 0 ? '#e53e3e' : '#888'}">${Number(f.custoTrocaInversor ?? 0) > 0 ? formatCurrency(f.custoTrocaInversor) : '&mdash;'}</td>
-              <td class="${fluxoLiq >= 0 ? 'fluxo-positivo' : 'fluxo-negativo'}">${formatCurrency(fluxoLiq)}</td>
-              <td class="${saldo >= 0 ? 'fluxo-positivo' : 'fluxo-negativo'}" style="font-weight:700">${formatCurrency(saldo)}</td>
-            </tr>`
-          }).join('')}
-        </tbody>
-      </table>
+      ${highlight}
+      <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 0 a 12</p>
+      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p1)}</tbody></table>
+    </div>
+    ${footer(numero, emp)}
+  </div>
+  <div class="page">
+    ${headerInterno(numero, logoUrl)}
+    <div class="section">
+      <div class="section-title">Fluxo de Caixa &mdash; 25 Anos</div>
+      ${highlight}
+      <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 13 a 25</p>
+      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p2)}</tbody></table>
     </div>
     ${footer(numero, emp)}
   </div>`

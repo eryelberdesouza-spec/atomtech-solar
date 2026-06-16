@@ -134,12 +134,13 @@ export function calcularFinanceiro(input: FinancialInput): FinancialResult {
   let paybackDescontado: number | null = null
 
   // Ano 0 — investimento inicial (sem geração de economia ainda)
+  // custoTrocaInversor = 0 no Ano 0; o investimento já consta em fluxoLiquido negativo
   fluxoCaixa.push({
     ano: 0,
     geracaoKwh: Number(input.geracaoAnualKwh.toFixed(0)),
     tarifa: Number(tarifaTotal.toFixed(4)),
     economiaAnual: 0,
-    custoTrocaInversor: input.investimentoTotal,
+    custoTrocaInversor: 0,
     fluxoLiquido: -input.investimentoTotal,
     saldoAcumulado: Number(saldoAcumulado.toFixed(2)),
     fluxoDescontado: -input.investimentoTotal,
