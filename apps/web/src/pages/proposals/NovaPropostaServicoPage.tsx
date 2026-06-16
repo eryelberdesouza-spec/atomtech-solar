@@ -149,7 +149,7 @@ export function NovaPropostaServicoPage() {
           <h2 style={{ color: C.text, fontSize: 20, fontWeight: 800, margin: '0 0 4px' }}>Nova Proposta de Serviço</h2>
           <p style={{ color: C.textDim, fontSize: 13, margin: 0 }}>CFTV, Carregadores Veiculares, Instalações Elétricas, Manutenção e outros serviços</p>
         </div>
-        <button onClick={() => navigate('/propostas')} style={{ background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 13, padding: '6px 12px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 13, padding: '6px 12px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           ← Voltar
         </button>
       </div>

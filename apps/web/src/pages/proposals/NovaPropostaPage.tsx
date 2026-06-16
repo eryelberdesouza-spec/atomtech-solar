@@ -237,7 +237,7 @@ export function NovaPropostaPage() {
   return (
     <PageWrapper>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => navigate('/propostas')} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 20 }}>←</button>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 20 }}>←</button>
         <h2 style={{ color: C.text, fontSize: 16, fontWeight: 600, margin: 0 }}>Nova Proposta</h2>
       </div>
 

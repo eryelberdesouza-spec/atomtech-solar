@@ -1578,7 +1578,7 @@ export function PropostaDetailPage() {
 
         {/* Linha 1: Voltar + Info + PDF */}
         <div style={{ padding: isMobile ? '10px 14px 8px' : '12px 24px 10px', display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14 }}>
-          <button onClick={() => navigate('/propostas')} style={{
+          <button onClick={() => navigate(-1)} style={{
             padding: '5px 11px', borderRadius: 8, border: `1px solid ${C.darkBorder}`,
             background: `${C.darkBorder}30`, color: C.textMuted, cursor: 'pointer', fontSize: 12,
             display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, whiteSpace: 'nowrap',

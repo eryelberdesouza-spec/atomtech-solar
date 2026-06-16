@@ -194,10 +194,17 @@ export function ClientesPage() {
   const [mergeDescartar, setMergeDescartar] = useState<number | null>(null)
   const isMobile = useIsMobile()
 
+  const utils = trpc.useUtils()
   const { data, isLoading, refetch } = trpc.cliente.list.useQuery({ busca: busca || undefined, porPagina: 200 })
   const createMutation = trpc.cliente.create.useMutation({ onSuccess: () => { setShowModal(false); refetch() } })
   const mergeMutation  = trpc.cliente.merge.useMutation({
-    onSuccess: () => { setShowMerge(false); setMergeAlvo(null); setMergeDescartar(null); refetch() },
+    onSuccess: () => {
+      setShowMerge(false); setMergeAlvo(null); setMergeDescartar(null)
+      refetch()
+      // Invalida cache de propostas e OS para refletir o novo clienteNome
+      utils.proposta.list.invalidate()
+      ;(utils as any).os?.list?.invalidate?.()
+    },
   })
 
   const lista = data?.data ?? []
@@ -386,7 +393,7 @@ export function ClienteDetailPage() {
     <PageWrapper>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
-          <button onClick={() => navigate('/clientes')} style={{ background: `${C.darkBorder}40`, border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
+          <button onClick={() => navigate(-1)} style={{ background: `${C.darkBorder}40`, border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16, width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
           <div style={{ width: isMobile ? 40 : 52, height: isMobile ? 40 : 52, borderRadius: 13, flexShrink: 0, background: `${cor}18`, border: `2px solid ${cor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 18 : 22, fontWeight: 800, color: cor }}>
             {cliente.nome.charAt(0).toUpperCase()}
           </div>
