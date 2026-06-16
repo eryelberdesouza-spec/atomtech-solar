@@ -426,10 +426,12 @@ function gerarHTML(data: any): string {
       <th>Saldo Acumulado</th>
     </tr></thead>`
 
+    const isMicroinversor = dim?.topologia === 'microinversor'
     const renderLinhas = (linhas: any[]) => linhas.map((f: any) => {
       const saldo = Number(f.saldoAcumulado ?? 0)
       const fluxoLiq = Number(f.fluxoLiquido ?? 0)
-      const troca = Number(f.custoTrocaInversor ?? 0)
+      // Ano 0 nunca tem troca; microinversor nunca tem troca (garantia 25 anos)
+      const troca = (f.ano === 0 || isMicroinversor) ? 0 : Number(f.custoTrocaInversor ?? 0)
       return `<tr>
         <td style="font-weight:700;color:#0E2040">${f.ano}</td>
         <td>${Number(f.geracaoKwh ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
@@ -568,14 +570,13 @@ function gerarHTML(data: any): string {
     <div class="section">
       <div class="section-title">LEIA COM ATEN&Ccedil;&Atilde;O &mdash; INFORMA&Ccedil;&Otilde;ES IMPORTANTES</div>
       ${itensHtml}
-      ${aceiteInner}
     </div>
     ${footer(numero, emp)}
   </div>`
   })() : ''
 
-  // Aceite como página própria — apenas se considerações não estiver ativo
-  const aceite = (!tem('consideracoes_gerais') && tem('aceite')) ? `<div class="page">
+  // Aceite sempre em página própria com header e footer — garante posicionamento correto
+  const aceite = tem('aceite') ? `<div class="page">
     ${headerInterno(numero, logoUrl)}
     <div class="section">
       ${aceiteInner}
