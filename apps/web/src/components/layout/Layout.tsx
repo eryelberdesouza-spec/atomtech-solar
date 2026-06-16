@@ -35,16 +35,76 @@ const IconLogout = () => (
   </svg>
 )
 
-const NAV = [
-  { path: '/dashboard',      label: 'Dashboard',    icon: '◈', color: '#F5A623', desc: 'Visão geral'       },
-  { path: '/propostas',      label: 'Propostas',    icon: '◧', color: '#58A6FF', desc: 'Gestão comercial'  },
-  { path: '/clientes',       label: 'Clientes',     icon: '◉', color: '#3EBB7A', desc: 'Base de clientes'  },
-  { path: '/faturas',        label: 'Faturas',      icon: '◈', color: '#BC8CFF', desc: 'Contas de energia' },
-  { path: '/ordens-servico', label: 'Operacional',  icon: '⚙', color: '#FB923C', desc: 'Ordens de serviço' },
-  { path: '/configuracoes',  label: 'Configurações',icon: '◎', color: '#8B949E', desc: 'Sistema'           },
+// ── Ícones SVG distintos por seção ──────────────────────────────────────────
+const s = (w = 18, h = 18) => ({ width: w, height: h, display: 'block' as const })
+
+// Dashboard — gráfico de barras com linha de tendência
+const IcoDashboard = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="12" width="4" height="9" rx="1"/>
+    <rect x="10" y="7" width="4" height="14" rx="1"/>
+    <rect x="17" y="3" width="4" height="18" rx="1"/>
+    <polyline points="3 6 9 3 15 5 21 2" strokeWidth="1.5"/>
+  </svg>
+)
+
+// Propostas — documento com texto e sinal de aprovação
+const IcoPropostas = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="9" y1="13" x2="15" y2="13"/>
+    <line x1="9" y1="17" x2="13" y2="17"/>
+    <polyline points="9 9 10 9" strokeWidth="2"/>
+  </svg>
+)
+
+// Clientes — dois usuários
+const IcoClientes = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+)
+
+// Faturas — recibo / nota fiscal
+const IcoFaturas = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2z"/>
+    <line x1="8" y1="10" x2="16" y2="10"/>
+    <line x1="8" y1="14" x2="14" y2="14"/>
+    <line x1="8" y1="6"  x2="11" y2="6"/>
+  </svg>
+)
+
+// Operacional — chave inglesa + prancheta
+const IcoOperacional = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+  </svg>
+)
+
+// Configurações — engrenagem
+const IcoConfiguracoes = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+)
+
+type NavItem = { path: string; label: string; Icon: React.FC; color: string; desc: string }
+const NAV: NavItem[] = [
+  { path: '/dashboard',      label: 'Dashboard',     Icon: IcoDashboard,     color: '#F5A623', desc: 'Visão geral'       },
+  { path: '/propostas',      label: 'Propostas',     Icon: IcoPropostas,     color: '#58A6FF', desc: 'Gestão comercial'  },
+  { path: '/clientes',       label: 'Clientes',      Icon: IcoClientes,      color: '#3EBB7A', desc: 'Base de clientes'  },
+  { path: '/faturas',        label: 'Faturas',       Icon: IcoFaturas,       color: '#BC8CFF', desc: 'Contas de energia' },
+  { path: '/ordens-servico', label: 'Operacional',   Icon: IcoOperacional,   color: '#FB923C', desc: 'Ordens de serviço' },
+  { path: '/configuracoes',  label: 'Configurações', Icon: IcoConfiguracoes, color: '#8B949E', desc: 'Sistema'           },
 ]
 
-function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean }) {
+function NavItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const location = useLocation()
   const isActive = location.pathname.startsWith(item.path)
   return (
@@ -70,11 +130,11 @@ function NavItem({ item, collapsed }: { item: typeof NAV[0]; collapsed: boolean 
         background: isActive ? item.color + '22' : 'transparent',
         border: '1px solid ' + (isActive ? item.color + '44' : 'transparent'),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, color: isActive ? item.color : '#4A6080',
+        color: isActive ? item.color : '#4A6080',
         transition: 'all 0.15s',
         boxShadow: isActive ? '0 0 12px ' + item.color + '30' : 'none',
       }}>
-        {item.icon}
+        <item.Icon />
       </div>
       {!collapsed && (
         <div style={{ flex: 1, minWidth: 0 }}>

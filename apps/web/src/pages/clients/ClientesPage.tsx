@@ -2,7 +2,7 @@
 // Clientes — Lista + Detalhe
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
@@ -187,7 +187,17 @@ export function ClientesPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const busca = searchParams.get('q') ?? ''
-  const setBusca = (v: string) => setSearchParams(v ? { q: v } : {}, { replace: true })
+  const setBusca = (v: string) => {
+    v ? sessionStorage.setItem('clientes_busca', v) : sessionStorage.removeItem('clientes_busca')
+    setSearchParams(v ? { q: v } : {}, { replace: true })
+  }
+  // Restaura busca salva ao navegar pelo menu (sem ?q= na URL)
+  useEffect(() => {
+    if (!searchParams.get('q')) {
+      const saved = sessionStorage.getItem('clientes_busca')
+      if (saved) setSearchParams({ q: saved }, { replace: true })
+    }
+  }, [])
   const [showModal, setShowModal] = useState(false)
   const [showMerge, setShowMerge] = useState(false)
   const [mergeAlvo, setMergeAlvo] = useState<number | null>(null)

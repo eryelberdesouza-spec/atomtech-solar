@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
@@ -31,8 +31,28 @@ export function PropostasPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const filtro = (searchParams.get('status') as StatusFiltro) ?? 'todos'
   const busca  = searchParams.get('q') ?? ''
-  const setFiltro = (v: StatusFiltro) => setSearchParams(p => { const n = new URLSearchParams(p); v === 'todos' ? n.delete('status') : n.set('status', v); return n }, { replace: true })
-  const setBusca  = (v: string)       => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('q', v) : n.delete('q'); return n }, { replace: true })
+  const setFiltro = (v: StatusFiltro) => {
+    v === 'todos' ? sessionStorage.removeItem('propostas_status') : sessionStorage.setItem('propostas_status', v)
+    setSearchParams(p => { const n = new URLSearchParams(p); v === 'todos' ? n.delete('status') : n.set('status', v); return n }, { replace: true })
+  }
+  const setBusca  = (v: string) => {
+    v ? sessionStorage.setItem('propostas_busca', v) : sessionStorage.removeItem('propostas_busca')
+    setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('q', v) : n.delete('q'); return n }, { replace: true })
+  }
+  // Restaura busca e filtro salvos ao navegar pelo menu (sem parâmetros na URL)
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams)
+    let changed = false
+    if (!params.get('q')) {
+      const saved = sessionStorage.getItem('propostas_busca')
+      if (saved) { params.set('q', saved); changed = true }
+    }
+    if (!params.get('status')) {
+      const saved = sessionStorage.getItem('propostas_status')
+      if (saved && saved !== 'todos') { params.set('status', saved); changed = true }
+    }
+    if (changed) setSearchParams(params, { replace: true })
+  }, [])
 
   const { data, isLoading } = trpc.proposta.list.useQuery({ isTemplate: false, porPagina: 100 })
   const lista = data?.data ?? []
