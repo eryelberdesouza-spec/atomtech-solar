@@ -75,6 +75,9 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
     { enabled: form.nome.length > 2 }
   )
 
+  // Duplicata "hard": nome + cpf + email todos detectados → bloqueia salvar
+  const dupHard = !!(dup?.temConflito && dup.conflitos.length >= 2)
+
   const sectionLabel = (label: string) => (
     <p style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
       letterSpacing: '0.08em', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -96,9 +99,18 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
         </div>
 
         {dup?.temConflito && (
-          <div style={{ background: `${C.warning}12`, border: `1px solid ${C.warning}40`, borderRadius: 10, padding: '10px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>⚠️</span>
-            <span style={{ color: C.warning, fontSize: 12, fontWeight: 600 }}>Possível duplicata: {dup.conflitos.join(' · ')}</span>
+          <div style={{ background: dupHard ? '#7F1D1D20' : `${C.warning}12`, border: `1px solid ${dupHard ? '#B91C1C' : C.warning}40`, borderRadius: 10, padding: '10px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>{dupHard ? '🚫' : '⚠️'}</span>
+            <div>
+              <span style={{ color: dupHard ? '#FCA5A5' : C.warning, fontSize: 12, fontWeight: 700, display: 'block' }}>
+                {dupHard ? 'Cadastro bloqueado — cliente duplicado' : 'Possível duplicata detectada'}
+              </span>
+              <span style={{ color: dupHard ? '#FCA5A5' : C.warning, fontSize: 11, opacity: 0.85 }}>
+                {dupHard
+                  ? 'Já existe um cliente com o mesmo nome, CPF/CNPJ e e-mail. O salvamento não será permitido.'
+                  : dup.conflitos.join(' · ')}
+              </span>
+            </div>
           </div>
         )}
 
@@ -108,7 +120,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
               options={[{ value: 'fisica', label: 'Pessoa Física' }, { value: 'juridica', label: 'Pessoa Jurídica' }]} />
             <Input label="CPF / CNPJ" value={form.cpfCnpj} onChange={e => set('cpfCnpj', e.target.value)} placeholder="000.000.000-00" />
           </div>
-          <Input label="Nome / Razão Social *" value={form.nome} onChange={e => set('nome', e.target.value)} />
+          <Input label="Nome / Razão Social *" value={form.nome} onChange={e => set('nome', e.target.value.toUpperCase())} />
           {form.tipoPessoa === 'juridica' && (
             <Input label="Nome do Responsável" value={form.nomeResponsavel} onChange={e => set('nomeResponsavel', e.target.value)} />
           )}
@@ -160,7 +172,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18, paddingTop: 18, borderTop: `1px solid ${C.darkBorder}40` }}>
           <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-          <Btn onClick={() => onSave(form)} disabled={!form.nome || !form.telefone || loading}>
+          <Btn onClick={() => onSave(form)} disabled={!form.nome || !form.telefone || loading || dupHard}>
             {loading ? 'Salvando...' : '✓ Salvar Cliente'}
           </Btn>
         </div>
@@ -223,7 +235,7 @@ export function ClientesPage() {
             const cor = avatarColor(c.nome)
             const isPJ = c.tipoPessoa === 'juridica'
             return (
-              <Card key={c.id} hover style={{ padding: isMobile ? '12px 14px' : '14px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16 }} onClick={() => navigate(`/clientes/${c.id}`)}>
+              <Card key={c.id} hover style={{ padding: isMobile ? '12px 14px' : '14px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16, opacity: (c as any).cancelado ? 0.55 : 1 }} onClick={() => navigate(`/clientes/${c.id}`)}>
                 <div style={{ width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: 11, flexShrink: 0, background: `${cor}18`, border: `2px solid ${cor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 14 : 16, fontWeight: 800, color: cor }}>
                   {c.nome.charAt(0).toUpperCase()}
                 </div>
@@ -231,6 +243,7 @@ export function ClientesPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
                     <p style={{ color: C.text, fontSize: isMobile ? 13 : 14, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nome}</p>
                     <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: isPJ ? C.accent : C.solar, background: isPJ ? `${C.accent}15` : `${C.solar}15`, border: `1px solid ${isPJ ? C.accent : C.solar}30`, borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>{isPJ ? 'PJ' : 'PF'}</span>
+                    {(c as any).cancelado && <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: '#FCA5A5', background: '#7F1D1D40', border: '1px solid #B91C1C50', borderRadius: 5, padding: '2px 6px', flexShrink: 0 }}>Cancelado</span>}
                   </div>
                   <p style={{ color: C.textDim, fontSize: 11, margin: 0, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {c.telefone && <span>{c.telefone}</span>}
@@ -280,6 +293,7 @@ export function ClienteDetailPage() {
   const navigate = useNavigate()
   const [showEdit, setShowEdit] = useState(false)
   const [updateErro, setUpdateErro] = useState('')
+  const [showConfirmCancel, setShowConfirmCancel] = useState(false)
   const isMobile = useIsMobile()
 
   const clienteId = Number(id)
@@ -287,14 +301,14 @@ export function ClienteDetailPage() {
   const { data: faturas } = trpc.fatura.byCliente.useQuery({ clienteId }, { enabled: !!clienteId })
   const { data: propostas } = trpc.proposta.list.useQuery({ clienteId }, { enabled: !!clienteId })
   const updateMutation = trpc.cliente.update.useMutation({
-    onSuccess: () => {
-      setShowEdit(false)
-      setUpdateErro('')
-      refetch()
-    },
-    onError: (err: any) => {
-      setUpdateErro(err?.message ?? 'Erro ao salvar. Tente novamente.')
-    },
+    onSuccess: () => { setShowEdit(false); setUpdateErro(''); refetch() },
+    onError: (err: any) => { setUpdateErro(err?.message ?? 'Erro ao salvar. Tente novamente.') },
+  })
+  const cancelMutation = trpc.cliente.cancel.useMutation({
+    onSuccess: () => { setShowConfirmCancel(false); refetch() },
+  })
+  const reativarMutation = trpc.cliente.reativar.useMutation({
+    onSuccess: () => refetch(),
   })
 
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><Spinner size={36} /></div>
@@ -322,9 +336,16 @@ export function ClienteDetailPage() {
             {!isMobile && <p style={{ color: C.textDim, fontSize: 12, margin: 0 }}>{[cliente.distribuidora, cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : null].filter(Boolean).join(' · ')}</p>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 8 }}>
-          <Btn variant="ghost" size="sm" onClick={() => setShowEdit(true)}>{isMobile ? '✏' : '✏ Editar'}</Btn>
-          {!isMobile && <NovaPropostaDropdown size="sm" />}
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 8, alignItems: 'center' }}>
+          {cliente.cancelado && (
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#FCA5A5', background: '#7F1D1D40', border: '1px solid #B91C1C60', borderRadius: 6, padding: '3px 8px' }}>Cancelado</span>
+          )}
+          {!cliente.cancelado && <Btn variant="ghost" size="sm" onClick={() => setShowEdit(true)}>{isMobile ? '✏' : '✏ Editar'}</Btn>}
+          {!isMobile && !cliente.cancelado && <NovaPropostaDropdown size="sm" />}
+          {cliente.cancelado
+            ? <Btn variant="ghost" size="sm" onClick={() => reativarMutation.mutate({ id: clienteId })} disabled={reativarMutation.isLoading}>Reativar</Btn>
+            : <Btn variant="ghost" size="sm" onClick={() => setShowConfirmCancel(true)} style={{ color: '#FCA5A5', borderColor: '#B91C1C60' }}>{isMobile ? '✕' : '✕ Cancelar'}</Btn>
+          }
         </div>
       </div>
 
@@ -417,6 +438,33 @@ export function ClienteDetailPage() {
           </Card>
         </div>
       </div>
+
+      {cliente.cancelado && (
+        <div style={{ background: '#7F1D1D20', border: '1px solid #B91C1C50', borderRadius: 10, padding: '12px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18 }}>🚫</span>
+          <div>
+            <p style={{ color: '#FCA5A5', fontSize: 13, fontWeight: 700, margin: 0 }}>Cliente cancelado</p>
+            <p style={{ color: '#FCA5A5', fontSize: 11, margin: 0, opacity: 0.8 }}>Este cadastro foi cancelado e não pode receber novas propostas. Clique em "Reativar" para restaurá-lo.</p>
+          </div>
+        </div>
+      )}
+
+      {showConfirmCancel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: C.darkCard, borderRadius: 14, border: '1px solid #B91C1C60', width: 380, padding: 28, boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
+            <p style={{ color: '#FCA5A5', fontSize: 16, fontWeight: 700, margin: '0 0 10px' }}>Cancelar cliente?</p>
+            <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 20px', lineHeight: 1.6 }}>
+              O cliente <strong style={{ color: C.text }}>{cliente.nome}</strong> será marcado como cancelado. Propostas e histórico existentes são preservados. Você pode reativar a qualquer momento.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setShowConfirmCancel(false)}>Não, voltar</Btn>
+              <Btn onClick={() => cancelMutation.mutate({ id: clienteId })} disabled={cancelMutation.isLoading} style={{ background: '#B91C1C', borderColor: '#B91C1C' }}>
+                {cancelMutation.isLoading ? 'Cancelando...' : '✕ Confirmar cancelamento'}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEdit && <ClienteFormModal inicial={clienteParaForm(cliente)} onSave={form => { setUpdateErro(''); updateMutation.mutate({ id: clienteId, ...form } as any) }} onClose={() => { setShowEdit(false); setUpdateErro('') }} loading={updateMutation.isLoading} erro={updateErro} />}
     </PageWrapper>

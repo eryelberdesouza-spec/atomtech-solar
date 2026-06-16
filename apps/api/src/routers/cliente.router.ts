@@ -219,10 +219,37 @@ export const clienteRouter = router({
         }
       }
 
+      // Nome sempre em caixa alta
+      const nomeUpper = input.nome.toUpperCase()
+
+      // Bloqueio rígido de duplicata: mesmo nome + cpf + email simultaneamente
+      if (input.cpfCnpj && input.email) {
+        const cpfClean = input.cpfCnpj.replace(/\D/g, '')
+        const [dup] = await ctx.db
+          .select({ id: cliente.id })
+          .from(cliente)
+          .where(
+            and(
+              eq(cliente.empresaId, empresaId),
+              like(cliente.nome, nomeUpper),
+              like(cliente.cpfCnpj, `%${cpfClean}%`),
+              eq(cliente.email, input.email),
+            ),
+          )
+          .limit(1)
+        if (dup) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Cadastro duplicado: já existe um cliente com o mesmo nome, CPF/CNPJ e e-mail.',
+          })
+        }
+      }
+
       const [result] = await ctx.db
         .insert(cliente)
         .values({
           ...input,
+          nome: nomeUpper,
           empresaId,
           createdBy,
           email: input.email || undefined,
@@ -268,7 +295,11 @@ export const clienteRouter = router({
 
       await ctx.db
         .update(cliente)
-        .set({ ...dados, email: dados.email || undefined })
+        .set({
+          ...dados,
+          nome: dados.nome ? dados.nome.toUpperCase() : undefined,
+          email: dados.email || undefined,
+        })
         .where(eq(cliente.id, id))
         .execute()
 
@@ -321,6 +352,45 @@ export const clienteRouter = router({
       }
 
       await ctx.db.delete(cliente).where(eq(cliente.id, input.id)).execute()
+
+      return { ok: true }
+    }),
+
+  // Cancela cliente (soft-delete — mantém histórico e propostas intactos)
+  cancel: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+
+      const [existente] = await ctx.db
+        .select({ id: cliente.id, cancelado: cliente.cancelado })
+        .from(cliente)
+        .where(and(eq(cliente.id, input.id), eq(cliente.empresaId, empresaId)))
+        .limit(1)
+
+      if (!existente) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+      if (existente.cancelado) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cliente já está cancelado' })
+
+      await ctx.db
+        .update(cliente)
+        .set({ cancelado: true, canceladoEm: new Date() })
+        .where(eq(cliente.id, input.id))
+        .execute()
+
+      return { ok: true }
+    }),
+
+  // Reativa cliente cancelado
+  reativar: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+
+      await ctx.db
+        .update(cliente)
+        .set({ cancelado: false, canceladoEm: null })
+        .where(and(eq(cliente.id, input.id), eq(cliente.empresaId, empresaId)))
+        .execute()
 
       return { ok: true }
     }),

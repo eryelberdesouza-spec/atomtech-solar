@@ -753,6 +753,30 @@ app.get('/run-migration-extrato-fingerprint', async (_, res) => {
   }
 })
 
+// ── Migração: cancelado + cancelado_em na tabela cliente ─────────────────────
+app.get('/run-migration-cliente-cancelado', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const addIfMissing = async (col: string, def: string) => {
+      const [rows]: any = await conn.execute(
+        `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cliente' AND COLUMN_NAME = ?`,
+        [col]
+      )
+      if (Number((rows as any[])[0].cnt) === 0) {
+        await conn.execute(`ALTER TABLE \`cliente\` ADD COLUMN \`${col}\` ${def}`)
+      }
+    }
+    await addIfMissing('cancelado',    'TINYINT(1) NOT NULL DEFAULT 0')
+    await addIfMissing('cancelado_em', 'TIMESTAMP NULL')
+    await conn.end()
+    res.json({ ok: true, message: 'Colunas cancelado e cancelado_em adicionadas ao cliente' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Parse de Extrato Bancário (PDF) ─────────────────────────────────────────
 app.post('/extrato/parse', upload.single('pdf'), async (req, res) => {
   try {

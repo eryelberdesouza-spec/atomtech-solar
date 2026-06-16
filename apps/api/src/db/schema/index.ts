@@ -101,6 +101,8 @@ export const cliente = mysqlTable('cliente', {
   estado: varchar('estado', { length: 2 }),
   distribuidora: varchar('distribuidora', { length: 100 }),
   observacoes: text('observacoes'),
+  cancelado: boolean('cancelado').default(false).notNull(),
+  canceladoEm: timestamp('cancelado_em'),
   createdBy: int('created_by').references(() => usuario.id),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp('updated_at'),
