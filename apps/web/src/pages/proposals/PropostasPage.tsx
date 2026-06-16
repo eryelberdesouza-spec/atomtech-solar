@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Btn, Badge, PageWrapper, Spinner, C } from '../../components/ui'
@@ -28,8 +28,11 @@ const STATUS_COLOR: Record<string, string> = {
 export function PropostasPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
-  const [filtro, setFiltro] = useState<StatusFiltro>('todos')
-  const [busca, setBusca]   = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filtro = (searchParams.get('status') as StatusFiltro) ?? 'todos'
+  const busca  = searchParams.get('q') ?? ''
+  const setFiltro = (v: StatusFiltro) => setSearchParams(p => { const n = new URLSearchParams(p); v === 'todos' ? n.delete('status') : n.set('status', v); return n }, { replace: true })
+  const setBusca  = (v: string)       => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('q', v) : n.delete('q'); return n }, { replace: true })
 
   const { data, isLoading } = trpc.proposta.list.useQuery({ isTemplate: false, porPagina: 100 })
   const lista = data?.data ?? []

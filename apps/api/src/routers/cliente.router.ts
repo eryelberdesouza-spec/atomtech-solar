@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { z } from 'zod'
-import { eq, and, like, or, ne } from 'drizzle-orm'
+import { eq, and, like, or, ne, asc } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from './trpc'
 import { cliente, empresa } from '../db/schema'
@@ -75,7 +75,7 @@ export const clienteRouter = router({
         ) as typeof query
       }
 
-      const clientes = await query.limit(porPagina).offset(offset)
+      const clientes = await query.orderBy(asc(cliente.nome)).limit(porPagina).offset(offset)
 
       return {
         data: clientes,
@@ -376,6 +376,48 @@ export const clienteRouter = router({
         .set({ cancelado: true, canceladoEm: new Date() })
         .where(eq(cliente.id, input.id))
         .execute()
+
+      return { ok: true }
+    }),
+
+  // Unifica dois clientes: migra todas as referências para o cliente mantido e exclui o descartado
+  merge: protectedProcedure
+    .input(z.object({
+      manterClienteId:   z.number().int().positive(),
+      removerClienteId:  z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+      const { manterClienteId, removerClienteId } = input
+
+      if (manterClienteId === removerClienteId)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Os dois clientes devem ser diferentes' })
+
+      // Valida que ambos pertencem à empresa
+      const ambos = await ctx.db
+        .select({ id: cliente.id })
+        .from(cliente)
+        .where(and(eq(cliente.empresaId, empresaId), or(eq(cliente.id, manterClienteId), eq(cliente.id, removerClienteId))))
+
+      if (ambos.length < 2)
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Um ou ambos os clientes não encontrados' })
+
+      const { proposta: propostaTable, fatura: faturaTable } = await import('../db/schema')
+
+      // Migra propostas
+      await ctx.db.update(propostaTable)
+        .set({ clienteId: manterClienteId })
+        .where(eq(propostaTable.clienteId, removerClienteId))
+        .execute()
+
+      // Migra faturas
+      await ctx.db.update(faturaTable)
+        .set({ clienteId: manterClienteId })
+        .where(eq(faturaTable.clienteId, removerClienteId))
+        .execute()
+
+      // Remove o cliente descartado
+      await ctx.db.delete(cliente).where(eq(cliente.id, removerClienteId)).execute()
 
       return { ok: true }
     }),

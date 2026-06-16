@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
@@ -93,15 +93,38 @@ function FunilBar({ label, count, valor, total, color, icon }: { label: string; 
   )
 }
 
+type Periodo = 'mes' | 'quinzena' | 'ano' | 'tudo'
+const PERIODOS: { id: Periodo; label: string }[] = [
+  { id: 'mes',      label: 'Mês atual'  },
+  { id: 'quinzena', label: 'Quinzena'   },
+  { id: 'ano',      label: 'Este ano'   },
+  { id: 'tudo',     label: 'Todo período' },
+]
+
+function inicioDoMes() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) }
+function inicioDoAno()  { const d = new Date(); return new Date(d.getFullYear(), 0, 1) }
+function quinzenaAtras(){ const d = new Date(); d.setDate(d.getDate() - 15); return d }
+
+function filtrarPorPeriodo(propostas: any[], periodo: Periodo) {
+  if (periodo === 'tudo') return propostas
+  const corte = periodo === 'mes' ? inicioDoMes() : periodo === 'quinzena' ? quinzenaAtras() : inicioDoAno()
+  return propostas.filter(p => {
+    const d = p.dataEmissao ? new Date(p.dataEmissao) : null
+    return d && d >= corte
+  })
+}
+
 export function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
-  const { data: raw, isLoading } = (trpc as any).proposta.list.useQuery({ page: 1, pageSize: 100 })
+  const [periodo, setPeriodo] = useState<Periodo>('mes')
+  const { data: raw, isLoading } = (trpc as any).proposta.list.useQuery({ page: 1, pageSize: 500 })
   const { data: empresa } = (trpc as any).empresa.get.useQuery()
-  const propostas: any[] = raw?.data ?? []
+  const todasPropostas: any[] = raw?.data ?? []
+  const propostas = useMemo(() => filtrarPorPeriodo(todasPropostas.filter((p: any) => !p.isTemplate), periodo), [todasPropostas, periodo])
 
   const stats = useMemo(() => {
-    const reais = propostas.filter(p => !p.isTemplate)
+    const reais = propostas  // já filtradas por período e sem templates
     const t = reais.length
     const val = (status: string) => reais
       .filter(p => p.status === status)
@@ -138,12 +161,26 @@ export function DashboardPage() {
   return (
     <div style={{ padding: isMobile ? '16px 14px' : '28px 32px' }}>
 
-      {/* Greeting */}
-      <div style={{ marginBottom: isMobile ? 16 : 28 }}>
-        <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 18 : 22, fontWeight: 800, margin: '0 0 4px' }}>Bom dia! ☀️</h2>
-        <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>
-          {(empresa as any)?.nome ?? 'Atom Tech'} · Aqui está o resumo de hoje
-        </p>
+      {/* Greeting + filtro período */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isMobile ? 16 : 28, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 18 : 22, fontWeight: 800, margin: '0 0 4px' }}>Bom dia! ☀️</h2>
+          <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>
+            {(empresa as any)?.nome ?? 'Atom Tech'} · Aqui está o resumo de hoje
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {PERIODOS.map(p => (
+            <button key={p.id} onClick={() => setPeriodo(p.id)}
+              style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                border: `1px solid ${periodo === p.id ? '#F5A623' : '#1E3050'}`,
+                background: periodo === p.id ? '#F5A62318' : 'transparent',
+                color: periodo === p.id ? '#F5A623' : '#4A6080',
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+              }}>{p.label}</button>
+          ))}
+        </div>
       </div>
 
       {/* KPI Cards — 2 colunas no mobile */}
@@ -162,7 +199,7 @@ export function DashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid #1A2D45' }}>
             <div>
               <h3 style={{ color: '#E2EAF5', fontSize: 15, fontWeight: 700, margin: 0 }}>Últimas Propostas</h3>
-              <p style={{ color: '#3A5070', fontSize: 11, margin: '2px 0 0' }}>{propostas.length} proposta{propostas.length !== 1 ? 's' : ''} no total</p>
+              <p style={{ color: '#3A5070', fontSize: 11, margin: '2px 0 0' }}>{propostas.length} proposta{propostas.length !== 1 ? 's' : ''} no período</p>
             </div>
             <button onClick={() => navigate('/propostas')}
               style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#F5A623', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}

@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import {
@@ -185,12 +185,20 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
 
 export function ClientesPage() {
   const navigate = useNavigate()
-  const [busca, setBusca] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const busca = searchParams.get('q') ?? ''
+  const setBusca = (v: string) => setSearchParams(v ? { q: v } : {}, { replace: true })
   const [showModal, setShowModal] = useState(false)
+  const [showMerge, setShowMerge] = useState(false)
+  const [mergeAlvo, setMergeAlvo] = useState<number | null>(null)
+  const [mergeDescartar, setMergeDescartar] = useState<number | null>(null)
   const isMobile = useIsMobile()
 
-  const { data, isLoading, refetch } = trpc.cliente.list.useQuery({ busca: busca || undefined, porPagina: 50 })
+  const { data, isLoading, refetch } = trpc.cliente.list.useQuery({ busca: busca || undefined, porPagina: 200 })
   const createMutation = trpc.cliente.create.useMutation({ onSuccess: () => { setShowModal(false); refetch() } })
+  const mergeMutation  = trpc.cliente.merge.useMutation({
+    onSuccess: () => { setShowMerge(false); setMergeAlvo(null); setMergeDescartar(null); refetch() },
+  })
 
   const lista = data?.data ?? []
   const pf = lista.filter(c => c.tipoPessoa === 'fisica').length
@@ -198,7 +206,12 @@ export function ClientesPage() {
 
   return (
     <PageWrapper>
-      <SectionHeader title="Clientes" action={<Btn onClick={() => setShowModal(true)}>+ Novo</Btn>} />
+      <SectionHeader title="Clientes" action={
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn variant="ghost" size="sm" onClick={() => setShowMerge(true)}>⇌ Unificar</Btn>
+          <Btn onClick={() => setShowModal(true)}>+ Novo</Btn>
+        </div>
+      } />
 
       {lista.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -219,7 +232,7 @@ export function ClientesPage() {
         <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.textMuted, fontSize: 14, pointerEvents: 'none' }}>🔍</span>
         <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
           style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: 10, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-          onFocus={e => (e.target.style.borderColor = C.accent)} onBlur={e => (e.target.style.borderColor = C.darkBorder)} />
+          onFocus={e => (e.target.style.borderColor = C.accent)} onBlur={e => (e.target.style.borderColor = C.darkBorder)} autoFocus={!!busca} />
         {busca && <button onClick={() => setBusca('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 16 }}>×</button>}
       </div>
 
@@ -258,6 +271,55 @@ export function ClientesPage() {
           })}
         </div>
       )}
+
+      {showMerge && (() => {
+        const todos = data?.data ?? []
+        const ativos = todos.filter((c: any) => !c.cancelado)
+        const nomeCliente = (id: number | null) => ativos.find((c: any) => c.id === id)?.nome ?? '—'
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' }}>
+            <div style={{ background: C.darkCard, borderRadius: 16, border: `1px solid ${C.darkBorder}`, width: isMobile ? '96vw' : 500, padding: 28, boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
+              <h2 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>⇌ Unificar Clientes</h2>
+              <p style={{ color: C.textDim, fontSize: 12, margin: '0 0 22px', lineHeight: 1.6 }}>
+                Selecione dois clientes. Todas as propostas, faturas e histórico do cliente descartado serão transferidos para o mantido, e o descartado será excluído permanentemente.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Cliente a MANTER</label>
+                  <select value={mergeAlvo ?? ''} onChange={e => setMergeAlvo(Number(e.target.value) || null)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13 }}>
+                    <option value="">Selecione...</option>
+                    {ativos.map((c: any) => <option key={c.id} value={c.id}>{c.nome}{c.cpfCnpj ? ` — ${c.cpfCnpj}` : ''}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Cliente a DESCARTAR (será excluído)</label>
+                  <select value={mergeDescartar ?? ''} onChange={e => setMergeDescartar(Number(e.target.value) || null)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13 }}>
+                    <option value="">Selecione...</option>
+                    {ativos.filter((c: any) => c.id !== mergeAlvo).map((c: any) => <option key={c.id} value={c.id}>{c.nome}{c.cpfCnpj ? ` — ${c.cpfCnpj}` : ''}</option>)}
+                  </select>
+                </div>
+                {mergeAlvo && mergeDescartar && (
+                  <div style={{ background: '#7F1D1D20', border: '1px solid #B91C1C50', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#FCA5A5', lineHeight: 1.6 }}>
+                    <strong>Confirmar:</strong> manter <strong>{nomeCliente(mergeAlvo)}</strong> e excluir permanentemente <strong>{nomeCliente(mergeDescartar)}</strong>.
+                    Todas as propostas e faturas do descartado serão vinculadas ao mantido.
+                  </div>
+                )}
+              </div>
+              {mergeMutation.error && <p style={{ color: '#FCA5A5', fontSize: 12, marginTop: 12 }}>{(mergeMutation.error as any)?.message}</p>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
+                <Btn variant="ghost" onClick={() => { setShowMerge(false); setMergeAlvo(null); setMergeDescartar(null) }}>Cancelar</Btn>
+                <Btn onClick={() => mergeAlvo && mergeDescartar && mergeMutation.mutate({ manterClienteId: mergeAlvo, removerClienteId: mergeDescartar })}
+                  disabled={!mergeAlvo || !mergeDescartar || mergeMutation.isLoading}
+                  style={{ background: '#B91C1C', borderColor: '#B91C1C' }}>
+                  {mergeMutation.isLoading ? 'Unificando...' : '⇌ Confirmar unificação'}
+                </Btn>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {showModal && <ClienteFormModal inicial={FORM_VAZIO} onSave={form => createMutation.mutate(form as any)} onClose={() => setShowModal(false)} loading={createMutation.isLoading} erro={createMutation.error?.message} />}
     </PageWrapper>

@@ -176,7 +176,14 @@ export function NovaPropostaPage() {
     { enabled: step >= 2 && ((form.modoCalculo === 'kwh' && form.consumoMensalKwh > 0) || (form.modoCalculo === 'kwp' && form.potenciaKwpManual > 0)) }
   )
 
+  const [confirmarDupli, setConfirmarDupli] = useState(false)
   const createMutation = trpc.proposta.create.useMutation({ onSuccess: (data: any) => navigate(`/propostas/${data.propostaId}`) })
+
+  const { data: propostasCliente } = trpc.proposta.list.useQuery(
+    { clienteId: Number(form.clienteId), porPagina: 10 },
+    { enabled: !!form.clienteId && Number(form.clienteId) > 0 }
+  )
+  const propostasExistentes = (propostasCliente?.data ?? []).filter((p: any) => !p.isTemplate)
 
   const handleCreate = () => {
     if (!form.clienteId || form.custoKitFotovoltaico <= 0) return
@@ -241,7 +248,21 @@ export function NovaPropostaPage() {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <h3 style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Selecione o Cliente</h3>
-            <ClienteAutocomplete clientes={clientes?.data ?? []} value={form.clienteId} onChange={id => set('clienteId', id)} />
+            <ClienteAutocomplete clientes={clientes?.data ?? []} value={form.clienteId} onChange={id => { set('clienteId', id); setConfirmarDupli(false) }} />
+            {form.clienteId && propostasExistentes.length > 0 && !confirmarDupli && (
+              <div style={{ background: `${C.warning}12`, border: `1px solid ${C.warning}40`, borderRadius: 10, padding: '12px 16px' }}>
+                <p style={{ color: C.warning, fontSize: 13, fontWeight: 700, margin: '0 0 6px' }}>
+                  ⚠️ Este cliente já possui {propostasExistentes.length} proposta{propostasExistentes.length > 1 ? 's' : ''} cadastrada{propostasExistentes.length > 1 ? 's' : ''}
+                </p>
+                <p style={{ color: C.warning, fontSize: 12, margin: '0 0 10px', opacity: 0.85 }}>
+                  {propostasExistentes.map((p: any) => p.numero).join(', ')}
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Btn variant="ghost" size="sm" onClick={() => set('clienteId', '')}>Desistir</Btn>
+                  <Btn size="sm" onClick={() => setConfirmarDupli(true)}>Continuar mesmo assim</Btn>
+                </div>
+              </div>
+            )}
             {form.clienteId && (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
                 <Input label="Data de Emissão"  type="date" value={form.dataEmissao}  onChange={(e: any) => set('dataEmissao',  e.target.value)} />
@@ -249,7 +270,7 @@ export function NovaPropostaPage() {
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <Btn disabled={!form.clienteId} onClick={() => setStep(2)}>Próximo →</Btn>
+              <Btn disabled={!form.clienteId || (propostasExistentes.length > 0 && !confirmarDupli)} onClick={() => setStep(2)}>Próximo →</Btn>
             </div>
           </div>
         )}
