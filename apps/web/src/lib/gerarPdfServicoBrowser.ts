@@ -486,7 +486,7 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
 - **Autoria do Orçamento:** Este documento é de uso exclusivo desta negociação e não deve ser repassado a terceiros.
 - **Encargos e Taxas:** Eventuais taxas, licenças ou liberações necessárias são de responsabilidade do contratante.
 - **Etapa Única:** Os serviços serão executados de forma contínua e em etapa única, salvo acordo formal em contrário.
-- **Garantia:** Os serviços possuem garantia de 90 dias contra defeitos de execução.
+- **Garantia:** Os serviços executados possuem garantia de 12 (doze) meses contra defeitos de execução e mão de obra, conforme estabelecido no contrato.
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
   if (blocoAtivo(blocos, 'consideracoes_gerais')) {

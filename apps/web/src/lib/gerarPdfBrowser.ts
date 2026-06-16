@@ -517,7 +517,7 @@ function gerarHTML(data: any): string {
 - **Autoria do Orçamento:** Este documento é de uso exclusivo desta negociação e não deve ser repassado a terceiros.
 - **Encargos e Taxas:** Taxas de homologação junto à distribuidora, AVCB e outras licenças são responsabilidade do contratante, salvo se expressamente incluídas.
 - **Etapa Única:** Os serviços serão executados de forma contínua e em etapa única, salvo acordo formal em contrário.
-- **Garantia:** Os serviços possuem garantia de 5 anos na instalação e conforme fabricante para os equipamentos.
+- **Garantia:** Os serviços de instalação possuem garantia de 12 (doze) meses a partir da emissão da Nota Fiscal. Equipamentos seguem a garantia do fabricante conforme especificado no contrato.
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
   const consideracoesBloco = tem('consideracoes_gerais') ? (() => {
