@@ -49,12 +49,17 @@ function ModalImportar({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [condicaoId, setCondicaoId]       = useState<number | null>(null)
-  const [planoContasId, setPlanoContasId] = useState<number | ''>('')
-  const [centroCustoId, setCentroCustoId] = useState<number | ''>('')
-  const [contaId, setContaId]             = useState<number | ''>('')
-  const [observacoes, setObservacoes]     = useState('')
-  const [erro, setErro]                   = useState('')
+  const [condicaoId, setCondicaoId]           = useState<number | null>(null)
+  const [planoContasId, setPlanoContasId]     = useState<number | ''>('')
+  const [centroCustoId, setCentroCustoId]     = useState<number | ''>('')
+  const [contaId, setContaId]                 = useState<number | ''>('')
+  const [observacoes, setObservacoes]         = useState('')
+  const [erro, setErro]                       = useState('')
+  // Financiamento
+  const [isFinanciamento, setIsFinanciamento] = useState(false)
+  const [valorKit, setValorKit]               = useState('')
+  const [fornecedorId, setFornecedorId]       = useState<number | ''>('')
+  const [planoContasCustoId, setPlanoContasCustoId] = useState<number | ''>('')
 
   const { data: condicoes, isLoading: loadCond } =
     (trpc as any).fin.proposta.condicoes.useQuery({ propostaId: proposta.id })
@@ -62,6 +67,7 @@ function ModalImportar({
   const { data: planos } = (trpc as any).fin.planoContas.list.useQuery()
   const { data: centros } = (trpc as any).fin.centroCusto.list.useQuery()
   const { data: contas } = (trpc as any).fin.conta.list.useQuery()
+  const { data: pessoas } = (trpc as any).fin.pessoa.list.useQuery()
 
   const utils = (trpc as any).useUtils()
   const importarMut = (trpc as any).fin.proposta.importar.useMutation({
@@ -82,18 +88,28 @@ function ModalImportar({
   }, [condicoesData.length])
 
   const planosReceita = (planos ?? []).filter((p: any) => p.tipo === 'RECEITA')
+  const planosCusto   = (planos ?? []).filter((p: any) => p.tipo === 'CUSTO' || p.tipo === 'DESPESA')
+  const fornecedores  = (pessoas ?? []).filter((p: any) => p.isFornecedor)
   const condSelecionada = condicoesData.find((c: any) => c.id === condicaoId)
 
   function handleImportar() {
     if (!condicaoId) { setErro('Selecione uma condição comercial'); return }
+    if (isFinanciamento && (!valorKit || Number(valorKit) <= 0)) {
+      setErro('Informe o valor do kit pago ao distribuidor')
+      return
+    }
     setErro('')
     importarMut.mutate({
-      propostaId:    proposta.id,
+      propostaId:         proposta.id,
       condicaoId,
-      planoContasId: planoContasId ? Number(planoContasId) : undefined,
-      centroCustoId: centroCustoId ? Number(centroCustoId) : undefined,
-      contaId:       contaId ? Number(contaId) : undefined,
-      observacoes:   observacoes || undefined,
+      planoContasId:      planoContasId ? Number(planoContasId) : undefined,
+      centroCustoId:      centroCustoId ? Number(centroCustoId) : undefined,
+      contaId:            contaId ? Number(contaId) : undefined,
+      observacoes:        observacoes || undefined,
+      isFinanciamento,
+      valorKit:           isFinanciamento ? Number(valorKit) : undefined,
+      fornecedorId:       isFinanciamento && fornecedorId ? Number(fornecedorId) : undefined,
+      planoContasCustoId: isFinanciamento && planoContasCustoId ? Number(planoContasCustoId) : undefined,
     })
   }
 
@@ -210,6 +226,72 @@ function ModalImportar({
               (contas ?? []).map((c: any) => ({ value: c.id, label: c.nome })),
               'Sem conta definida'
             )}
+
+            {/* Toggle Financiamento */}
+            <div style={{
+              background: isFinanciamento ? '#7C3AED18' : C.bg,
+              border: `1px solid ${isFinanciamento ? '#7C3AED' : C.border}`,
+              borderRadius: 10, padding: '12px 14px',
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={isFinanciamento}
+                  onChange={e => setIsFinanciamento(e.target.checked)}
+                  style={{ accentColor: '#7C3AED', width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isFinanciamento ? '#A78BFA' : C.text }}>
+                    Contrato pago por financiamento bancário
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+                    O banco paga o kit diretamente ao distribuidor — não transita pela conta da Atom
+                  </div>
+                </div>
+              </label>
+
+              {isFinanciamento && (
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 14, borderTop: `1px solid #7C3AED30` }}>
+                  <div style={{ background: '#7C3AED12', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#A78BFA', lineHeight: 1.6 }}>
+                    Será gerado automaticamente um título <strong>PAGAR</strong> ao distribuidor já marcado como quitado, sem impactar o saldo bancário da Atom.
+                    A receita bruta fica registrada, mas o fluxo de caixa reflete apenas a margem real.
+                  </div>
+
+                  {/* Valor do Kit */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
+                      Valor do Kit pago ao Distribuidor *
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={valorKit}
+                      onChange={e => setValorKit(e.target.value)}
+                      placeholder="Ex.: 32500.00"
+                      style={{
+                        width: '100%', background: C.bg, border: `1px solid #7C3AED`,
+                        borderRadius: 8, color: C.text, fontSize: 13, padding: '8px 10px', boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 3 }}>
+                      Pode ser alterado depois se o valor negociado com o distribuidor for diferente do contrato.
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {select('Distribuidor / Fornecedor', fornecedorId, setFornecedorId,
+                      fornecedores.map((p: any) => ({ value: p.id, label: p.nome })),
+                      'Sem vínculo'
+                    )}
+                    {select('Plano de Contas (Custo do Kit)', planoContasCustoId, setPlanoContasCustoId,
+                      planosCusto.map((p: any) => ({ value: p.id, label: `${p.codigo} — ${p.nome}` })),
+                      'Sem classificação'
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Observações */}
             <div>

@@ -1315,6 +1315,11 @@ const propostaFinRouter = router({
       centroCustoId: z.number().int().optional(),
       contaId:       z.number().int().optional(),
       observacoes:   z.string().optional(),
+      // Financiamento: kit pago diretamente ao distribuidor pelo banco
+      isFinanciamento:    z.boolean().optional(),
+      valorKit:           z.number().positive().optional(),
+      fornecedorId:       z.number().int().positive().nullish(),
+      planoContasCustoId: z.number().int().positive().nullish(), // custo do kit no plano de contas
     }))
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
@@ -1418,6 +1423,48 @@ const propostaFinRouter = router({
           status:     'ABERTA',
           contaId:    input.contaId ?? null,
         })
+      }
+
+      // 8. Se for financiamento: cria título PAGAR (kit → distribuidor) já liquidado
+      //    O banco paga o distribuidor diretamente — não passa pelo caixa da Atom
+      if (input.isFinanciamento && input.valorKit && input.valorKit > 0) {
+        const dataBase = prop.dataEmissao
+          ? String(prop.dataEmissao).slice(0, 10)
+          : new Date().toISOString().slice(0, 10)
+
+        const kitIns = await ctx.db.insert(finTitulo).values({
+          empresaId:     empId,
+          tipo:          'PAGAR',
+          descricao:     `Kit Fotovoltaico — financiamento direto ao distribuidor (${prop.numero})`,
+          documento:     prop.numero,
+          pessoaId:      input.fornecedorId ?? null,
+          planoContasId: input.planoContasCustoId ?? null,
+          centroCustoId: input.centroCustoId ?? null,
+          propostaId:    prop.id,
+          valorOriginal: input.valorKit.toFixed(2),
+          emissao:       dataBase,
+          observacoes:   'Pagamento realizado diretamente pelo banco financiador ao distribuidor. Não transita pela conta da Atom.',
+          ativo:         true,
+        })
+        const kitTituloId = Number((kitIns as any).insertId ?? (kitIns[0] as any)?.insertId ?? 0)
+
+        if (kitTituloId) {
+          // Cria a parcela do kit já marcada como PAGA — o banco quitou na data do contrato
+          await ctx.db.insert(finParcela).values({
+            tituloId:       kitTituloId,
+            numero:         1,
+            valor:          input.valorKit.toFixed(2),
+            vencimento:     dataBase,
+            status:         'PAGA',
+            contaId:        null, // não passou pela conta da Atom
+            dataPagamento:  dataBase,
+            valorPago:      input.valorKit.toFixed(2),
+            formaPagamento: 'financiamento',
+            juros:          '0.00',
+            multa:          '0.00',
+            desconto:       '0.00',
+          })
+        }
       }
 
       return { ok: true, tituloId, pessoaId }
@@ -2192,6 +2239,94 @@ const extratoRouter = router({
       }
 
       return { ok: true, criados, ignorados, total: input.itens.length }
+    }),
+
+  // ── Verifica potenciais duplicatas contra lançamentos manuais já existentes ──
+  // Retorna: { fingerprint -> [{ parcelaId, tituloId, descricao, valor, vencimento, status }] }
+  verificarPotenciais: protectedProcedure
+    .input(z.object({
+      itens: z.array(z.object({
+        fingerprint: z.string(),
+        valor:       z.number(),
+        data:        z.string(), // YYYY-MM-DD
+        tipo:        z.enum(['PAGAR', 'RECEBER']),
+      })),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const resultado: Record<string, any[]> = {}
+
+      for (const item of input.itens) {
+        // Janela de ±3 dias ao redor da data da transação
+        const base  = new Date(item.data + 'T12:00:00Z')
+        const dFrom = new Date(base); dFrom.setDate(dFrom.getDate() - 3)
+        const dTo   = new Date(base); dTo.setDate(dTo.getDate() + 3)
+
+        const matches = await ctx.db
+          .select({
+            parcelaId:  finParcela.id,
+            tituloId:   finTitulo.id,
+            descricao:  finTitulo.descricao,
+            valor:      finParcela.valor,
+            vencimento: finParcela.vencimento,
+            status:     finParcela.status,
+          })
+          .from(finParcela)
+          .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+          .where(
+            and(
+              eq(finTitulo.empresaId, empId),
+              eq(finTitulo.tipo, item.tipo),
+              isNull(finParcela.extratoFingerprint),           // apenas lançamentos manuais
+              sql`ABS(CAST(${finParcela.valor} AS DECIMAL(10,2)) - ${item.valor}) < 0.02`,
+              gte(finParcela.vencimento, dFrom.toISOString().slice(0, 10) as any),
+              lte(finParcela.vencimento, dTo.toISOString().slice(0, 10) as any),
+            )
+          )
+          .limit(5)
+
+        if (matches.length > 0) resultado[item.fingerprint] = matches
+      }
+
+      return resultado
+    }),
+
+  // ── Concilia transação do extrato com lançamento manual existente ─────────────
+  // Marca a parcela manual como PAGA e vincula o fingerprint (deduplicação futura)
+  conciliar: protectedProcedure
+    .input(z.object({
+      parcelaId:      z.number().int().positive(),
+      fingerprint:    z.string(),
+      contaId:        z.number().nullish(),
+      dataPagamento:  z.string(),
+      formaPagamento: z.string().nullish(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // Valida propriedade
+      const [parcela] = await ctx.db
+        .select({ id: finParcela.id, valor: finParcela.valor })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(and(eq(finParcela.id, input.parcelaId), eq(finTitulo.empresaId, empId)))
+        .limit(1)
+
+      if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' })
+
+      await ctx.db.update(finParcela).set({
+        status:             'PAGA',
+        extratoFingerprint: input.fingerprint,
+        contaId:            input.contaId ?? null,
+        dataPagamento:      input.dataPagamento as any,
+        valorPago:          parcela.valor,
+        formaPagamento:     input.formaPagamento ?? 'pix',
+        juros:              '0.00',
+        multa:              '0.00',
+        desconto:           '0.00',
+      }).where(eq(finParcela.id, input.parcelaId))
+
+      return { ok: true }
     }),
 })
 

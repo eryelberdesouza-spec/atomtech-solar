@@ -504,7 +504,9 @@ function OFXPage() {
   const [erro,         setErro]         = useState('')
   const [sucesso,      setSucesso]      = useState('')
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
-  const [importados,   setImportados]   = useState<Set<string>>(new Set())  // fitids já no banco
+  const [importados,   setImportados]   = useState<Set<string>>(new Set())
+  const [potenciais,   setPotenciais]   = useState<Record<string, any[]>>({})    // fitid → matches manuais
+  const [conciliando,  setConciliando]  = useState<{ tx: OFXTransacao; matches: any[] } | null>(null)
   const [contaId,      setContaId]      = useState('')
   const [planos,       setPlanos]       = useState<any[]>([])
   const [planoMap,     setPlanoMap]     = useState<Record<string, number>>({})
@@ -512,9 +514,10 @@ function OFXPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const utils = (trpc as any).useUtils()
 
-  const contasQ = (trpc as any).fin.conta.list.useQuery()
-  const planoQ  = (trpc as any).fin.planoContas.list.useQuery()
+  const contasQ      = (trpc as any).fin.conta.list.useQuery()
+  const planoQ       = (trpc as any).fin.planoContas.list.useQuery()
   const importarLote = (trpc as any).fin.extrato.importarLote.useMutation()
+  const conciliarMut = (trpc as any).fin.extrato.conciliar.useMutation()
 
   useEffect(() => {
     if (contasQ.data) setContas(contasQ.data)
@@ -545,7 +548,7 @@ function OFXPage() {
 
   const processarOFX = async () => {
     if (!file) { setErro('Selecione um arquivo OFX'); return }
-    setLoading(true); setErro(''); setSucesso(''); setResultado(null); setSelecionados(new Set()); setImportados(new Set())
+    setLoading(true); setErro(''); setSucesso(''); setResultado(null); setSelecionados(new Set()); setImportados(new Set()); setPotenciais({})
     try {
       const token = localStorage.getItem('atomfin_token') || localStorage.getItem('atomtech_token') || ''
       const form = new FormData()
@@ -558,17 +561,29 @@ function OFXPage() {
       const data = await resp.json()
       if (!data.ok) throw new Error(data.error || 'Erro ao processar OFX')
       setResultado(data)
-      // Pré-seleciona todas as transações
-      setSelecionados(new Set(data.transacoes.map((t: OFXTransacao) => t.fitid)))
-      // Verifica no banco quais FITIDs já foram importados
+
       const fitids = data.transacoes.map((t: OFXTransacao) => t.fitid)
-      const res = await utils.fin.extrato.verificarImportados.fetch({ fingerprints: fitids })
-      if (res?.importados?.length) {
-        const jaImportados = new Set<string>(res.importados)
-        setImportados(jaImportados)
-        // Desmarca automaticamente os já importados
-        setSelecionados(new Set(fitids.filter((f: string) => !jaImportados.has(f))))
-      }
+
+      // 1. Verifica quais FITIDs já estão no banco (importados antes)
+      const resImp = await utils.fin.extrato.verificarImportados.fetch({ fingerprints: fitids })
+      const jaImportados = new Set<string>(resImp?.importados ?? [])
+      setImportados(jaImportados)
+
+      // 2. Detecta lançamentos manuais que possam ser duplicatas
+      const pendentes = data.transacoes.filter((t: OFXTransacao) => !jaImportados.has(t.fitid))
+      const resPot = await utils.fin.extrato.verificarPotenciais.fetch({
+        itens: pendentes.map((t: OFXTransacao) => ({
+          fingerprint: t.fitid,
+          valor:       t.valor,
+          data:        t.data,
+          tipo:        t.sugestaoTipo,
+        })),
+      })
+      setPotenciais(resPot ?? {})
+
+      // Pré-seleciona pendentes sem potencial duplicata; desseleciona os com potencial (exige revisão manual)
+      const comPotencial = new Set(Object.keys(resPot ?? {}))
+      setSelecionados(new Set(fitids.filter((f: string) => !jaImportados.has(f) && !comPotencial.has(f))))
     } catch (e: any) {
       setErro(e.message || 'Erro ao processar OFX')
     } finally {
@@ -693,6 +708,25 @@ function OFXPage() {
           {sucesso && <Alert type="success" style={{ marginBottom: 16 }}>{sucesso}</Alert>}
           {erro     && <Alert type="danger"  style={{ marginBottom: 16 }}>{erro}</Alert>}
 
+          {/* Aviso de potenciais duplicatas */}
+          {Object.keys(potenciais).length > 0 && (
+            <div style={{
+              background: '#92400E18', border: '1px solid #D97706', borderRadius: 10,
+              padding: '10px 16px', marginBottom: 12,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 18 }}>⚠️</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#FBBF24' }}>
+                  {Object.keys(potenciais).length} transação(ões) com possível duplicata detectada
+                </div>
+                <div style={{ fontSize: 11, color: '#D97706', marginTop: 2 }}>
+                  Estas foram desmarcadas automaticamente. Revise cada uma e escolha: <strong>Conciliar</strong> (vincula ao lançamento manual existente) ou marque o checkbox para criar um novo lançamento separado.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Toolbar */}
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -760,8 +794,9 @@ function OFXPage() {
 
             <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
               {resultado.transacoes.map(tx => {
-                const jaImportado = importados.has(tx.fitid)
-                const selecionado = selecionados.has(tx.fitid)
+                const jaImportado  = importados.has(tx.fitid)
+                const selecionado  = selecionados.has(tx.fitid)
+                const temPotencial = !jaImportado && (potenciais[tx.fitid]?.length ?? 0) > 0
                 const cor = tx.tipo === 'C' ? C.credit : C.debit
 
                 return (
@@ -769,15 +804,19 @@ function OFXPage() {
                     display: 'grid', gridTemplateColumns: '32px 96px 1fr 140px 120px 110px',
                     padding: '9px 16px', borderBottom: `1px solid ${C.border}50`,
                     alignItems: 'center',
-                    background: jaImportado ? C.emerald + '08'
-                              : selecionado ? '#60A5FA08'
+                    background: jaImportado  ? C.emerald + '08'
+                              : temPotencial ? '#D9770610'
+                              : selecionado  ? '#60A5FA08'
                               : 'transparent',
+                    borderLeft: temPotencial ? '3px solid #D97706' : '3px solid transparent',
                     opacity: jaImportado ? 0.55 : 1,
                     transition: 'background 0.1s',
                   }}>
-                    {/* Checkbox */}
-                    <div>
-                      {!jaImportado && (
+                    {/* Checkbox ou ícone de alerta */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {jaImportado ? null : temPotencial ? (
+                        <span title="Possível duplicata — revise antes de importar" style={{ fontSize: 14, cursor: 'default' }}>⚠️</span>
+                      ) : (
                         <input
                           type="checkbox"
                           checked={selecionado}
@@ -798,14 +837,20 @@ function OFXPage() {
                       {fmtDataBR(tx.data)}
                     </div>
 
-                    {/* Descrição + categoria */}
+                    {/* Descrição + categoria + aviso de duplicata */}
                     <div style={{ overflow: 'hidden', paddingRight: 8 }}>
                       <div style={{ fontSize: 12, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.descricao}>
                         {tx.descricao}
                       </div>
-                      <div style={{ fontSize: 10, color: '#60A5FA99', marginTop: 1 }}>
-                        📂 {tx.sugestaoCategoria}
-                      </div>
+                      {temPotencial ? (
+                        <div style={{ fontSize: 10, color: '#FBBF24', marginTop: 2 }}>
+                          ⚠ Lançamento manual com mesmo valor encontrado: "{potenciais[tx.fitid][0]?.descricao}"
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 10, color: '#60A5FA99', marginTop: 1 }}>
+                          📂 {tx.sugestaoCategoria}
+                        </div>
+                      )}
                     </div>
 
                     {/* Tipo sugerido */}
@@ -824,14 +869,27 @@ function OFXPage() {
                       {tx.tipo === 'D' ? '- ' : '+ '}{fmtBRLFull(tx.valor)}
                     </div>
 
-                    {/* Status */}
+                    {/* Status / Ação */}
                     <div style={{ textAlign: 'center' }}>
-                      {jaImportado
-                        ? <span style={{ fontSize: 11, color: C.emerald, fontWeight: 700 }}>✓ Importado</span>
-                        : selecionado
-                          ? <span style={{ fontSize: 11, color: '#60A5FA', fontWeight: 600 }}>☑ Selecionado</span>
-                          : <span style={{ fontSize: 11, color: C.textDim }}>— Ignorar</span>
-                      }
+                      {jaImportado ? (
+                        <span style={{ fontSize: 11, color: C.emerald, fontWeight: 700 }}>✓ Importado</span>
+                      ) : temPotencial ? (
+                        <button
+                          onClick={() => setConciliando({ tx, matches: potenciais[tx.fitid] })}
+                          style={{
+                            fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                            padding: '3px 8px', borderRadius: 6,
+                            background: '#D9770618', border: '1px solid #D97706',
+                            color: '#FBBF24',
+                          }}
+                        >
+                          ⇌ Conciliar
+                        </button>
+                      ) : selecionado ? (
+                        <span style={{ fontSize: 11, color: '#60A5FA', fontWeight: 600 }}>☑ Selecionado</span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: C.textDim }}>— Ignorar</span>
+                      )}
                     </div>
                   </div>
                 )
@@ -839,6 +897,109 @@ function OFXPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Modal de Conciliação ──────────────────────────────────────────── */}
+      {conciliando && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            background: C.bgCard, borderRadius: 16, border: `1px solid #D97706`,
+            padding: '24px', width: 520, maxWidth: '95vw',
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#FBBF24', marginBottom: 6 }}>
+              ⇌ Conciliar Lançamento
+            </div>
+            <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 20, lineHeight: 1.6 }}>
+              O extrato bancário contém uma transação com o mesmo valor de um lançamento manual já existente.
+              Escolha como deseja tratar:
+            </p>
+
+            {/* Transação do extrato */}
+            <div style={{ background: C.bg, borderRadius: 8, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#60A5FA', textTransform: 'uppercase', marginBottom: 6 }}>Transação do Extrato</div>
+              <div style={{ fontSize: 13, color: C.text, marginBottom: 3 }}>{conciliando.tx.descricao}</div>
+              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted }}>
+                <span>{fmtDataBR(conciliando.tx.data)}</span>
+                <span style={{ color: conciliando.tx.tipo === 'C' ? C.credit : C.debit, fontWeight: 700 }}>
+                  {fmtBRLFull(conciliando.tx.valor)}
+                </span>
+              </div>
+            </div>
+
+            {/* Lançamentos manuais correspondentes */}
+            {conciliando.matches.map((m: any, i: number) => (
+              <div key={m.parcelaId} style={{
+                background: '#D9770610', borderRadius: 8, border: '1px solid #D97706',
+                padding: '12px 14px', marginBottom: 8,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#D97706', textTransform: 'uppercase', marginBottom: 6 }}>
+                  Lançamento Manual {conciliando.matches.length > 1 ? `#${i + 1}` : ''}
+                </div>
+                <div style={{ fontSize: 13, color: C.text, marginBottom: 3 }}>{m.descricao}</div>
+                <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted }}>
+                  <span>{fmtDataBR(String(m.vencimento).slice(0, 10))}</span>
+                  <span style={{ fontWeight: 700 }}>{fmtBRLFull(Number(m.valor))}</span>
+                  <span style={{
+                    padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                    background: m.status === 'PAGA' ? C.emerald + '20' : '#60A5FA20',
+                    color: m.status === 'PAGA' ? C.emerald : '#60A5FA',
+                  }}>{m.status}</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await conciliarMut.mutateAsync({
+                        parcelaId:     m.parcelaId,
+                        fingerprint:   conciliando.tx.fitid,
+                        contaId:       contaId ? parseInt(contaId) : null,
+                        dataPagamento: conciliando.tx.data,
+                        formaPagamento: detectarFormaPag(conciliando.tx.descricao),
+                      })
+                      setImportados(prev => new Set([...prev, conciliando.tx.fitid]))
+                      setPotenciais(prev => { const n = { ...prev }; delete n[conciliando.tx.fitid]; return n })
+                      setSucesso('✓ Lançamento conciliado com sucesso')
+                      setConciliando(null)
+                    } catch (e: any) {
+                      setErro(e.message || 'Erro ao conciliar')
+                      setConciliando(null)
+                    }
+                  }}
+                  style={{
+                    marginTop: 10, width: '100%', padding: '8px', borderRadius: 7,
+                    background: '#D97706', border: 'none', color: '#fff',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  ✓ Conciliar — marcar este como pago pelo extrato
+                </button>
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button
+                onClick={() => {
+                  // Usuário opta por criar novo mesmo assim: marca o checkbox e fecha o modal
+                  setSelecionados(prev => new Set([...prev, conciliando.tx.fitid]))
+                  setPotenciais(prev => { const n = { ...prev }; delete n[conciliando.tx.fitid]; return n })
+                  setConciliando(null)
+                }}
+                style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMuted, fontSize: 12, cursor: 'pointer' }}
+              >
+                + Criar novo lançamento separado
+              </button>
+              <button
+                onClick={() => setConciliando(null)}
+                style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMuted, fontSize: 12, cursor: 'pointer' }}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
