@@ -184,6 +184,7 @@ function ModalEditarLancamento({
   const { data: pessoas      = [] } = (trpc as any).fin.pessoa.list.useQuery()
   const { data: planosContas = [] } = (trpc as any).fin.planoContas.list.useQuery()
   const { data: centrosCusto = [] } = (trpc as any).fin.centroCusto.list.useQuery()
+  const { data: categoriasCusto = [] } = (trpc as any).fin.categoriaCusto.list.useQuery()
 
   const [form, setForm] = useState<any>(null)
   const [parcelas, setParcelas] = useState<any[]>([])
@@ -201,6 +202,7 @@ function ModalEditarLancamento({
       pessoaId:      t.pessoaId      ? String(t.pessoaId)      : '',
       planoContasId: t.planoContasId ? String(t.planoContasId) : '',
       centroCustoId: t.centroCustoId ? String(t.centroCustoId) : '',
+      categoriaCustoId: t.categoriaCustoId ? String(t.categoriaCustoId) : '',
       emissao:       t.emissao       ? String(t.emissao).slice(0, 10) : hoje(),
       observacoes:   t.observacoes   ?? '',
     })
@@ -266,6 +268,7 @@ function ModalEditarLancamento({
       pessoaId:      form.pessoaId      ? parseInt(form.pessoaId)      : undefined,
       planoContasId: form.planoContasId ? parseInt(form.planoContasId) : undefined,
       centroCustoId: form.centroCustoId ? parseInt(form.centroCustoId) : undefined,
+      categoriaCustoId: form.categoriaCustoId ? parseInt(form.categoriaCustoId) : undefined,
       observacoes:   form.observacoes   || undefined,
       emissao:       form.emissao,
       parcelas:      parcelasPayload.filter(Boolean) as any,
@@ -359,6 +362,19 @@ function ModalEditarLancamento({
             />
             <Input label="Data de Emissão" type="date" value={form.emissao} onChange={e => setForm({ ...form, emissao: e.target.value })} />
           </FormRow>
+
+          {tipo === 'PAGAR' && form.centroCustoId && (
+            <FormRow cols={1}>
+              <Select
+                label="Categoria de Custo"
+                value={form.categoriaCustoId}
+                onChange={e => setForm({ ...form, categoriaCustoId: e.target.value })}
+                placeholder="— Selecione (opcional) —"
+                options={categoriasCusto.map((c: any) => ({ value: String(c.id), label: c.nome }))}
+                hint="Classifica este gasto dentro do orçamento do Projeto vinculado a este centro de custo"
+              />
+            </FormRow>
+          )}
 
           <div style={{ marginBottom: 16 }}>
             <Textarea
@@ -959,6 +975,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const { data: pessoas      = [] } = (trpc as any).fin.pessoa.list.useQuery()
   const { data: planosContas = [] } = (trpc as any).fin.planoContas.list.useQuery()
   const { data: centrosCusto = [] } = (trpc as any).fin.centroCusto.list.useQuery()
+  const { data: categoriasCusto = [] } = (trpc as any).fin.categoriaCusto.list.useQuery()
 
   const deletarTitulo = (trpc as any).fin.titulo.delete.useMutation({
     onSuccess: () => { setConfirmDelete(null); setDeleteErro(''); setErro(''); refetch() },
@@ -1243,6 +1260,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
           pessoas={pessoas}
           planosContas={planosContas}
           centrosCusto={centrosCusto}
+          categoriasCusto={categoriasCusto}
           onClose={() => setShowNovo(false)}
           onSuccess={() => { setShowNovo(false); refetch() }}
         />
@@ -1306,13 +1324,14 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
 // ─── MODAL: NOVO LANÇAMENTO ───────────────────────────────────────────────────
 
 function ModalNovoLancamento({
-  tipo, contas, pessoas, planosContas, centrosCusto, onClose, onSuccess,
+  tipo, contas, pessoas, planosContas, centrosCusto, categoriasCusto, onClose, onSuccess,
 }: {
   tipo:          'PAGAR' | 'RECEBER'
   contas:        any[]
   pessoas:       any[]
   planosContas:  any[]
   centrosCusto:  any[]
+  categoriasCusto: any[]
   onClose:       () => void
   onSuccess:     () => void
 }) {
@@ -1322,6 +1341,7 @@ function ModalNovoLancamento({
     pessoaId:      '',
     planoContasId: '',
     centroCustoId: '',
+    categoriaCustoId: '',
     valorOriginal: '',
     emissao:       hoje(),
     observacoes:   '',
@@ -1380,6 +1400,7 @@ function ModalNovoLancamento({
       pessoaId:      form.pessoaId      ? parseInt(form.pessoaId)      : undefined,
       planoContasId: form.planoContasId ? parseInt(form.planoContasId) : undefined,
       centroCustoId: form.centroCustoId ? parseInt(form.centroCustoId) : undefined,
+      categoriaCustoId: form.categoriaCustoId ? parseInt(form.categoriaCustoId) : undefined,
       valorOriginal: valor,
       emissao:       form.emissao,
       observacoes:   form.observacoes.trim() || undefined,
@@ -1450,6 +1471,19 @@ function ModalNovoLancamento({
         />
         <InputMoeda label="Valor Total *" value={form.valorOriginal} onChange={v => f('valorOriginal', v)} />
       </FormRow>
+
+      {tipo === 'PAGAR' && form.centroCustoId && (
+        <FormRow cols={1}>
+          <Select
+            label="Categoria de Custo"
+            value={form.categoriaCustoId}
+            onChange={e => f('categoriaCustoId', e.target.value)}
+            placeholder="— Selecione (opcional) —"
+            options={categoriasCusto.map((c: any) => ({ value: String(c.id), label: c.nome }))}
+            hint="Classifica este gasto dentro do orçamento do Projeto vinculado a este centro de custo"
+          />
+        </FormRow>
+      )}
 
       <FormRow>
         <Input label="Data de Emissão *" type="date" value={form.emissao} onChange={e => f('emissao', e.target.value)} />

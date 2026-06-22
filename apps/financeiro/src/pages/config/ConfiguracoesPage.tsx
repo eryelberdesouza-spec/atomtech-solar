@@ -2,14 +2,16 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { ContasBancariasPage } from './ContasBancariasPage'
 import { PlanoContasPage } from './PlanoContasPage'
 import { CentrosCustoPage } from './CentrosCustoPage'
+import { CategoriasCustoPage } from './CategoriasCustoPage'
 import { UsuariosPage } from './UsuariosPage'
 import { C } from '../../components/ui'
 
 const TABS = [
-  { path: '/configuracoes/contas',        label: '🏦 Contas Bancárias' },
-  { path: '/configuracoes/plano-contas',  label: '📊 Plano de Contas' },
-  { path: '/configuracoes/centros-custo', label: '🏷️ Centros de Custo' },
-  { path: '/configuracoes/usuarios',      label: '👥 Usuários' },
+  { path: '/configuracoes/contas',          label: '🏦 Contas Bancárias' },
+  { path: '/configuracoes/plano-contas',    label: '📊 Plano de Contas' },
+  { path: '/configuracoes/centros-custo',   label: '🏷️ Centros de Custo' },
+  { path: '/configuracoes/categorias-custo',label: '🧾 Categorias de Custo' },
+  { path: '/configuracoes/usuarios',        label: '👥 Usuários' },
 ]
 
 export function ConfiguracoesPage() {
@@ -49,6 +51,7 @@ export function ConfiguracoesPage() {
         <Route path="contas" element={<ContasBancariasPage />} />
         <Route path="plano-contas" element={<PlanoContasPage />} />
         <Route path="centros-custo" element={<CentrosCustoPage />} />
+        <Route path="categorias-custo" element={<CategoriasCustoPage />} />
         <Route path="usuarios" element={<UsuariosPage />} />
       </Routes>
     </div>

@@ -8,6 +8,7 @@ const NAV = [
   { path: '/lancamentos',  label: 'Lançamentos',   icon: '↕', color: '#60A5FA', desc: 'CP / CR / Extrato' },
   { path: '/fluxo-caixa', label: 'Fluxo de Caixa',icon: '⇌', color: '#F59E0B', desc: 'Projeção de caixa' },
   { path: '/dre',         label: 'DRE',           icon: '◫', color: '#34D399', desc: 'Resultado do exercício' },
+  { path: '/projetos',    label: 'Projetos',      icon: '📁', color: '#FBBF24', desc: 'Orçamento por contrato' },
   { path: '/pessoas',      label: 'Pessoas',       icon: '◉', color: '#A78BFA', desc: 'Clientes e Fornecedores' },
   { path: '/propostas',    label: 'Propostas',     icon: '◑', color: '#F59E0B', desc: 'Importar propostas aceitas' },
   { path: '/extrato',      label: 'Extrato',       icon: '⇅', color: '#60A5FA', desc: 'Importar extrato bancário' },

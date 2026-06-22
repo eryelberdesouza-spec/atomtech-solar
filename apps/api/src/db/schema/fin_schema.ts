@@ -54,6 +54,34 @@ export const finCentroCusto = mysqlTable('fin_centro_custo', {
   idxEmpresa: index('idx_fin_cc_empresa').on(t.empresaId),
 }))
 
+// ─── CATEGORIA DE CUSTO (classificação de gasto dentro de um projeto) ─────────
+export const finCategoriaCusto = mysqlTable('fin_categoria_custo', {
+  id:        int('id').primaryKey().autoincrement(),
+  empresaId: int('empresa_id').notNull().references(() => empresa.id),
+  nome:      varchar('nome', { length: 100 }).notNull(),
+  ativo:     boolean('ativo').default(true).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (t) => ({
+  idxEmpresa: index('idx_fin_catcusto_empresa').on(t.empresaId),
+}))
+
+// ─── PROJETO (orçamento por contrato/serviço, em cima do Centro de Custo) ─────
+export const finProjeto = mysqlTable('fin_projeto', {
+  id:            int('id').primaryKey().autoincrement(),
+  empresaId:     int('empresa_id').notNull().references(() => empresa.id),
+  centroCustoId: int('centro_custo_id').notNull().references(() => finCentroCusto.id),
+  propostaId:    int('proposta_id'),   // link opcional para proposta/contrato da plataforma web
+  nome:          varchar('nome', { length: 200 }).notNull(),
+  valorContrato: decimal('valor_contrato', { precision: 12, scale: 2 }).notNull(),
+  status:        mysqlEnum('status', ['ABERTO', 'ENCERRADO']).notNull().default('ABERTO'),
+  observacoes:   text('observacoes'),
+  createdAt:     timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt:     timestamp('updated_at'),
+}, (t) => ({
+  idxEmpresa: index('idx_fin_projeto_empresa').on(t.empresaId),
+  idxCentro:  index('idx_fin_projeto_centro').on(t.centroCustoId),
+}))
+
 // ─── PESSOA (Clientes / Fornecedores financeiros) ─────────────────────────────
 export const finPessoa = mysqlTable('fin_pessoa', {
   id:          int('id').primaryKey().autoincrement(),
@@ -98,6 +126,7 @@ export const finTitulo = mysqlTable('fin_titulo', {
   pessoaId:       int('pessoa_id').references(() => finPessoa.id),
   planoContasId:  int('plano_contas_id').references(() => finPlanoContas.id),
   centroCustoId:  int('centro_custo_id').references(() => finCentroCusto.id),
+  categoriaCustoId: int('categoria_custo_id').references(() => finCategoriaCusto.id),
   propostaId:     int('proposta_id'),   // link externo para proposta aceita
   valorOriginal:  decimal('valor_original', { precision: 12, scale: 2 }).notNull(),
   emissao:        date('emissao').notNull(),

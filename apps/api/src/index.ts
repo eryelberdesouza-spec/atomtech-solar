@@ -728,6 +728,55 @@ app.get('/run-migration-fin-alerta', async (_, res) => {
   }
 })
 
+// ── Migração: cria fin_categoria_custo + fin_projeto + fin_titulo.categoria_custo_id ──
+app.get('/run-migration-projeto', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_categoria_custo (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id  INT NOT NULL,
+        nome        VARCHAR(100) NOT NULL,
+        ativo       TINYINT(1) NOT NULL DEFAULT 1,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fin_catcusto_empresa (empresa_id)
+      )
+    `)
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_projeto (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id       INT NOT NULL,
+        centro_custo_id  INT NOT NULL,
+        proposta_id      INT NULL,
+        nome             VARCHAR(200) NOT NULL,
+        valor_contrato   DECIMAL(12,2) NOT NULL,
+        status           ENUM('ABERTO','ENCERRADO') NOT NULL DEFAULT 'ABERTO',
+        observacoes      TEXT NULL,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TIMESTAMP NULL,
+        INDEX idx_fin_projeto_empresa (empresa_id),
+        INDEX idx_fin_projeto_centro (centro_custo_id)
+      )
+    `)
+
+    const [cols]: any = await conn.execute(
+      `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fin_titulo' AND COLUMN_NAME = 'categoria_custo_id'`
+    )
+    if (Number((cols as any[])[0].cnt) === 0) {
+      await conn.execute(`ALTER TABLE fin_titulo ADD COLUMN categoria_custo_id INT NULL`)
+    }
+
+    await conn.end()
+    res.json({ ok: true, message: 'fin_categoria_custo, fin_projeto e fin_titulo.categoria_custo_id criados com sucesso' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: adiciona coluna extrato_fingerprint na fin_parcela ─────────────
 app.get('/run-migration-extrato-fingerprint', async (_, res) => {
   try {

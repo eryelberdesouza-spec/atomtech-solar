@@ -13,6 +13,8 @@ import {
   finContaBancaria,
   finPlanoContas,
   finCentroCusto,
+  finCategoriaCusto,
+  finProjeto,
   finPessoa,
   finTitulo,
   finParcela,
@@ -200,6 +202,243 @@ const centroCustoRouter = router({
         .update(finCentroCusto)
         .set({ ativo: input.ativo })
         .where(and(eq(finCentroCusto.id, input.id), eq(finCentroCusto.empresaId, ctx.usuario.empresaId)))
+      return { ok: true }
+    }),
+})
+
+// ─── CATEGORIA DE CUSTO ───────────────────────────────────────────────────────
+
+const categoriaCustoRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db
+      .select()
+      .from(finCategoriaCusto)
+      .where(eq(finCategoriaCusto.empresaId, ctx.usuario.empresaId))
+      .orderBy(asc(finCategoriaCusto.nome))
+  }),
+
+  create: protectedProcedure
+    .input(z.object({ nome: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.insert(finCategoriaCusto).values({
+        empresaId: ctx.usuario.empresaId,
+        nome: input.nome,
+        ativo: true,
+      })
+      return { ok: true }
+    }),
+
+  update: protectedProcedure
+    .input(z.object({ id: z.number(), nome: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(finCategoriaCusto)
+        .set({ nome: input.nome })
+        .where(and(eq(finCategoriaCusto.id, input.id), eq(finCategoriaCusto.empresaId, ctx.usuario.empresaId)))
+      return { ok: true }
+    }),
+
+  toggle: protectedProcedure
+    .input(z.object({ id: z.number(), ativo: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(finCategoriaCusto)
+        .set({ ativo: input.ativo })
+        .where(and(eq(finCategoriaCusto.id, input.id), eq(finCategoriaCusto.empresaId, ctx.usuario.empresaId)))
+      return { ok: true }
+    }),
+})
+
+// ─── PROJETO (orçamento de contrato/serviço por Centro de Custo) ──────────────
+
+const projetoRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const empId = ctx.usuario.empresaId
+
+    const projetos = await ctx.db
+      .select({
+        id:            finProjeto.id,
+        nome:          finProjeto.nome,
+        valorContrato: finProjeto.valorContrato,
+        status:        finProjeto.status,
+        propostaId:    finProjeto.propostaId,
+        centroCustoId: finProjeto.centroCustoId,
+        centroNome:    finCentroCusto.nome,
+        centroCodigo:  finCentroCusto.codigo,
+        createdAt:     finProjeto.createdAt,
+      })
+      .from(finProjeto)
+      .innerJoin(finCentroCusto, eq(finProjeto.centroCustoId, finCentroCusto.id))
+      .where(eq(finProjeto.empresaId, empId))
+      .orderBy(desc(finProjeto.createdAt))
+
+    if (projetos.length === 0) return []
+
+    const centroIds = projetos.map(p => p.centroCustoId)
+    const custos = await ctx.db
+      .select({
+        centroCustoId: finTitulo.centroCustoId,
+        total: sql<string>`SUM(${finTitulo.valorOriginal})`,
+      })
+      .from(finTitulo)
+      .where(and(
+        eq(finTitulo.empresaId, empId),
+        eq(finTitulo.tipo, 'PAGAR'),
+        eq(finTitulo.ativo, true),
+        inArray(finTitulo.centroCustoId, centroIds),
+      ))
+      .groupBy(finTitulo.centroCustoId)
+
+    const custoMap = new Map(custos.map(c => [c.centroCustoId, Number(c.total ?? 0)]))
+
+    return projetos.map(p => {
+      const totalGasto = custoMap.get(p.centroCustoId) ?? 0
+      return {
+        ...p,
+        valorContrato: Number(p.valorContrato),
+        totalGasto,
+        margem: Number(p.valorContrato) - totalGasto,
+      }
+    })
+  }),
+
+  byId: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [projeto] = await ctx.db
+        .select({
+          id:            finProjeto.id,
+          nome:          finProjeto.nome,
+          valorContrato: finProjeto.valorContrato,
+          status:        finProjeto.status,
+          propostaId:    finProjeto.propostaId,
+          centroCustoId: finProjeto.centroCustoId,
+          centroNome:    finCentroCusto.nome,
+          centroCodigo:  finCentroCusto.codigo,
+          observacoes:   finProjeto.observacoes,
+        })
+        .from(finProjeto)
+        .innerJoin(finCentroCusto, eq(finProjeto.centroCustoId, finCentroCusto.id))
+        .where(and(eq(finProjeto.id, input.id), eq(finProjeto.empresaId, empId)))
+        .limit(1)
+
+      if (!projeto) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      const custosPorCategoria = await ctx.db
+        .select({
+          categoriaId:   finTitulo.categoriaCustoId,
+          categoriaNome: finCategoriaCusto.nome,
+          total:         sql<string>`SUM(${finTitulo.valorOriginal})`,
+        })
+        .from(finTitulo)
+        .leftJoin(finCategoriaCusto, eq(finTitulo.categoriaCustoId, finCategoriaCusto.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finTitulo.tipo, 'PAGAR'),
+          eq(finTitulo.ativo, true),
+          eq(finTitulo.centroCustoId, projeto.centroCustoId),
+        ))
+        .groupBy(finTitulo.categoriaCustoId, finCategoriaCusto.nome)
+
+      const lancamentos = await ctx.db
+        .select({
+          tituloId:      finTitulo.id,
+          descricao:     finTitulo.descricao,
+          valor:         finTitulo.valorOriginal,
+          emissao:       finTitulo.emissao,
+          categoriaNome: finCategoriaCusto.nome,
+          pessoaNome:    finPessoa.nome,
+        })
+        .from(finTitulo)
+        .leftJoin(finCategoriaCusto, eq(finTitulo.categoriaCustoId, finCategoriaCusto.id))
+        .leftJoin(finPessoa, eq(finTitulo.pessoaId, finPessoa.id))
+        .where(and(
+          eq(finTitulo.empresaId, empId),
+          eq(finTitulo.tipo, 'PAGAR'),
+          eq(finTitulo.ativo, true),
+          eq(finTitulo.centroCustoId, projeto.centroCustoId),
+        ))
+        .orderBy(desc(finTitulo.emissao))
+
+      const totalGasto = custosPorCategoria.reduce((s, c) => s + Number(c.total ?? 0), 0)
+
+      return {
+        ...projeto,
+        valorContrato: Number(projeto.valorContrato),
+        totalGasto,
+        margem: Number(projeto.valorContrato) - totalGasto,
+        categorias: custosPorCategoria.map(c => ({
+          categoriaId:   c.categoriaId,
+          categoriaNome: c.categoriaNome ?? 'Sem categoria',
+          total:         Number(c.total ?? 0),
+        })),
+        lancamentos: lancamentos.map(l => ({
+          ...l,
+          valor:   Number(l.valor),
+          emissao: String(l.emissao).slice(0, 10),
+        })),
+      }
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      nome:          z.string().min(1),
+      centroCustoId: z.number(),
+      valorContrato: z.number().positive(),
+      propostaId:    z.number().nullish(),
+      observacoes:   z.string().nullish(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [centro] = await ctx.db
+        .select({ id: finCentroCusto.id })
+        .from(finCentroCusto)
+        .where(and(eq(finCentroCusto.id, input.centroCustoId), eq(finCentroCusto.empresaId, empId)))
+        .limit(1)
+      if (!centro) throw new TRPCError({ code: 'NOT_FOUND', message: 'Centro de custo não encontrado' })
+
+      const [res] = await ctx.db.insert(finProjeto).values({
+        empresaId:     empId,
+        centroCustoId: input.centroCustoId,
+        propostaId:    input.propostaId ?? null,
+        nome:          input.nome,
+        valorContrato: input.valorContrato.toFixed(2),
+        observacoes:   input.observacoes ?? null,
+        status:        'ABERTO',
+      })
+      return { ok: true, id: (res as any).insertId as number }
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id:            z.number(),
+      nome:          z.string().min(1),
+      valorContrato: z.number().positive(),
+      observacoes:   z.string().nullish(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(finProjeto)
+        .set({
+          nome:          input.nome,
+          valorContrato: input.valorContrato.toFixed(2),
+          observacoes:   input.observacoes ?? null,
+          updatedAt:     new Date(),
+        })
+        .where(and(eq(finProjeto.id, input.id), eq(finProjeto.empresaId, ctx.usuario.empresaId)))
+      return { ok: true }
+    }),
+
+  toggleStatus: protectedProcedure
+    .input(z.object({ id: z.number(), status: z.enum(['ABERTO', 'ENCERRADO']) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(finProjeto)
+        .set({ status: input.status, updatedAt: new Date() })
+        .where(and(eq(finProjeto.id, input.id), eq(finProjeto.empresaId, ctx.usuario.empresaId)))
       return { ok: true }
     }),
 })
@@ -521,6 +760,8 @@ const tituloRouter = router({
           planoNome:     finPlanoContas.nome,
           centroId:      finTitulo.centroCustoId,
           centroNome:    finCentroCusto.nome,
+          categoriaCustoId:   finTitulo.categoriaCustoId,
+          categoriaCustoNome: finCategoriaCusto.nome,
           propostaId:    finTitulo.propostaId,
         })
         .from(finParcela)
@@ -528,6 +769,7 @@ const tituloRouter = router({
         .leftJoin(finPessoa,        eq(finTitulo.pessoaId,      finPessoa.id))
         .leftJoin(finPlanoContas,   eq(finTitulo.planoContasId, finPlanoContas.id))
         .leftJoin(finCentroCusto,   eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .leftJoin(finCategoriaCusto, eq(finTitulo.categoriaCustoId, finCategoriaCusto.id))
         .leftJoin(finContaBancaria, eq(finParcela.contaId,      finContaBancaria.id))
         .where(and(
           eq(finTitulo.empresaId, empId),
@@ -587,11 +829,14 @@ const tituloRouter = router({
           pessoaTipoPagamento: finPessoa.tipoPagamento,
           planoNome:     finPlanoContas.nome,
           centroNome:    finCentroCusto.nome,
+          categoriaCustoId:   finTitulo.categoriaCustoId,
+          categoriaCustoNome: finCategoriaCusto.nome,
         })
         .from(finTitulo)
         .leftJoin(finPessoa,       eq(finTitulo.pessoaId,      finPessoa.id))
         .leftJoin(finPlanoContas,  eq(finTitulo.planoContasId, finPlanoContas.id))
         .leftJoin(finCentroCusto,  eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .leftJoin(finCategoriaCusto, eq(finTitulo.categoriaCustoId, finCategoriaCusto.id))
         .where(and(eq(finTitulo.id, input.tituloId), eq(finTitulo.empresaId, empId)))
         .limit(1)
 
@@ -615,6 +860,7 @@ const tituloRouter = router({
       pessoaId:      z.number().nullish(),
       planoContasId: z.number().nullish(),
       centroCustoId: z.number().nullish(),
+      categoriaCustoId: z.number().nullish(),
       propostaId:    z.number().nullish(),
       valorOriginal: z.number().positive(),
       emissao:       z.string(),  // YYYY-MM-DD
@@ -637,6 +883,7 @@ const tituloRouter = router({
         pessoaId:       tituloData.pessoaId ?? null,
         planoContasId:  tituloData.planoContasId ?? null,
         centroCustoId:  tituloData.centroCustoId ?? null,
+        categoriaCustoId: tituloData.categoriaCustoId ?? null,
         propostaId:     tituloData.propostaId ?? null,
         valorOriginal:  tituloData.valorOriginal.toFixed(2),
         emissao:        tituloData.emissao as any,
@@ -668,6 +915,7 @@ const tituloRouter = router({
       pessoaId:      z.number().nullish(),
       planoContasId: z.number().nullish(),
       centroCustoId: z.number().nullish(),
+      categoriaCustoId: z.number().nullish(),
       observacoes:   z.string().nullish(),
       emissao:       z.string(),
       // parcelaId presente = atualiza existente; ausente = nova parcela
@@ -714,6 +962,7 @@ const tituloRouter = router({
           pessoaId:      input.pessoaId ?? null,
           planoContasId: input.planoContasId ?? null,
           centroCustoId: input.centroCustoId ?? null,
+          categoriaCustoId: input.categoriaCustoId ?? null,
           observacoes:   input.observacoes ?? null,
           emissao:       input.emissao as any,
           valorOriginal: novoTotal.toFixed(2),
@@ -2397,6 +2646,8 @@ export const finRouter = router({
   conta:         contaRouter,
   planoContas:   planoContasRouter,
   centroCusto:   centroCustoRouter,
+  categoriaCusto: categoriaCustoRouter,
+  projeto:       projetoRouter,
   pessoa:        pessoaRouter,
   dashboard:     dashboardRouter,
   titulo:        tituloRouter,
