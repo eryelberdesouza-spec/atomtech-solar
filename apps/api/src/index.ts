@@ -777,6 +777,28 @@ app.get('/run-migration-projeto', async (_, res) => {
   }
 })
 
+// ── Migração: adiciona coluna lote_rateio_id na fin_titulo (rateio de NF entre projetos) ──
+app.get('/run-migration-rateio', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [cols]: any = await conn.execute(
+      `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fin_titulo' AND COLUMN_NAME = 'lote_rateio_id'`
+    )
+    if (Number((cols as any[])[0].cnt) === 0) {
+      await conn.execute(`ALTER TABLE fin_titulo ADD COLUMN lote_rateio_id VARCHAR(40) NULL`)
+      await conn.execute(`CREATE INDEX idx_fin_titulo_lote_rateio ON fin_titulo(lote_rateio_id)`)
+    }
+
+    await conn.end()
+    res.json({ ok: true, message: 'fin_titulo.lote_rateio_id criado com sucesso' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: adiciona coluna extrato_fingerprint na fin_parcela ─────────────
 app.get('/run-migration-extrato-fingerprint', async (_, res) => {
   try {

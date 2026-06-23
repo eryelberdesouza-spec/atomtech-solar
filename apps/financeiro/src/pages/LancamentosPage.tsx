@@ -954,6 +954,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [dataIni, setDataIni]           = useState(mesAtualIni())
   const [dataFim, setDataFim]           = useState('')
   const [showNovo, setShowNovo]         = useState(false)
+  const [showRateio, setShowRateio]     = useState(false)
   const [editandoTituloId, setEditandoTituloId]   = useState<number | null>(null)
   const [baixandoParcela, setBaixandoParcela]     = useState<any>(null)
   const [comprovanteRow, setComprovanteRow]       = useState<any>(null)
@@ -1099,6 +1100,11 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
               ✕ Limpar
             </Btn>
           )}
+          {tipo === 'PAGAR' && (
+            <Btn variant="ghost" onClick={() => setShowRateio(true)} title="Dividir uma nota/compra entre vários projetos">
+              📑 Dividir entre Projetos
+            </Btn>
+          )}
           <Btn onClick={() => setShowNovo(true)}>+ Nova Conta a {label}</Btn>
         </div>
       </div>
@@ -1161,6 +1167,16 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             descricao: (
               <div>
                 <span style={{ color: C.text, fontSize: 13 }}>{r.descricao}</span>
+                {r.loteRateioId && (
+                  <span
+                    title="Este lançamento faz parte de uma nota dividida entre projetos"
+                    style={{
+                      display: 'inline-block', marginLeft: 6,
+                      fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                      background: C.info + '20', color: C.info, border: `1px solid ${C.info}40`,
+                    }}
+                  >🔗 rateio</span>
+                )}
                 {r.planoNome && (
                   <span style={{ display: 'block', color: C.textDim, fontSize: 11 }}>{r.planoNome}</span>
                 )}
@@ -1266,6 +1282,18 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
         />
       )}
 
+      {/* Modal: Dividir Nota entre Projetos (rateio) */}
+      {showRateio && (
+        <ModalRateioLancamento
+          pessoas={pessoas}
+          planosContas={planosContas}
+          centrosCusto={centrosCusto}
+          categoriasCusto={categoriasCusto}
+          onClose={() => setShowRateio(false)}
+          onSuccess={() => { setShowRateio(false); refetch() }}
+        />
+      )}
+
       {/* Modal: Baixa */}
       {baixandoParcela && (
         <ModalBaixa
@@ -1322,6 +1350,213 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
 }
 
 // ─── MODAL: NOVO LANÇAMENTO ───────────────────────────────────────────────────
+
+// ─── MODAL DIVIDIR NOTA ENTRE PROJETOS (RATEIO) ───────────────────────────────
+
+interface RateioItem { centroCustoId: string; categoriaCustoId: string; valor: string }
+const RATEIO_ITEM_VAZIO: RateioItem = { centroCustoId: '', categoriaCustoId: '', valor: '' }
+
+function ModalRateioLancamento({
+  pessoas, planosContas, centrosCusto, categoriasCusto, onClose, onSuccess,
+}: {
+  pessoas:         any[]
+  planosContas:    any[]
+  centrosCusto:    any[]
+  categoriasCusto: any[]
+  onClose:         () => void
+  onSuccess:       () => void
+}) {
+  const [form, setForm] = useState({
+    descricao:   '',
+    documento:   '',
+    pessoaId:    '',
+    emissao:     hoje(),
+    vencimento:  hoje(),
+    observacoes: '',
+  })
+  const [itens, setItens] = useState<RateioItem[]>([{ ...RATEIO_ITEM_VAZIO }, { ...RATEIO_ITEM_VAZIO }])
+  const [valorTotal, setValorTotal] = useState('')
+  const [erro, setErro] = useState('')
+
+  const create = (trpc as any).fin.titulo.criarRateio.useMutation({
+    onSuccess,
+    onError: (e: any) => setErro(e.message ?? 'Erro ao dividir lançamento'),
+  })
+
+  const planosFiltrados = planosContas.filter((p: any) => p.tipo === 'DESPESA' || p.tipo === 'FINANCEIRO')
+  const totalInformado = parseMoeda(valorTotal)
+  const somaItens = itens.reduce((s, it) => s + parseMoeda(it.valor), 0)
+  const diferenca = Math.round((totalInformado - somaItens) * 100) / 100
+
+  function addItem() {
+    setItens(prev => [...prev, { ...RATEIO_ITEM_VAZIO }])
+  }
+  function removerItem(i: number) {
+    setItens(prev => prev.filter((_, j) => j !== i))
+  }
+  function atualizarItem(i: number, campo: keyof RateioItem, valor: string) {
+    setItens(prev => prev.map((it, j) => j === i ? { ...it, [campo]: valor } : it))
+  }
+
+  // Distribui o valor total igualmente entre os itens que ainda não têm valor definido
+  function distribuirIgualmente() {
+    if (totalInformado <= 0 || itens.length === 0) return
+    const valorBase = Math.floor(totalInformado * 100 / itens.length) / 100
+    let acumulado = 0
+    setItens(prev => prev.map((it, i) => {
+      const isLast = i === prev.length - 1
+      const v = isLast ? Math.round((totalInformado - acumulado) * 100) / 100 : valorBase
+      acumulado += v
+      return { ...it, valor: maskMoeda(v) }
+    }))
+  }
+
+  function submit() {
+    setErro('')
+    if (!form.descricao.trim()) return setErro('Descrição é obrigatória')
+    if (!form.vencimento) return setErro('Informe o vencimento')
+    if (itens.length < 2) return setErro('Informe ao menos 2 projetos/centros de custo para dividir')
+
+    const itensValidos = itens.map((it, i) => {
+      if (!it.centroCustoId) { setErro(`Selecione o centro de custo do item ${i + 1}`); return null }
+      const v = parseMoeda(it.valor)
+      if (v <= 0) { setErro(`Informe o valor do item ${i + 1}`); return null }
+      return {
+        centroCustoId:    parseInt(it.centroCustoId),
+        categoriaCustoId: it.categoriaCustoId ? parseInt(it.categoriaCustoId) : undefined,
+        valor:            v,
+      }
+    })
+    if (itensValidos.some(it => it === null)) return
+
+    if (Math.abs(diferenca) > 0.01) {
+      return setErro(`A soma dos itens (${maskMoeda(somaItens)}) não bate com o valor total da nota (${maskMoeda(totalInformado)})`)
+    }
+
+    create.mutate({
+      descricao:   form.descricao.trim(),
+      documento:   form.documento.trim() || undefined,
+      pessoaId:    form.pessoaId ? parseInt(form.pessoaId) : undefined,
+      emissao:     form.emissao,
+      vencimento:  form.vencimento,
+      observacoes: form.observacoes.trim() || undefined,
+      itens:       itensValidos as any,
+    })
+  }
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="📑 Dividir Nota entre Projetos"
+      width={700}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn disabled={create.isLoading} onClick={submit}>
+            {create.isLoading ? 'Salvando...' : `Criar ${itens.length} Lançamentos`}
+          </Btn>
+        </>
+      }
+    >
+      <Alert type="info">
+        Use esta opção quando uma única nota fiscal/compra contiver itens de mais de um projeto.
+        Será criado um lançamento individual para cada projeto, todos vinculados à mesma nota.
+      </Alert>
+
+      {erro && <div style={{ margin: '16px 0' }}><Alert type="danger">{erro}</Alert></div>}
+
+      <FormRow>
+        <Input label="Descrição *" value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} placeholder="Ex: Compra de materiais — NF #1234" />
+        <Input label="Documento / NF" value={form.documento} onChange={e => setForm({ ...form, documento: e.target.value })} />
+      </FormRow>
+
+      <FormRow>
+        <Select
+          label="Fornecedor"
+          value={form.pessoaId}
+          onChange={e => setForm({ ...form, pessoaId: e.target.value })}
+          placeholder="— Selecione (opcional) —"
+          options={pessoas.filter((p: any) => p.isFornecedor).map((p: any) => ({ value: String(p.id), label: p.nome }))}
+        />
+        <InputMoeda label="Valor Total da Nota" value={valorTotal} onChange={setValorTotal} hint="Usado para validar a soma dos itens" />
+      </FormRow>
+
+      <FormRow>
+        <Input label="Data de Emissão *" type="date" value={form.emissao} onChange={e => setForm({ ...form, emissao: e.target.value })} />
+        <Input label="Vencimento *" type="date" value={form.vencimento} onChange={e => setForm({ ...form, vencimento: e.target.value })} />
+      </FormRow>
+
+      <div style={{ borderTop: '1px solid ' + C.border, paddingTop: 16, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
+            Itens — um por Projeto / Centro de Custo
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {totalInformado > 0 && (
+              <Btn size="sm" variant="ghost" onClick={distribuirIgualmente}>Dividir igualmente</Btn>
+            )}
+            <Btn size="sm" variant="ghost" onClick={addItem}>+ Adicionar Item</Btn>
+          </div>
+        </div>
+
+        {itens.map((it, i) => (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr 140px auto',
+            gap: 8, alignItems: 'flex-end', marginBottom: 8,
+          }}>
+            <Select
+              label={`Centro de Custo ${i + 1} *`}
+              value={it.centroCustoId}
+              onChange={e => atualizarItem(i, 'centroCustoId', e.target.value)}
+              placeholder="— Selecione —"
+              options={centrosCusto.map((c: any) => ({ value: String(c.id), label: `${c.codigo} — ${c.nome}` }))}
+            />
+            <Select
+              label="Categoria de Custo"
+              value={it.categoriaCustoId}
+              onChange={e => atualizarItem(i, 'categoriaCustoId', e.target.value)}
+              placeholder="— Opcional —"
+              options={categoriasCusto.map((c: any) => ({ value: String(c.id), label: c.nome }))}
+            />
+            <InputMoeda
+              label="Valor *"
+              value={it.valor}
+              onChange={v => atualizarItem(i, 'valor', v)}
+            />
+            <div style={{ paddingBottom: 8 }}>
+              <Btn size="sm" variant="danger" onClick={() => removerItem(i)} disabled={itens.length <= 2} title="Remover item">✕</Btn>
+            </div>
+          </div>
+        ))}
+
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', marginTop: 12,
+          padding: '10px 14px', borderRadius: 8, background: C.bg, border: '1px solid ' + C.border,
+        }}>
+          <span style={{ color: C.textMuted, fontSize: 12 }}>Soma dos itens</span>
+          <span style={{ color: Math.abs(diferenca) > 0.01 && totalInformado > 0 ? C.danger : C.success, fontWeight: 700 }}>
+            {maskMoeda(somaItens)}
+            {totalInformado > 0 && Math.abs(diferenca) > 0.01 && (
+              <span style={{ marginLeft: 8, fontSize: 11, color: C.danger }}>
+                (diferença de {maskMoeda(Math.abs(diferenca))})
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <Textarea
+          label="Observações"
+          value={form.observacoes}
+          onChange={e => setForm({ ...form, observacoes: e.target.value })}
+          style={{ minHeight: 60 }}
+        />
+      </div>
+    </Modal>
+  )
+}
 
 function ModalNovoLancamento({
   tipo, contas, pessoas, planosContas, centrosCusto, categoriasCusto, onClose, onSuccess,

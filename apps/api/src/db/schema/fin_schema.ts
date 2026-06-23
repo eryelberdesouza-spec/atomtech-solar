@@ -127,6 +127,7 @@ export const finTitulo = mysqlTable('fin_titulo', {
   planoContasId:  int('plano_contas_id').references(() => finPlanoContas.id),
   centroCustoId:  int('centro_custo_id').references(() => finCentroCusto.id),
   categoriaCustoId: int('categoria_custo_id').references(() => finCategoriaCusto.id),
+  loteRateioId:   varchar('lote_rateio_id', { length: 40 }),  // agrupa títulos gerados a partir de uma mesma NF rateada entre projetos
   propostaId:     int('proposta_id'),   // link externo para proposta aceita
   valorOriginal:  decimal('valor_original', { precision: 12, scale: 2 }).notNull(),
   emissao:        date('emissao').notNull(),
@@ -138,6 +139,7 @@ export const finTitulo = mysqlTable('fin_titulo', {
   idxEmpresa: index('idx_fin_titulo_empresa').on(t.empresaId),
   idxTipo:    index('idx_fin_titulo_tipo').on(t.tipo),
   idxPessoa:  index('idx_fin_titulo_pessoa').on(t.pessoaId),
+  idxLoteRateio: index('idx_fin_titulo_lote_rateio').on(t.loteRateioId),
 }))
 
 // ─── PARCELA ──────────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { eq, and, like, or, asc, desc, sql, isNull, gte, lte, lt, ne, inArray } from 'drizzle-orm'
 import { protectedProcedure } from './trpc'
 import { TRPCError } from '@trpc/server'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import {
   finContaBancaria,
   finPlanoContas,
@@ -762,6 +762,7 @@ const tituloRouter = router({
           centroNome:    finCentroCusto.nome,
           categoriaCustoId:   finTitulo.categoriaCustoId,
           categoriaCustoNome: finCategoriaCusto.nome,
+          loteRateioId:  finTitulo.loteRateioId,
           propostaId:    finTitulo.propostaId,
         })
         .from(finParcela)
@@ -904,6 +905,77 @@ const tituloRouter = router({
       )
 
       return { tituloId, ok: true }
+    }),
+
+  // Lista os demais títulos gerados a partir da mesma nota/compra rateada
+  porLote: protectedProcedure
+    .input(z.object({ loteRateioId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      return ctx.db
+        .select({
+          tituloId:   finTitulo.id,
+          descricao:  finTitulo.descricao,
+          valor:      finTitulo.valorOriginal,
+          centroNome: finCentroCusto.nome,
+          categoriaNome: finCategoriaCusto.nome,
+        })
+        .from(finTitulo)
+        .leftJoin(finCentroCusto, eq(finTitulo.centroCustoId, finCentroCusto.id))
+        .leftJoin(finCategoriaCusto, eq(finTitulo.categoriaCustoId, finCategoriaCusto.id))
+        .where(and(eq(finTitulo.loteRateioId, input.loteRateioId), eq(finTitulo.empresaId, empId)))
+    }),
+
+  // Divide uma única nota/compra em vários títulos PAGAR, um por projeto/centro de custo,
+  // mantendo um vínculo (loteRateioId) entre eles para identificar a origem comum.
+  criarRateio: protectedProcedure
+    .input(z.object({
+      descricao:   z.string().min(1),
+      documento:   z.string().nullish(),
+      pessoaId:    z.number().nullish(),
+      emissao:     z.string(),      // YYYY-MM-DD
+      vencimento:  z.string(),      // YYYY-MM-DD — única data para todas as parcelas do rateio
+      observacoes: z.string().nullish(),
+      itens: z.array(z.object({
+        centroCustoId:    z.number(),
+        categoriaCustoId: z.number().nullish(),
+        planoContasId:    z.number().nullish(),
+        valor:            z.number().positive(),
+      })).min(2),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const loteId = randomUUID()
+
+      const tituloIds: number[] = []
+      for (const item of input.itens) {
+        const [res] = await ctx.db.insert(finTitulo).values({
+          empresaId:        empId,
+          tipo:             'PAGAR',
+          descricao:        input.descricao,
+          documento:        input.documento ?? null,
+          pessoaId:         input.pessoaId ?? null,
+          planoContasId:    item.planoContasId ?? null,
+          centroCustoId:    item.centroCustoId,
+          categoriaCustoId: item.categoriaCustoId ?? null,
+          loteRateioId:     loteId,
+          valorOriginal:    item.valor.toFixed(2),
+          emissao:          input.emissao as any,
+          observacoes:      input.observacoes ?? null,
+          ativo:            true,
+        })
+        const tituloId = (res as any).insertId as number
+        await ctx.db.insert(finParcela).values({
+          tituloId,
+          numero:     1,
+          valor:      item.valor.toFixed(2),
+          vencimento: input.vencimento as any,
+          status:     'ABERTA',
+        })
+        tituloIds.push(tituloId)
+      }
+
+      return { ok: true, loteId, tituloIds }
     }),
 
   // Atualiza título + parcelas ABERTAS
