@@ -1646,6 +1646,12 @@ export function PropostaDetailPage() {
                     style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.danger, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
                     ✕ Recusar Proposta
                   </button>
+                  {(proposta.status === 'rascunho' || proposta.status === 'enviada') && (
+                    <button onClick={() => { handleStatus('expirada'); setShowMobileMenu(false) }}
+                      style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: '#FFA726', fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
+                      ⏳ Expirar Proposta
+                    </button>
+                  )}
                   <button onClick={() => { setShowEditDados(true); setShowMobileMenu(false) }}
                     style={{ display: 'block', width: '100%', padding: '12px 16px', textAlign: 'left', background: 'none', border: 'none', color: C.textMuted, fontSize: 13, cursor: 'pointer', borderBottom: `1px solid ${C.darkBorder}30` }}>
                     ✏ Editar Proposta
@@ -1695,6 +1701,11 @@ export function PropostaDetailPage() {
             )}
             <Btn variant="ghost" size="sm" onClick={() => handleStatus('recusada')}
               style={{ color: C.danger, borderColor: C.danger + '50' }}>Recusar</Btn>
+            {(proposta.status === 'rascunho' || proposta.status === 'enviada') && (
+              <Btn variant="ghost" size="sm"
+                onClick={() => { if (window.confirm('Marcar esta proposta como expirada?\n\nUse quando o prazo de validade não é mais válido para fechamento.')) handleStatus('expirada') }}
+                style={{ color: '#FFA726', borderColor: '#FFA72650' }}>⏳ Expirar</Btn>
+            )}
             <Btn variant="ghost" size="sm" onClick={() => setShowEditDados(true)}
               style={{ color: C.textMuted, borderColor: C.darkBorder }}>✏ Editar</Btn>
             <Btn variant="ghost" size="sm" onClick={() => setShowAltCliente(true)}

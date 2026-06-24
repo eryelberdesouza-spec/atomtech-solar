@@ -74,6 +74,21 @@ const DESC_PROJETO             = 'Projeto de Engenharia'
 
 const DESCRICOES_ADICIONAIS = [DESC_INSTALACAO_MODULOS, DESC_INSTALACAO_INVERSOR, DESC_PROJETO]
 
+// ─── AUTO-EXPIRAÇÃO ───────────────────────────────────────────────────────────
+// Propostas em rascunho/enviada cuja data de validade já passou são marcadas
+// como 'expirada' de forma lazy, na primeira leitura após o vencimento (não há
+// cron na infra atual). Idempotente e barato — usa o índice de status.
+async function expirarPropostasVencidas(db: any, empresaId: number) {
+  await db.execute(sql`
+    UPDATE proposta
+    SET status = 'expirada'
+    WHERE empresa_id = ${empresaId}
+      AND status IN ('rascunho', 'enviada')
+      AND data_validade IS NOT NULL
+      AND data_validade < CURDATE()
+  `)
+}
+
 // ─── ROUTER ───────────────────────────────────────────────────────────────────
 
 export const propostaRouter = router({
@@ -82,7 +97,7 @@ export const propostaRouter = router({
   list: protectedProcedure
     .input(
       z.object({
-        status: z.enum(['rascunho', 'enviada', 'aceita', 'recusada', 'expirada']).optional(),
+        status: z.enum(['rascunho', 'enviada', 'aceita', 'recusada', 'expirada', 'cancelada']).optional(),
         clienteId: z.number().optional(),
         usuarioId: z.number().optional(),
         isTemplate: z.boolean().optional(),
@@ -94,6 +109,8 @@ export const propostaRouter = router({
       const { empresaId } = ctx.usuario
       const { pagina = 1, porPagina = 20, status, clienteId, isTemplate } = input ?? {}
       const offset = (pagina - 1) * porPagina
+
+      await expirarPropostasVencidas(ctx.db, empresaId)
 
       // Subquery: soma dos itens de serviço por proposta
       const itemServicoSum = ctx.db
@@ -148,6 +165,8 @@ export const propostaRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
       const { empresaId } = ctx.usuario
+
+      await expirarPropostasVencidas(ctx.db, empresaId)
 
       const [prop] = await ctx.db
         .select()

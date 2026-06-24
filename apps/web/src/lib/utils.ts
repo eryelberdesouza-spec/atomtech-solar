@@ -69,6 +69,7 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
   aceita:    { label: 'Aceita',    color: '#66BB6A', bg: '#1A3A28' },
   recusada:  { label: 'Recusada',  color: '#EF5350', bg: '#3A1A1A' },
   expirada:  { label: 'Expirada',  color: '#FFA726', bg: '#2A2A1A' },
+  cancelada: { label: 'Cancelada', color: '#9CA3AF', bg: '#2A2A2E' },
 }
 
 // Tipo de telhado

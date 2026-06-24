@@ -250,7 +250,7 @@ export const proposta = mysqlTable('proposta', {
   clienteId: int('cliente_id').notNull().references(() => cliente.id),
   faturaId: int('fatura_id').references(() => fatura.id),
   usuarioId: int('usuario_id').references(() => usuario.id),
-  status: mysqlEnum('status', ['rascunho','enviada','aceita','recusada','expirada']).default('rascunho').notNull(),
+  status: mysqlEnum('status', ['rascunho','enviada','aceita','recusada','expirada','cancelada']).default('rascunho').notNull(),
   versao: int('versao').default(1).notNull(),
   propostaPaiId: int('proposta_pai_id'),
   templateOrigemId: int('template_origem_id'),

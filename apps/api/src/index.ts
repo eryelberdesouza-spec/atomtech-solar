@@ -728,6 +728,23 @@ app.get('/run-migration-fin-alerta', async (_, res) => {
   }
 })
 
+// ── Migração: garante que proposta.status aceite 'expirada' e 'cancelada' ────
+app.get('/run-migration-proposta-status', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      ALTER TABLE proposta
+      MODIFY COLUMN status ENUM('rascunho','enviada','aceita','recusada','expirada','cancelada')
+      NOT NULL DEFAULT 'rascunho'
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'proposta.status agora aceita expirada/cancelada' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: cria fin_categoria_custo + fin_projeto + fin_titulo.categoria_custo_id ──
 app.get('/run-migration-projeto', async (_, res) => {
   try {
