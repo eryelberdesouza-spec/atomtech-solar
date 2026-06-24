@@ -466,6 +466,101 @@ const pessoaRouter = router({
         .orderBy(asc(finPessoa.nome))
     }),
 
+  // Visão completa da pessoa — cadastro + lançamentos financeiros + propostas/contratos
+  // vinculados (cruza por CPF/CNPJ com a base de Propostas, mesmo banco de dados).
+  detalhe: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [pessoa] = await ctx.db
+        .select()
+        .from(finPessoa)
+        .where(and(eq(finPessoa.id, input.id), eq(finPessoa.empresaId, empId)))
+        .limit(1)
+      if (!pessoa) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      const titulos = await ctx.db
+        .select({
+          id:            finTitulo.id,
+          tipo:          finTitulo.tipo,
+          descricao:     finTitulo.descricao,
+          valorOriginal: finTitulo.valorOriginal,
+          emissao:       finTitulo.emissao,
+        })
+        .from(finTitulo)
+        .where(and(
+          eq(finTitulo.pessoaId, input.id),
+          eq(finTitulo.empresaId, empId),
+          eq(finTitulo.ativo, true),
+        ))
+        .orderBy(desc(finTitulo.emissao))
+        .limit(50)
+
+      const parcelasAbertas = titulos.length > 0
+        ? await ctx.db
+            .select({
+              tituloId: finParcela.tituloId,
+              valor:    finParcela.valor,
+              status:   finParcela.status,
+              tipo:     finTitulo.tipo,
+            })
+            .from(finParcela)
+            .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+            .where(and(
+              eq(finTitulo.pessoaId, input.id),
+              eq(finTitulo.empresaId, empId),
+              eq(finParcela.status, 'ABERTA'),
+            ))
+        : []
+
+      const aReceberAberto = parcelasAbertas.filter(p => p.tipo === 'RECEBER').reduce((s, p) => s + Number(p.valor), 0)
+      const aPagarAberto   = parcelasAbertas.filter(p => p.tipo === 'PAGAR').reduce((s, p) => s + Number(p.valor), 0)
+
+      let propostas: any[] = []
+      if (pessoa.cpfCnpj) {
+        const result = await ctx.db.execute(sql`
+          SELECT
+            p.id, p.numero, p.tipo_proposta AS tipoProposta, p.titulo_servico AS tituloServico,
+            p.status, p.data_emissao AS dataEmissao, p.contrato_formalizado AS contratoFormalizado,
+            prec.preco_final AS valorTotal,
+            c.distribuidora AS distribuidora, c.endereco AS clienteEndereco,
+            c.cidade AS clienteCidade, c.estado AS clienteEstado
+          FROM cliente c
+          INNER JOIN proposta p ON p.cliente_id = c.id
+          LEFT JOIN precificacao prec ON prec.proposta_id = p.id
+          WHERE c.empresa_id = ${empId} AND c.cpf_cnpj = ${pessoa.cpfCnpj}
+            AND (p.is_template IS NULL OR p.is_template = 0)
+          ORDER BY p.data_emissao DESC
+        `) as any
+        const rows: any[] = Array.isArray(result) && Array.isArray(result[0])
+          ? result[0]
+          : Array.isArray(result) ? result : []
+        propostas = rows.map(r => ({
+          id:                  Number(r.id),
+          numero:               String(r.numero ?? ''),
+          tipoProposta:         String(r.tipoProposta ?? ''),
+          tituloServico:        r.tituloServico ? String(r.tituloServico) : null,
+          status:               String(r.status ?? ''),
+          dataEmissao:          r.dataEmissao ? String(r.dataEmissao).slice(0, 10) : null,
+          contratoFormalizado:  Number(r.contratoFormalizado) === 1,
+          valorTotal:           r.valorTotal ? Number(r.valorTotal) : null,
+          distribuidora:        r.distribuidora ? String(r.distribuidora) : null,
+          clienteEndereco:      r.clienteEndereco ? String(r.clienteEndereco) : null,
+          clienteCidade:        r.clienteCidade ? String(r.clienteCidade) : null,
+          clienteEstado:        r.clienteEstado ? String(r.clienteEstado) : null,
+        }))
+      }
+
+      return {
+        pessoa,
+        titulos: titulos.map(t => ({ ...t, valorOriginal: Number(t.valorOriginal), emissao: String(t.emissao).slice(0, 10) })),
+        aReceberAberto,
+        aPagarAberto,
+        propostas,
+      }
+    }),
+
   create: protectedProcedure
     .input(z.object({
       tipoPessoa:    z.enum(['FISICA', 'JURIDICA']),

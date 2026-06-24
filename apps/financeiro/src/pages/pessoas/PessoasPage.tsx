@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import {
   PageWrapper, SectionHeader, Card, Btn, Table, Badge, Modal,
@@ -56,6 +57,7 @@ const EMPTY: PessoaForm = {
 }
 
 export function PessoasPage() {
+  const navigate = useNavigate()
   const [aba, setAba] = useState('todos')
   const [busca, setBusca] = useState('')
   const [modal, setModal] = useState(false)
@@ -135,6 +137,7 @@ export function PessoasPage() {
     status: <Badge status={p.ativo ? 'ativo' : 'inativo'} />,
     acoes: (
       <div style={{ display: 'flex', gap: 6 }}>
+        <Btn size="sm" variant="ghost" onClick={() => navigate(`/pessoas/${p.id}`)}>👁 Ver</Btn>
         <Btn size="sm" variant="ghost" onClick={() => openEdit(p)}>Editar</Btn>
         <Btn size="sm" variant={p.ativo ? 'danger' : 'success'} onClick={() => toggle.mutate({ id: p.id, ativo: !p.ativo })}>
           {p.ativo ? 'Inativar' : 'Ativar'}
@@ -188,7 +191,7 @@ export function PessoasPage() {
               { key: 'contato', label: 'Contato',      width: '200px' },
               { key: 'tipo',    label: 'Tipo',         width: '160px' },
               { key: 'status',  label: 'Status',       width: '90px' },
-              { key: 'acoes',   label: '',             width: '160px', align: 'right' },
+              { key: 'acoes',   label: '',             width: '220px', align: 'right' },
             ]}
             rows={rows}
           />

@@ -10,6 +10,7 @@ import { LancamentosPage } from './pages/LancamentosPage'
 import { FluxoCaixaPage } from './pages/FluxoCaixaPage'
 import { DREPage } from './pages/DREPage'
 import { PessoasPage } from './pages/pessoas/PessoasPage'
+import { PessoaDetailPage } from './pages/pessoas/PessoaDetailPage'
 import { ConfiguracoesPage } from './pages/config/ConfiguracoesPage'
 import { PropostasPage } from './pages/PropostasPage'
 import { ExtratoPage } from './pages/ExtratoPage'
@@ -139,6 +140,7 @@ export default function App() {
               <Route path="/fluxo-caixa" element={<FluxoCaixaPage />} />
               <Route path="/dre" element={<DREPage />} />
               <Route path="/pessoas" element={<PessoasPage />} />
+              <Route path="/pessoas/:id" element={<PessoaDetailPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
               <Route path="/propostas" element={<PropostasPage />} />
               <Route path="/extrato" element={<ExtratoPage />} />
