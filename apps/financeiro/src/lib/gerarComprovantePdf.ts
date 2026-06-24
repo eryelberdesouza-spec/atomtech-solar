@@ -141,15 +141,35 @@ function enderecoPessoa(t: TituloInfo): string {
   return partes.join(', ') || '—'
 }
 
+// ─── Conversão de imagem para base64 (evita logo invisível no PDF) ────────────
+// Imagens carregadas por URL externa podem não terminar de carregar a tempo do
+// print/PDF (timing, CORS). Convertendo para data URI, o logo fica embutido no
+// HTML e sempre aparece, independente de rede.
+async function toDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
 // ─── Cabeçalho da empresa ─────────────────────────────────────────────────────
 
-function headerHtml(empresa: EmpresaInfo): string {
+function headerHtml(empresa: EmpresaInfo, logoDataUrl: string | null): string {
   const now = new Date()
   const emitidoEm = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
-  const logoTag = empresa.logoUrl
-    ? `<img src="${empresa.logoUrl}" alt="Logo" style="height:56px;object-fit:contain;" />`
-    : `<div style="width:56px;height:56px;background:#1E40AF;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:20px;">A</div>`
+  const logoTag = logoDataUrl
+    ? `<img src="${logoDataUrl}" alt="Logo" style="height:56px;object-fit:contain;" />`
+    : `<div style="width:56px;height:56px;background:#1E40AF;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:20px;">${(empresa.nome || 'A')[0].toUpperCase()}</div>`
 
   // Endereço da empresa
   const endEmp: string[] = []
@@ -205,6 +225,22 @@ function campo(label: string, value: string | null | undefined, destaque = false
 
 function secaoTitulo(label: string): string {
   return `<div style="font-size:9px;font-weight:800;color:#1E40AF;text-transform:uppercase;letter-spacing:0.1em;margin:14px 0 6px;border-left:3px solid #1E40AF;padding-left:8px;">${label}</div>`
+}
+
+function avisoFaltante(msg: string): string {
+  return `
+    <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:6px;margin:2px 0 4px;">
+      <span style="font-size:12px;">⚠</span>
+      <span style="font-size:11px;color:#92400E;font-weight:600;">${msg}</span>
+    </div>
+  `
+}
+
+// Agrupa campos sob um título; se nenhum campo tiver conteúdo, mostra um aviso
+// em vez de deixar o título "órfão" sem nenhuma informação abaixo.
+function secao(label: string, campos: string[], avisoSeVazio: string): string {
+  const conteudo = campos.filter(Boolean).join('')
+  return secaoTitulo(label) + (conteudo || avisoFaltante(avisoSeVazio))
 }
 
 // ─── Bloco de agendamento ─────────────────────────────────────────────────────
@@ -269,28 +305,32 @@ function htmlPagamento(
 
     ${agendamentoHtml(agendamento)}
 
-    ${secaoTitulo('Beneficiário / Fornecedor')}
-    ${campo('Nome / Razão Social', titulo.pessoaNome)}
-    ${campo('Nome Fantasia', titulo.pessoaFantasia)}
-    ${campo('CPF / CNPJ', fmtCnpj(titulo.pessoaCpfCnpj))}
-    ${campo('Telefone', titulo.pessoaTelefone)}
-    ${campo('E-mail', titulo.pessoaEmail)}
-    ${campo('Endereço', enderecoPessoa(titulo))}
+    ${secao('Beneficiário / Fornecedor', [
+      campo('Nome / Razão Social', titulo.pessoaNome),
+      campo('Nome Fantasia', titulo.pessoaFantasia),
+      campo('CPF / CNPJ', fmtCnpj(titulo.pessoaCpfCnpj)),
+      campo('Telefone', titulo.pessoaTelefone),
+      campo('E-mail', titulo.pessoaEmail),
+      campo('Endereço', enderecoPessoa(titulo)),
+    ], 'Nenhum beneficiário/fornecedor vinculado a este lançamento. Vincule um cadastro para identificar quem deve receber o pagamento.')}
 
-    ${secaoTitulo('Dados Bancários para Pagamento')}
-    ${campo('Banco', titulo.pessoaBanco)}
-    ${campo('Tipo de Chave PIX', titulo.pessoaTipoPix)}
-    ${campo('Chave PIX', titulo.pessoaChavePix)}
-    ${campo('Forma de Pagamento', titulo.pessoaTipoPagamento)}
+    ${secao('Dados Bancários para Pagamento', [
+      campo('Banco', titulo.pessoaBanco),
+      campo('Tipo de Chave PIX', titulo.pessoaTipoPix),
+      campo('Chave PIX', titulo.pessoaChavePix),
+      campo('Forma de Pagamento', titulo.pessoaTipoPagamento),
+    ], 'Nenhum dado bancário cadastrado para este beneficiário. Atualize o cadastro em Pessoas antes de efetuar o pagamento.')}
 
-    ${secaoTitulo('Informações do Lançamento')}
-    ${campo('Plano de Contas', titulo.planoNome)}
-    ${campo('Centro de Custo', titulo.centroNome)}
-    ${campo('Parcela', `${parcela.numero}ª parcela`)}
-    ${campo('Vencimento', fmtData(parcela.vencimento))}
-    ${parcela.dataPagamento ? campo('Data de Pagamento', fmtData(parcela.dataPagamento)) : ''}
-    ${campo('Valor', fmtBRL(parcela.valorPago ?? parcela.valor), true)}
-    ${titulo.observacoes ? campo('Observações do Lançamento', titulo.observacoes) : ''}
+    ${secao('Informações do Lançamento', [
+      campo('Descrição', titulo.descricao),
+      campo('Plano de Contas', titulo.planoNome),
+      campo('Centro de Custo', titulo.centroNome),
+      campo('Parcela', `${parcela.numero}ª parcela`),
+      campo('Vencimento', fmtData(parcela.vencimento)),
+      parcela.dataPagamento ? campo('Data de Pagamento', fmtData(parcela.dataPagamento)) : '',
+      campo('Valor', fmtBRL(parcela.valorPago ?? parcela.valor), true),
+      titulo.observacoes ? campo('Observações do Lançamento', titulo.observacoes) : '',
+    ], 'Sem informações adicionais de plano de contas ou centro de custo para este lançamento.')}
 
     <!-- Assinaturas -->
     <div style="display:flex;gap:40px;margin-top:48px;">
@@ -365,23 +405,26 @@ function htmlRecebimento(
 
     ${agendamentoHtml(agendamento)}
 
-    ${secaoTitulo('Dados do Cliente')}
-    ${campo('Nome / Razão Social', titulo.pessoaNome)}
-    ${campo('Nome Fantasia', titulo.pessoaFantasia)}
-    ${campo('CPF / CNPJ', fmtCnpj(titulo.pessoaCpfCnpj))}
-    ${campo('Telefone', titulo.pessoaTelefone)}
-    ${campo('E-mail', titulo.pessoaEmail)}
-    ${campo('Endereço', enderecoPessoa(titulo))}
+    ${secao('Dados do Cliente', [
+      campo('Nome / Razão Social', titulo.pessoaNome),
+      campo('Nome Fantasia', titulo.pessoaFantasia),
+      campo('CPF / CNPJ', fmtCnpj(titulo.pessoaCpfCnpj)),
+      campo('Telefone', titulo.pessoaTelefone),
+      campo('E-mail', titulo.pessoaEmail),
+      campo('Endereço', enderecoPessoa(titulo)),
+    ], 'Nenhum cliente vinculado a este lançamento. Vincule um cadastro para identificar quem deve efetuar o pagamento.')}
 
-    ${secaoTitulo('Dados Financeiros')}
-    ${campo('Plano de Contas', titulo.planoNome)}
-    ${campo('Centro de Custo', titulo.centroNome)}
-    ${campo('Forma de Pagamento Acordada', titulo.pessoaTipoPagamento)}
-    ${campo('Total de Parcelas', `${totalParcelas}x`)}
-    ${campo('Valor Total', fmtBRL(valorTotal), true)}
-    ${valorRecebido > 0 ? campo('Valor Recebido', fmtBRL(valorRecebido)) : ''}
-    ${valorPendente > 0 ? campo('Valor Pendente', fmtBRL(valorPendente), true) : ''}
-    ${titulo.observacoes ? campo('Observações', titulo.observacoes) : ''}
+    ${secao('Dados Financeiros', [
+      campo('Descrição', titulo.descricao),
+      campo('Plano de Contas', titulo.planoNome),
+      campo('Centro de Custo', titulo.centroNome),
+      campo('Forma de Pagamento Acordada', titulo.pessoaTipoPagamento),
+      campo('Total de Parcelas', `${totalParcelas}x`),
+      campo('Valor Total', fmtBRL(valorTotal), true),
+      valorRecebido > 0 ? campo('Valor Recebido', fmtBRL(valorRecebido)) : '',
+      valorPendente > 0 ? campo('Valor Pendente', fmtBRL(valorPendente), true) : '',
+      titulo.observacoes ? campo('Observações', titulo.observacoes) : '',
+    ], 'Sem informações adicionais de plano de contas ou centro de custo para este lançamento.')}
 
     <!-- Tabela de parcelas -->
     <div style="margin-top:16px;">
@@ -413,7 +456,8 @@ function htmlRecebimento(
       <div style="font-size:9px;font-weight:800;color:#065F46;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Dados para Pagamento — ${empresa.nome}</div>
       ${empresa.bancoPixChave ? `<div style="font-size:11px;color:#1E293B;font-weight:600;">PIX (${empresa.bancoPixTipo ?? ''}): <span style="color:#065F46;">${empresa.bancoPixChave}</span></div>` : ''}
       ${empresa.bancoNome ? `<div style="font-size:10.5px;color:#475569;margin-top:3px;">Banco: ${empresa.bancoNome}${empresa.bancoAgencia ? ` — Ag: ${empresa.bancoAgencia}` : ''}${empresa.bancoConta ? ` — Conta: ${empresa.bancoConta}` : ''}${empresa.bancoTipo ? ` (${empresa.bancoTipo})` : ''}</div>` : ''}
-    </div>` : ''}
+    </div>` : `
+    <div style="margin-top:16px;">${avisoFaltante('Nenhum dado bancário cadastrado para a empresa. Configure em Configurações para que o cliente saiba onde efetuar o pagamento.')}</div>`}
 
     <!-- Assinaturas -->
     <div style="display:flex;gap:40px;margin-top:40px;">
@@ -429,7 +473,7 @@ function htmlRecebimento(
 
 // ─── FUNÇÃO PRINCIPAL ─────────────────────────────────────────────────────────
 
-export function gerarComprovantePdf(params: {
+export async function gerarComprovantePdf(params: {
   tipo:          'PAGAR' | 'RECEBER'
   empresa:       EmpresaInfo
   titulo:        TituloInfo
@@ -439,6 +483,17 @@ export function gerarComprovantePdf(params: {
 }) {
   const { tipo, empresa, titulo, parcelas, parcelaAtual, agendamento } = params
   const parcela = parcelaAtual ?? parcelas[0]
+
+  // Abre a janela ANTES de qualquer await — navegadores bloqueiam popups
+  // abertos fora do gesto de clique direto (ex: depois de um await).
+  const win = window.open('', '_blank', 'width=880,height=940,scrollbars=yes')
+  if (!win) {
+    alert('Por favor, permita popups para gerar o comprovante.')
+    return
+  }
+  win.document.write('<p style="font-family:sans-serif;padding:24px;color:#64748B;">Gerando comprovante…</p>')
+
+  const logoDataUrl = empresa.logoUrl ? await toDataUrl(empresa.logoUrl) : null
 
   const conteudo = tipo === 'PAGAR'
     ? htmlPagamento(empresa, titulo, parcela, agendamento)
@@ -473,7 +528,7 @@ export function gerarComprovantePdf(params: {
       </style>
     </head>
     <body>
-      ${headerHtml(empresa)}
+      ${headerHtml(empresa, logoDataUrl)}
       ${conteudo}
 
       <div style="margin-top:28px;padding-top:12px;border-top:1px solid #E2E8F0;text-align:center;font-size:9px;color:#94A3B8;">
@@ -495,11 +550,7 @@ export function gerarComprovantePdf(params: {
     </html>
   `
 
-  const win = window.open('', '_blank', 'width=880,height=940,scrollbars=yes')
-  if (!win) {
-    alert('Por favor, permita popups para gerar o comprovante.')
-    return
-  }
+  win.document.open()
   win.document.write(html)
   win.document.close()
 }
