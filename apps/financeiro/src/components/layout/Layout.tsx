@@ -198,8 +198,8 @@ export function Layout() {
           </div>
         )}
 
-        {/* Nav */}
-        <nav style={{ padding: '12px 8px', flex: 1 }}>
+        {/* Nav — overflowY + minHeight:0 garantem rolagem própria em telas baixas (notebook) */}
+        <nav style={{ padding: '12px 8px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {!collapsed && (
             <div style={{
               fontSize: 9, color: C.textDim, fontWeight: 700,
