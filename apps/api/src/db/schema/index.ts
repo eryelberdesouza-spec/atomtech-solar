@@ -545,6 +545,20 @@ export const osMarco = mysqlTable('os_marco', {
   createdAt:       timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
 })
 
+export const osEtiqueta = mysqlTable('os_etiqueta', {
+  id:        int('id').primaryKey().autoincrement(),
+  empresaId: int('empresa_id').notNull(),
+  nome:      varchar('nome', { length: 40 }).notNull(),
+  cor:       varchar('cor', { length: 7 }).notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
+
+export const osEtiquetaLink = mysqlTable('os_etiqueta_link', {
+  id:             int('id').primaryKey().autoincrement(),
+  ordemServicoId: int('ordem_servico_id').notNull(),
+  etiquetaId:     int('etiqueta_id').notNull(),
+})
+
 // ─── FINANCEIRO ──────────────────────────────────────────────────────────────
 export * from './fin_schema'
 

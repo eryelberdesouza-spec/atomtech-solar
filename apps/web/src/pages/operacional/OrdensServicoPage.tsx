@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Spinner } from '../../components/ui'
@@ -11,6 +13,8 @@ const STATUS_OS = [
   { id: 'concluida',    label: 'Concluída',    color: '#3EBB7A', icon: '✅' },
   { id: 'cancelada',    label: 'Cancelada',    color: '#F85149', icon: '✕' },
 ]
+
+const CORES_ETIQUETA = ['#58A6FF', '#F5A623', '#3EBB7A', '#F85149', '#A371F7', '#39C5CF', '#FF7B72']
 
 function ProgressBar({ feitos, total }: { feitos: number; total: number }) {
   const pct = total > 0 ? Math.round((feitos / total) * 100) : 0
@@ -301,21 +305,174 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
   )
 }
 
-function OSCard({ os, onClick }: { os: any; onClick: () => void }) {
+// ─── Modal de Etiquetas ──────────────────────────────────────────────────────
+
+function ModalEtiquetasOS({ os, onClose }: { os: any; onClose: () => void }) {
+  const isMobile = useIsMobile()
+  const [aba, setAba] = useState<'aplicar' | 'gerenciar'>('aplicar')
+  const [novoNome, setNovoNome] = useState('')
+  const [novaCor, setNovaCor] = useState(CORES_ETIQUETA[0])
+  const [editandoId, setEditandoId] = useState<number | null>(null)
+  const [editNome, setEditNome] = useState('')
+  const [editCor, setEditCor] = useState('')
+
+  const utils = (trpc as any).useUtils()
+  const { data: etiquetas = [] } = (trpc as any).os.etiqueta.list.useQuery()
+  const criar       = (trpc as any).os.etiqueta.criar.useMutation({ onSuccess: () => utils.os.etiqueta.list.invalidate() })
+  const atualizar   = (trpc as any).os.etiqueta.atualizar.useMutation({ onSuccess: () => utils.os.etiqueta.list.invalidate() })
+  const excluir     = (trpc as any).os.etiqueta.excluir.useMutation({ onSuccess: () => { utils.os.etiqueta.list.invalidate(); utils.os.list.invalidate() } })
+  const vincular    = (trpc as any).os.etiqueta.vincular.useMutation({ onSuccess: () => utils.os.list.invalidate() })
+  const desvincular = (trpc as any).os.etiqueta.desvincular.useMutation({ onSuccess: () => utils.os.list.invalidate() })
+
+  const idsAtuais: number[] = (os.etiquetas ?? []).map((e: any) => e.id)
+
+  const toggleEtiqueta = (etId: number) => {
+    if (idsAtuais.includes(etId)) desvincular.mutate({ ordemServicoId: os.id, etiquetaId: etId })
+    else vincular.mutate({ ordemServicoId: os.id, etiquetaId: etId })
+  }
+
+  const criarEtiqueta = () => {
+    if (!novoNome.trim()) return
+    criar.mutate({ nome: novoNome.trim(), cor: novaCor })
+    setNovoNome('')
+  }
+
+  const salvarEdicao = () => {
+    if (editandoId == null) return
+    atualizar.mutate({ id: editandoId, nome: editNome.trim(), cor: editCor })
+    setEditandoId(null)
+  }
+
+  const inputStyle = {
+    padding: '7px 10px', borderRadius: 7, border: '1px solid #1E3050',
+    background: '#0C1828', color: '#C8D8EC', fontSize: 12, fontFamily: 'inherit',
+    outline: 'none', width: '100%', boxSizing: 'border-box' as const,
+  }
+
+  const ColorPicker = ({ value, onChange }: { value: string; onChange: (c: string) => void }) => (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {CORES_ETIQUETA.map(c => (
+        <button key={c} onClick={() => onChange(c)} type="button"
+          style={{ width: 22, height: 22, borderRadius: 6, background: c, border: value === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', boxShadow: value === c ? '0 0 0 1px #1E3050' : 'none' }} />
+      ))}
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid #1E3050', padding: 0, cursor: 'pointer', background: 'transparent' }} />
+    </div>
+  )
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#000000CC', zIndex: 3000, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 24 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#0F1A29', border: '1px solid #1E3050', borderRadius: isMobile ? '16px 16px 0 0' : 14, width: '100%', maxWidth: isMobile ? '100%' : 420, maxHeight: isMobile ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: isMobile ? '14px 16px' : '16px 20px', borderBottom: '1px solid #1E3050', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 800, margin: 0 }}>🏷️ Etiquetas — {os.numero}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4A6080', fontSize: 18, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', borderBottom: '1px solid #1E3050', padding: '0 20px' }}>
+          {([['aplicar', 'Aplicar'], ['gerenciar', 'Gerenciar']] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setAba(id)}
+              style={{ padding: '9px 14px', border: 'none', borderBottom: `2px solid ${aba === id ? '#F5A623' : 'transparent'}`, background: 'none', color: aba === id ? '#F5A623' : '#4A6080', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: isMobile ? '14px 16px' : '16px 20px', overflowY: 'auto', flex: 1 }}>
+          {aba === 'aplicar' && (
+            <div>
+              {etiquetas.length === 0 && (
+                <div style={{ color: '#4A6080', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Nenhuma etiqueta criada. Vá em "Gerenciar" para criar uma.</div>
+              )}
+              {etiquetas.map((et: any) => {
+                const ativa = idsAtuais.includes(et.id)
+                return (
+                  <label key={et.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={ativa} onChange={() => toggleEtiqueta(et.id)} />
+                    <span style={{ flex: 1, padding: '5px 10px', borderRadius: 6, background: et.cor + '30', color: et.cor, fontSize: 12, fontWeight: 700, border: `1px solid ${et.cor}60` }}>{et.nome}</span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
+
+          {aba === 'gerenciar' && (
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: '#4A6080', fontWeight: 700, marginBottom: 6 }}>Nova etiqueta</div>
+                <input style={{ ...inputStyle, marginBottom: 8 }} placeholder="Nome da etiqueta" value={novoNome} onChange={e => setNovoNome(e.target.value)} />
+                <div style={{ marginBottom: 8 }}><ColorPicker value={novaCor} onChange={setNovaCor} /></div>
+                <button onClick={criarEtiqueta} disabled={!novoNome.trim()}
+                  style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: novoNome.trim() ? '#F5A623' : '#F5A62360', color: '#0C1421', cursor: novoNome.trim() ? 'pointer' : 'default', fontSize: 11, fontWeight: 800, fontFamily: 'inherit' }}>
+                  + Criar etiqueta
+                </button>
+              </div>
+
+              <div style={{ borderTop: '1px solid #1E3050', paddingTop: 12 }}>
+                {etiquetas.map((et: any) => (
+                  <div key={et.id} style={{ marginBottom: 10 }}>
+                    {editandoId === et.id ? (
+                      <div style={{ background: '#0C1828', border: '1px solid #1E3050', borderRadius: 8, padding: 10 }}>
+                        <input style={{ ...inputStyle, marginBottom: 8 }} value={editNome} onChange={e => setEditNome(e.target.value)} />
+                        <div style={{ marginBottom: 8 }}><ColorPicker value={editCor} onChange={setEditCor} /></div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={salvarEdicao} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: '#3EBB7A', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>Salvar</button>
+                          <button onClick={() => setEditandoId(null)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ flex: 1, padding: '5px 10px', borderRadius: 6, background: et.cor + '30', color: et.cor, fontSize: 12, fontWeight: 700, border: `1px solid ${et.cor}60` }}>{et.nome}</span>
+                        <button onClick={() => { setEditandoId(et.id); setEditNome(et.nome); setEditCor(et.cor) }} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 13 }}>✏️</button>
+                        <button onClick={() => excluir.mutate({ id: et.id })} style={{ background: 'none', border: 'none', color: '#F85149', cursor: 'pointer', fontSize: 13 }}>🗑️</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EtiquetaChips({ etiquetas }: { etiquetas: { id: number; nome: string; cor: string }[] }) {
+  if (!etiquetas?.length) return null
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+      {etiquetas.map(et => (
+        <span key={et.id} style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: et.cor + '30', color: et.cor, border: `1px solid ${et.cor}60` }}>{et.nome}</span>
+      ))}
+    </div>
+  )
+}
+
+function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: {
+  os: any
+  onClick: () => void
+  onAbrirEtiquetas?: () => void
+  dragHandleProps?: any
+  isDragging?: boolean
+}) {
   const status = STATUS_OS.find(s => s.id === os.status) ?? STATUS_OS[0]
   const isHistorico = os.origem === 'historico'
   return (
     <div
+      {...dragHandleProps}
       onClick={onClick}
       style={{
         background: '#111D2E', border: '1px solid #1E3050', borderRadius: 10,
-        padding: '12px 14px', cursor: 'pointer', marginBottom: 8,
+        padding: '12px 14px', cursor: dragHandleProps ? 'grab' : 'pointer', marginBottom: 8,
         borderLeft: `3px solid ${status.color}`,
         transition: 'all 0.15s',
+        opacity: isDragging ? 0.4 : 1,
       }}
       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = status.color; (e.currentTarget as HTMLDivElement).style.background = '#131F30' }}
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#1E3050'; (e.currentTarget as HTMLDivElement).style.borderLeftColor = status.color; (e.currentTarget as HTMLDivElement).style.background = '#111D2E' }}
     >
+      <EtiquetaChips etiquetas={os.etiquetas ?? []} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <span style={{ fontSize: 11, fontFamily: 'monospace', color: status.color, fontWeight: 700 }}>{os.numero}</span>
@@ -323,9 +480,16 @@ function OSCard({ os, onClick }: { os: any; onClick: () => void }) {
             <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#8A9BB520', color: '#8A9BB5', border: '1px solid #8A9BB540' }}>HIST</span>
           )}
         </div>
-        {os.totalAgendamentos > 0 && (
-          <span style={{ fontSize: 10, color: '#58A6FF' }}>📅 {os.totalAgendamentos}</span>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {os.totalAgendamentos > 0 && (
+            <span style={{ fontSize: 10, color: '#58A6FF' }}>📅 {os.totalAgendamentos}</span>
+          )}
+          {onAbrirEtiquetas && (
+            <button onClick={e => { e.stopPropagation(); onAbrirEtiquetas() }}
+              style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 12, padding: 0 }}
+              title="Gerenciar etiquetas">🏷️</button>
+          )}
+        </div>
       </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#C8D8EC', marginBottom: 4, lineHeight: 1.3 }}>
         {os.clienteNome ?? '—'}
@@ -350,6 +514,24 @@ function OSCard({ os, onClick }: { os: any; onClick: () => void }) {
   )
 }
 
+function DraggableOSCard({ os, onClick, onAbrirEtiquetas }: { os: any; onClick: () => void; onAbrirEtiquetas: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: String(os.id), data: { os } })
+  return (
+    <div ref={setNodeRef}>
+      <OSCard os={os} onClick={onClick} onAbrirEtiquetas={onAbrirEtiquetas} dragHandleProps={{ ...attributes, ...listeners }} isDragging={isDragging} />
+    </div>
+  )
+}
+
+function DroppableColuna({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef} style={{ minHeight: 60, background: isOver ? '#F5A62310' : 'transparent', borderRadius: 10, transition: 'background 0.15s' }}>
+      {children}
+    </div>
+  )
+}
+
 export function OrdensServicoPage() {
   const navigate  = useNavigate()
   const isMobile  = useIsMobile()
@@ -357,12 +539,27 @@ export function OrdensServicoPage() {
   const [view, setView]   = useState<'kanban' | 'lista'>(isMobile ? 'lista' : 'kanban')
   const [kanbanCol, setKanbanCol] = useState(0) // coluna ativa no kanban mobile
   const [showModalHistorico, setShowModalHistorico] = useState(false)
+  const [osEtiquetas, setOsEtiquetas] = useState<any | null>(null) // OS aberta no modal de etiquetas
+  const [draggingOs, setDraggingOs] = useState<any | null>(null)
 
+  const utils = (trpc as any).useUtils()
   const { data, isLoading } = (trpc as any).os.list.useQuery(
     { porPagina: 200 },
     { staleTime: 0 },
   )
+  const updateStatus = (trpc as any).os.updateStatus.useMutation({ onSuccess: () => utils.os.list.invalidate() })
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
   const lista: any[] = data?.data ?? []
+
+  const handleDragStart = (e: DragStartEvent) => setDraggingOs(e.active.data.current?.os ?? null)
+  const handleDragEnd = (e: DragEndEvent) => {
+    setDraggingOs(null)
+    const novoStatus = e.over?.id as string | undefined
+    const os = e.active.data.current?.os
+    if (!novoStatus || !os || os.status === novoStatus) return
+    updateStatus.mutate({ id: os.id, status: novoStatus })
+  }
 
   const filtradas = lista.filter((o: any) =>
     !busca
@@ -450,21 +647,30 @@ export function OrdensServicoPage() {
 
       {/* ── KANBAN ── */}
       {view === 'kanban' && !isMobile && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, flex: 1, overflowY: 'auto', alignItems: 'flex-start' }}>
-          {colunas.map(col => (
-            <div key={col.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: col.color + '12', border: `1px solid ${col.color}30` }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: col.color }}>{col.icon} {col.label}</span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: col.color, background: col.color + '20', borderRadius: 12, padding: '1px 8px' }}>{col.itens.length}</span>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, flex: 1, overflowY: 'auto', alignItems: 'flex-start' }}>
+            {colunas.map(col => (
+              <div key={col.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: col.color + '12', border: `1px solid ${col.color}30` }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: col.color }}>{col.icon} {col.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: col.color, background: col.color + '20', borderRadius: 12, padding: '1px 8px' }}>{col.itens.length}</span>
+                </div>
+                <DroppableColuna id={col.id}>
+                  {col.itens.length === 0 ? (
+                    <div style={{ border: `1px dashed ${col.color}30`, borderRadius: 10, padding: '20px', textAlign: 'center', color: '#2A3F55', fontSize: 12 }}>Nenhuma OS</div>
+                  ) : (
+                    col.itens.map((os: any) => (
+                      <DraggableOSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} onAbrirEtiquetas={() => setOsEtiquetas(os)} />
+                    ))
+                  )}
+                </DroppableColuna>
               </div>
-              {col.itens.length === 0 ? (
-                <div style={{ border: `1px dashed ${col.color}30`, borderRadius: 10, padding: '20px', textAlign: 'center', color: '#2A3F55', fontSize: 12 }}>Nenhuma OS</div>
-              ) : (
-                col.itens.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />)
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <DragOverlay>
+            {draggingOs ? <div style={{ width: 260 }}><OSCard os={draggingOs} onClick={() => {}} /></div> : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* ── KANBAN MOBILE — abas por coluna ── */}
@@ -484,7 +690,7 @@ export function OrdensServicoPage() {
             {colunas[kanbanCol]?.itens.length === 0 ? (
               <div style={{ border: `1px dashed ${colunas[kanbanCol].color}30`, borderRadius: 10, padding: '32px', textAlign: 'center', color: '#2A3F55', fontSize: 13 }}>Nenhuma OS nesta etapa</div>
             ) : (
-              colunas[kanbanCol]?.itens.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />)
+              colunas[kanbanCol]?.itens.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} onAbrirEtiquetas={() => setOsEtiquetas(os)} />)
             )}
           </div>
         </div>
@@ -530,7 +736,7 @@ export function OrdensServicoPage() {
           {filtradas.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#4A6080', padding: 40, fontSize: 13 }}>Nenhuma OS encontrada</div>
           ) : (
-            filtradas.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} />)
+            filtradas.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} onAbrirEtiquetas={() => setOsEtiquetas(os)} />)
           )}
         </div>
       )}
@@ -540,6 +746,14 @@ export function OrdensServicoPage() {
         <ModalHistorico
           onClose={() => setShowModalHistorico(false)}
           onSucesso={() => setShowModalHistorico(false)}
+        />
+      )}
+
+      {/* ── Modal Etiquetas ── */}
+      {osEtiquetas && (
+        <ModalEtiquetasOS
+          os={lista.find((o: any) => o.id === osEtiquetas.id) ?? osEtiquetas}
+          onClose={() => setOsEtiquetas(null)}
         />
       )}
     </div>

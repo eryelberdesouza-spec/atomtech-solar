@@ -143,8 +143,26 @@ export const osRouter = router({
       )
       const total = Number((countRows as any[])[0]?.total ?? 0)
 
+      const osList = rows as any[]
+      if (osList.length) {
+        const ids = osList.map(o => o.id)
+        const [etqRows]: any = await pool.execute(
+          `SELECT link.ordem_servico_id AS osId, et.id, et.nome, et.cor
+           FROM os_etiqueta_link link
+           JOIN os_etiqueta et ON et.id = link.etiqueta_id
+           WHERE link.ordem_servico_id IN (${ids.map(() => '?').join(',')})`,
+          ids,
+        )
+        const porOs = new Map<number, any[]>()
+        for (const e of etqRows as any[]) {
+          if (!porOs.has(e.osId)) porOs.set(e.osId, [])
+          porOs.get(e.osId)!.push({ id: e.id, nome: e.nome, cor: e.cor })
+        }
+        for (const o of osList) o.etiquetas = porOs.get(o.id) ?? []
+      }
+
       return {
-        data:     rows as any[],
+        data:     osList,
         total,
         pagina:   input.pagina,
         porPagina: input.porPagina,
@@ -949,4 +967,104 @@ export const osRouter = router({
       const erros      = resultados.filter(r => !r.ok).length
       return { ok: true, importados, erros, resultados }
     }),
+
+  // ── Etiquetas (labels coloridas, estilo Trello) ──────────────────
+  etiqueta: router({
+
+    list: protectedProcedure
+      .query(async ({ ctx }) => {
+        const pool = getRawPool()
+        const [rows]: any = await pool.execute(
+          `SELECT id, nome, cor FROM os_etiqueta WHERE empresa_id = ? ORDER BY nome ASC`,
+          [ctx.usuario.empresaId],
+        )
+        return rows as any[]
+      }),
+
+    criar: protectedProcedure
+      .input(z.object({ nome: z.string().min(1).max(40), cor: z.string().regex(/^#[0-9A-Fa-f]{6}$/) }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [res]: any = await pool.execute(
+          `INSERT INTO os_etiqueta (empresa_id, nome, cor) VALUES (?, ?, ?)`,
+          [ctx.usuario.empresaId, input.nome.trim(), input.cor],
+        )
+        return { id: (res as any).insertId, nome: input.nome.trim(), cor: input.cor }
+      }),
+
+    atualizar: protectedProcedure
+      .input(z.object({
+        id:   z.number().int().positive(),
+        nome: z.string().min(1).max(40).optional(),
+        cor:  z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [check]: any = await pool.execute(
+          `SELECT id FROM os_etiqueta WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.id, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Etiqueta não encontrada' })
+
+        const [atual]: any = await pool.execute(
+          `SELECT nome, cor FROM os_etiqueta WHERE id = ? LIMIT 1`,
+          [input.id],
+        )
+        const nome = input.nome?.trim() ?? (atual as any[])[0].nome
+        const cor  = input.cor          ?? (atual as any[])[0].cor
+
+        await pool.execute(
+          `UPDATE os_etiqueta SET nome = ?, cor = ? WHERE id = ? AND empresa_id = ?`,
+          [nome, cor, input.id, ctx.usuario.empresaId],
+        )
+        return { ok: true }
+      }),
+
+    excluir: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [check]: any = await pool.execute(
+          `SELECT id FROM os_etiqueta WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.id, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Etiqueta não encontrada' })
+
+        await pool.execute(`DELETE FROM os_etiqueta_link WHERE etiqueta_id = ?`, [input.id])
+        await pool.execute(`DELETE FROM os_etiqueta WHERE id = ? AND empresa_id = ?`, [input.id, ctx.usuario.empresaId])
+        return { ok: true }
+      }),
+
+    vincular: protectedProcedure
+      .input(z.object({ ordemServicoId: z.number().int().positive(), etiquetaId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [check]: any = await pool.execute(
+          `SELECT os.id FROM ordem_servico os
+           JOIN os_etiqueta et ON et.id = ? AND et.empresa_id = os.empresa_id
+           WHERE os.id = ? AND os.empresa_id = ? LIMIT 1`,
+          [input.etiquetaId, input.ordemServicoId, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS ou etiqueta não encontrada' })
+
+        await pool.execute(
+          `INSERT IGNORE INTO os_etiqueta_link (ordem_servico_id, etiqueta_id) VALUES (?, ?)`,
+          [input.ordemServicoId, input.etiquetaId],
+        )
+        return { ok: true }
+      }),
+
+    desvincular: protectedProcedure
+      .input(z.object({ ordemServicoId: z.number().int().positive(), etiquetaId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        await pool.execute(
+          `DELETE link FROM os_etiqueta_link link
+           JOIN ordem_servico os ON os.id = link.ordem_servico_id
+           WHERE link.ordem_servico_id = ? AND link.etiqueta_id = ? AND os.empresa_id = ?`,
+          [input.ordemServicoId, input.etiquetaId, ctx.usuario.empresaId],
+        )
+        return { ok: true }
+      }),
+  }),
 })
