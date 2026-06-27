@@ -1356,6 +1356,36 @@ const parcelaRouter = router({
 
       return { ok: true }
     }),
+
+  // Corrige a conta bancária vinculada a um lançamento já registrado
+  // (ex.: importação de extrato atribuiu o banco errado)
+  atualizarConta: protectedProcedure
+    .input(z.object({ parcelaId: z.number(), contaId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [parcela] = await ctx.db
+        .select({ id: finParcela.id })
+        .from(finParcela)
+        .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
+        .where(and(eq(finParcela.id, input.parcelaId), eq(finTitulo.empresaId, empId)))
+        .limit(1)
+      if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' })
+
+      const [conta] = await ctx.db
+        .select({ id: finContaBancaria.id })
+        .from(finContaBancaria)
+        .where(and(eq(finContaBancaria.id, input.contaId), eq(finContaBancaria.empresaId, empId)))
+        .limit(1)
+      if (!conta) throw new TRPCError({ code: 'NOT_FOUND', message: 'Conta bancária não encontrada' })
+
+      await ctx.db
+        .update(finParcela)
+        .set({ contaId: input.contaId })
+        .where(eq(finParcela.id, input.parcelaId))
+
+      return { ok: true }
+    }),
 })
 
 // ─── TRANSFERÊNCIAS ───────────────────────────────────────────────────────────

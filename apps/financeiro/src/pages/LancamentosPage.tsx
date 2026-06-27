@@ -957,6 +957,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [showRateio, setShowRateio]     = useState(false)
   const [editandoTituloId, setEditandoTituloId]   = useState<number | null>(null)
   const [baixandoParcela, setBaixandoParcela]     = useState<any>(null)
+  const [editandoContaParcela, setEditandoContaParcela] = useState<any>(null)
   const [comprovanteRow, setComprovanteRow]       = useState<any>(null)
   const [confirmDelete, setConfirmDelete]         = useState<any>(null)
   const [deleteErro, setDeleteErro]               = useState('')
@@ -1182,22 +1183,28 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
                 )}
               </div>
             ),
-            conta: r.contaNome ? (() => {
-              const nome = String(r.contaNome).toLowerCase()
+            conta: (() => {
+              const nome = String(r.contaNome ?? '').toLowerCase()
               const isInter   = nome.includes('inter')
               const isSicoob  = nome.includes('sicoob')
               const cor = isInter ? '#F5A623' : isSicoob ? '#10B981' : C.emerald
               return (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                  background: cor + '20', color: cor,
-                  border: `1px solid ${cor}40`,
-                  whiteSpace: 'nowrap' as const,
-                }}>
-                  🏦 {r.contaNome}
+                <span
+                  onClick={e => { e.stopPropagation(); setEditandoContaParcela(r) }}
+                  title="Clique para corrigir o banco deste lançamento"
+                  style={{
+                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                    background: r.contaNome ? cor + '20' : 'transparent',
+                    color: r.contaNome ? cor : C.textDim,
+                    border: r.contaNome ? `1px solid ${cor}40` : `1px dashed ${C.border}`,
+                    whiteSpace: 'nowrap' as const,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {r.contaNome ? `🏦 ${r.contaNome}` : '+ banco'}
                 </span>
               )
-            })() : <span style={{ color: C.textDim, fontSize: 11 }}>—</span>,
+            })(),
             valor: (() => {
               const valorOrig = Number(r.valor)
               const valorPago = r.valorPago != null ? Number(r.valorPago) : null
@@ -1301,6 +1308,16 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
           contas={contas}
           onClose={() => setBaixandoParcela(null)}
           onSuccess={() => { setBaixandoParcela(null); refetch() }}
+        />
+      )}
+
+      {/* Modal: Editar Conta Bancária do Lançamento */}
+      {editandoContaParcela && (
+        <ModalEditarContaParcela
+          parcela={editandoContaParcela}
+          contas={contas}
+          onClose={() => setEditandoContaParcela(null)}
+          onSuccess={() => { setEditandoContaParcela(null); refetch() }}
         />
       )}
 
@@ -1791,6 +1808,58 @@ function ModalNovoLancamento({
         value={form.observacoes}
         onChange={e => f('observacoes', e.target.value)}
         placeholder="Notas internas sobre este lançamento..."
+      />
+    </Modal>
+  )
+}
+
+// ─── MODAL: EDITAR CONTA BANCÁRIA DO LANÇAMENTO ────────────────────────────────
+
+function ModalEditarContaParcela({ parcela, contas, onClose, onSuccess }: {
+  parcela:   any
+  contas:    any[]
+  onClose:   () => void
+  onSuccess: () => void
+}) {
+  const [contaId, setContaId] = useState(parcela.contaId ? String(parcela.contaId) : '')
+  const [erro, setErro] = useState('')
+
+  const atualizar = (trpc as any).fin.parcela.atualizarConta.useMutation({
+    onSuccess,
+    onError: (e: any) => setErro(e.message ?? 'Erro ao salvar'),
+  })
+
+  function salvar() {
+    setErro('')
+    if (!contaId) return setErro('Selecione a conta bancária')
+    atualizar.mutate({ parcelaId: parcela.parcelaId, contaId: parseInt(contaId) })
+  }
+
+  return (
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="🏦 Corrigir Banco do Lançamento"
+      width={420}
+      footer={
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+          <Btn disabled={atualizar.isLoading} onClick={salvar}>
+            {atualizar.isLoading ? 'Salvando...' : 'Salvar'}
+          </Btn>
+        </>
+      }
+    >
+      {erro && <div style={{ marginBottom: 16 }}><Alert type="danger">{erro}</Alert></div>}
+      <p style={{ color: C.textMuted, fontSize: 12, marginTop: 0, marginBottom: 14 }}>
+        {parcela.descricao ?? 'Lançamento'}
+      </p>
+      <Select
+        label="Conta Bancária"
+        value={contaId}
+        onChange={e => setContaId(e.target.value)}
+        placeholder="— Selecione —"
+        options={contas.map((c: any) => ({ value: String(c.id), label: c.nome }))}
       />
     </Modal>
   )
