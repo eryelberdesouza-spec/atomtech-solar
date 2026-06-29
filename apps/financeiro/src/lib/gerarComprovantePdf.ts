@@ -167,8 +167,12 @@ function headerHtml(empresa: EmpresaInfo, logoDataUrl: string | null): string {
   const now = new Date()
   const emitidoEm = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
+  // O logo da Atom Tech é branco (sem fundo opaco) — em fundo claro como o do PDF
+  // ele fica invisível. Por isso vai sempre dentro de um cartão azul-marinho.
   const logoTag = logoDataUrl
-    ? `<img src="${logoDataUrl}" alt="Logo" style="height:56px;object-fit:contain;" />`
+    ? `<div style="width:64px;height:64px;background:#0F1A2E;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:6px;flex-shrink:0;">
+         <img src="${logoDataUrl}" alt="Logo" style="max-height:48px;max-width:48px;object-fit:contain;" />
+       </div>`
     : `<div style="width:56px;height:56px;background:#1E40AF;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:20px;">${(empresa.nome || 'A')[0].toUpperCase()}</div>`
 
   // Endereço da empresa
