@@ -1,20 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatCurrency } from '../../lib/utils'
 import { Btn, Input, Card, Spinner, C, PageWrapper } from '../../components/ui'
 
-function ClienteAutocomplete({ clientes, value, onChange }: {
+// A lista inicial (clientesIniciais) só cobre os primeiros N clientes por
+// ordem alfabética — usada apenas para o estado "selecionado". A busca em
+// si é sempre feita no servidor (com debounce) para não perder clientes
+// que ficaram fora desse corte inicial.
+function ClienteAutocomplete({ clientes: clientesIniciais, value, onChange }: {
   clientes: { id: number; nome: string; cpfCnpj?: string; cidade?: string; estado?: string }[]
   value: string
   onChange: (id: string) => void
 }) {
   const [busca, setBusca] = useState('')
+  const [buscaDebounced, setBuscaDebounced] = useState('')
   const [aberto, setAberto] = useState(false)
-  const selecionado = clientes.find(c => String(c.id) === value)
-  const filtrados = busca.length >= 1
-    ? clientes.filter(c => c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.cpfCnpj ?? '').includes(busca)).slice(0, 8)
-    : clientes.slice(0, 8)
+
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaDebounced(busca), 250)
+    return () => clearTimeout(t)
+  }, [busca])
+
+  const { data: resultadoBusca } = trpc.cliente.list.useQuery(
+    { busca: buscaDebounced, porPagina: 20 },
+    { enabled: buscaDebounced.length >= 1, staleTime: 0 },
+  )
+
+  const clientes = buscaDebounced.length >= 1 ? (resultadoBusca?.data ?? []) : clientesIniciais
+  const selecionado = clientesIniciais.find(c => String(c.id) === value) ?? resultadoBusca?.data.find((c: any) => String(c.id) === value)
+  const filtrados = clientes.slice(0, 8)
   const selecionar = (c: typeof clientes[0]) => { onChange(String(c.id)); setBusca(''); setAberto(false) }
   const limpar = () => { onChange(''); setBusca(''); setAberto(false) }
 
