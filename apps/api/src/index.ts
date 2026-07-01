@@ -728,6 +728,38 @@ app.get('/run-migration-fin-alerta', async (_, res) => {
   }
 })
 
+app.get('/run-migration-fin-auditoria', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_auditoria (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id     INT NOT NULL,
+        usuario_id     INT,
+        usuario_nome   VARCHAR(150),
+        acao           ENUM('CREATE','UPDATE','DELETE','BAIXA','ESTORNO') NOT NULL,
+        entidade       VARCHAR(60) NOT NULL,
+        entidade_id    INT NOT NULL,
+        dados_antes    TEXT,
+        dados_depois   TEXT,
+        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fin_audit_empresa  (empresa_id),
+        INDEX idx_fin_audit_entidade (entidade, entidade_id),
+        INDEX idx_fin_audit_created  (created_at)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela fin_auditoria criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 // ── Migração: garante que proposta.status aceite 'expirada' e 'cancelada' ────
 app.get('/run-migration-proposta-status', async (_, res) => {
   try {

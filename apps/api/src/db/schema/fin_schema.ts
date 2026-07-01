@@ -166,6 +166,24 @@ export const finParcela = mysqlTable('fin_parcela', {
   idxFingerprint:      index('idx_fin_parcela_fingerprint').on(t.extratoFingerprint),
 }))
 
+// ─── AUDITORIA ────────────────────────────────────────────────────────────────
+export const finAuditoria = mysqlTable('fin_auditoria', {
+  id:          int('id').primaryKey().autoincrement(),
+  empresaId:   int('empresa_id').notNull(),
+  usuarioId:   int('usuario_id'),
+  usuarioNome: varchar('usuario_nome', { length: 150 }),
+  acao:        mysqlEnum('acao', ['CREATE', 'UPDATE', 'DELETE', 'BAIXA', 'ESTORNO']).notNull(),
+  entidade:    varchar('entidade', { length: 60 }).notNull(),   // ex: 'fin_titulo', 'fin_parcela'
+  entidadeId:  int('entidade_id').notNull(),
+  dadosAntes:  text('dados_antes'),   // JSON serializado
+  dadosDepois: text('dados_depois'),  // JSON serializado
+  createdAt:   timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (t) => ({
+  idxEmpresa:   index('idx_fin_audit_empresa').on(t.empresaId),
+  idxEntidade:  index('idx_fin_audit_entidade').on(t.entidade, t.entidadeId),
+  idxCreatedAt: index('idx_fin_audit_created').on(t.createdAt),
+}))
+
 // ─── TRANSFERÊNCIA ────────────────────────────────────────────────────────────
 export const finTransferencia = mysqlTable('fin_transferencia', {
   id:              int('id').primaryKey().autoincrement(),
