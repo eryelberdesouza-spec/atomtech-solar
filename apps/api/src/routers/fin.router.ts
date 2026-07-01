@@ -19,6 +19,7 @@ import {
   finTitulo,
   finParcela,
   finTransferencia,
+  finAuditoria,
   empresa,
   usuario,
   proposta,
@@ -27,6 +28,30 @@ import {
   parcelaPagamento,
   precificacao,
 } from '../db/schema'
+
+// ─── AUDITORIA — helper de log ────────────────────────────────────────────────
+async function registrarAuditoria(
+  db: any,
+  ctx: { usuario: { empresaId: number; id: number; nome: string } },
+  params: {
+    acao: 'CREATE' | 'UPDATE' | 'DELETE' | 'BAIXA' | 'ESTORNO'
+    entidade: string
+    entidadeId: number
+    dadosAntes?: unknown
+    dadosDepois?: unknown
+  },
+) {
+  await db.insert(finAuditoria).values({
+    empresaId:   ctx.usuario.empresaId,
+    usuarioId:   ctx.usuario.id,
+    usuarioNome: ctx.usuario.nome,
+    acao:        params.acao,
+    entidade:    params.entidade,
+    entidadeId:  params.entidadeId,
+    dadosAntes:  params.dadosAntes !== undefined ? JSON.stringify(params.dadosAntes) : null,
+    dadosDepois: params.dadosDepois !== undefined ? JSON.stringify(params.dadosDepois) : null,
+  })
+}
 
 // ─── CONTAS BANCÁRIAS ─────────────────────────────────────────────────────────
 
@@ -1190,7 +1215,7 @@ const tituloRouter = router({
       if (!admin) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Senha de administrador incorreta' })
 
       const [titulo] = await ctx.db
-        .select({ id: finTitulo.id })
+        .select()
         .from(finTitulo)
         .where(and(eq(finTitulo.id, input.tituloId), eq(finTitulo.empresaId, empId)))
         .limit(1)
@@ -1207,6 +1232,9 @@ const tituloRouter = router({
       if (paga) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Título possui parcelas pagas. Estorne os pagamentos antes de excluir.' })
 
       await ctx.db.delete(finTitulo).where(eq(finTitulo.id, input.tituloId))
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'DELETE', entidade: 'fin_titulo', entidadeId: input.tituloId, dadosAntes: titulo,
+      })
       return { ok: true }
     }),
 
@@ -1262,7 +1290,7 @@ const tituloRouter = router({
 
       // Verifica que todos os IDs pertencem à empresa
       const titulos = await ctx.db
-        .select({ id: finTitulo.id })
+        .select()
         .from(finTitulo)
         .where(and(
           eq(finTitulo.empresaId, empId),
@@ -1274,6 +1302,12 @@ const tituloRouter = router({
 
       // Exclui em lote (cascata remove as parcelas via FK)
       await ctx.db.delete(finTitulo).where(inArray(finTitulo.id, idsValidos))
+
+      for (const t of titulos) {
+        await registrarAuditoria(ctx.db, ctx, {
+          acao: 'DELETE', entidade: 'fin_titulo', entidadeId: t.id, dadosAntes: t,
+        })
+      }
 
       return { ok: true, excluidos: idsValidos.length }
     }),
@@ -1308,19 +1342,28 @@ const parcelaRouter = router({
       if (parcela.status === 'PAGA') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Parcela já está paga' })
       if (parcela.status === 'CANCELADA') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Parcela cancelada não pode ser baixada' })
 
+      const [parcelaAntes] = await ctx.db.select().from(finParcela).where(eq(finParcela.id, input.parcelaId)).limit(1)
+
+      const depois = {
+        status:         'PAGA' as const,
+        contaId:        input.contaId,
+        dataPagamento:  input.dataPagamento,
+        valorPago:      input.valorPago.toFixed(2),
+        juros:          input.juros.toFixed(2),
+        multa:          input.multa.toFixed(2),
+        desconto:       input.desconto.toFixed(2),
+        formaPagamento: input.formaPagamento ?? null,
+      }
+
       await ctx.db
         .update(finParcela)
-        .set({
-          status:         'PAGA',
-          contaId:        input.contaId,
-          dataPagamento:  input.dataPagamento as any,
-          valorPago:      input.valorPago.toFixed(2),
-          juros:          input.juros.toFixed(2),
-          multa:          input.multa.toFixed(2),
-          desconto:       input.desconto.toFixed(2),
-          formaPagamento: input.formaPagamento ?? null,
-        })
+        .set({ ...depois, dataPagamento: depois.dataPagamento as any })
         .where(eq(finParcela.id, input.parcelaId))
+
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'BAIXA', entidade: 'fin_parcela', entidadeId: input.parcelaId,
+        dadosAntes: parcelaAntes, dadosDepois: depois,
+      })
 
       return { ok: true }
     }),
@@ -1340,6 +1383,8 @@ const parcelaRouter = router({
       if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' })
       if (parcela.status !== 'PAGA') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Somente parcelas pagas podem ser estornadas' })
 
+      const [parcelaAntes] = await ctx.db.select().from(finParcela).where(eq(finParcela.id, input.parcelaId)).limit(1)
+
       await ctx.db
         .update(finParcela)
         .set({
@@ -1353,6 +1398,10 @@ const parcelaRouter = router({
           formaPagamento: null,
         })
         .where(eq(finParcela.id, input.parcelaId))
+
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'ESTORNO', entidade: 'fin_parcela', entidadeId: input.parcelaId, dadosAntes: parcelaAntes,
+      })
 
       return { ok: true }
     }),
