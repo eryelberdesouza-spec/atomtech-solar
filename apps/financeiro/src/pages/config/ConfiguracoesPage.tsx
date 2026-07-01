@@ -4,6 +4,7 @@ import { PlanoContasPage } from './PlanoContasPage'
 import { CentrosCustoPage } from './CentrosCustoPage'
 import { CategoriasCustoPage } from './CategoriasCustoPage'
 import { UsuariosPage } from './UsuariosPage'
+import { PeriodosPage } from './PeriodosPage'
 import { C } from '../../components/ui'
 
 const TABS = [
@@ -11,6 +12,7 @@ const TABS = [
   { path: '/configuracoes/plano-contas',    label: '📊 Plano de Contas' },
   { path: '/configuracoes/centros-custo',   label: '🏷️ Centros de Custo' },
   { path: '/configuracoes/categorias-custo',label: '🧾 Categorias de Custo' },
+  { path: '/configuracoes/periodos',        label: '🔒 Fechamento de Período' },
   { path: '/configuracoes/usuarios',        label: '👥 Usuários' },
 ]
 
@@ -52,6 +54,7 @@ export function ConfiguracoesPage() {
         <Route path="plano-contas" element={<PlanoContasPage />} />
         <Route path="centros-custo" element={<CentrosCustoPage />} />
         <Route path="categorias-custo" element={<CategoriasCustoPage />} />
+        <Route path="periodos" element={<PeriodosPage />} />
         <Route path="usuarios" element={<UsuariosPage />} />
       </Routes>
     </div>
