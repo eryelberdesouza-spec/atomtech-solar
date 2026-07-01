@@ -4,9 +4,25 @@ import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../../components/ui/NovaPropostaDropdown'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
+// Extrai ano/mês/dia de uma string "YYYY-MM-DD..." sem passar por conversão de fuso horário.
+// Necessário porque dataEmissao vem do banco como DATE puro — `new Date(s)` o interpreta como
+// UTC-meia-noite, o que em horários negativos (Brasília, UTC-3) empurra a data para o dia anterior.
+function parseDataYMD(s: string | null | undefined): { y: number; m: number; d: number } | null {
+  if (!s) return null
+  const match = String(s).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) }
+}
+
+function parseDataLocal(s: string | null | undefined): Date | null {
+  const ymd = parseDataYMD(s)
+  return ymd ? new Date(ymd.y, ymd.m - 1, ymd.d) : null
+}
+
 function formatDate(s: string | null | undefined): string {
-  if (!s) return '—'
-  try { const d = new Date(s); return d.toLocaleDateString('pt-BR') } catch { return '—' }
+  const ymd = parseDataYMD(s)
+  if (!ymd) return '—'
+  return `${String(ymd.d).padStart(2, '0')}/${String(ymd.m).padStart(2, '0')}/${ymd.y}`
 }
 
 const S: Record<string, { label: string; color: string; bg: string; icon: string }> = {
@@ -19,8 +35,6 @@ const S: Record<string, { label: string; color: string; bg: string; icon: string
 
 function fmtBRL(v: number): string {
   if (v === 0) return '—'
-  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-  if (v >= 1_000) return `R$ ${(v / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}K`
   return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
@@ -109,7 +123,7 @@ function filtrarPorPeriodo(propostas: any[], periodo: Periodo) {
   if (periodo === 'tudo') return propostas
   const corte = periodo === 'mes' ? inicioDoMes() : periodo === 'quinzena' ? quinzenaAtras() : inicioDoAno()
   return propostas.filter(p => {
-    const d = p.dataEmissao ? new Date(p.dataEmissao) : null
+    const d = parseDataLocal(p.dataEmissao)
     return d && d >= corte
   })
 }
