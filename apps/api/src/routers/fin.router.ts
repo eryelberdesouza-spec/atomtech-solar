@@ -2888,6 +2888,45 @@ const alertaRouter = router({
   }),
 })
 
+// ─── AUDITORIA (consulta do log) ──────────────────────────────────────────────
+
+const auditoriaRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      entidade:   z.string().nullish(),
+      acao:       z.enum(['CREATE', 'UPDATE', 'DELETE', 'BAIXA', 'ESTORNO']).nullish(),
+      dataIni:    z.string().nullish(),
+      dataFim:    z.string().nullish(),
+      pagina:     z.number().int().min(1).default(1),
+      porPagina:  z.number().int().min(1).max(100).default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const filtros = [eq(finAuditoria.empresaId, empId)]
+      if (input.entidade) filtros.push(eq(finAuditoria.entidade, input.entidade))
+      if (input.acao) filtros.push(eq(finAuditoria.acao, input.acao))
+      if (input.dataIni) filtros.push(gte(finAuditoria.createdAt, new Date(input.dataIni) as any))
+      if (input.dataFim) filtros.push(lte(finAuditoria.createdAt, new Date(input.dataFim + 'T23:59:59') as any))
+
+      const offset = (input.pagina - 1) * input.porPagina
+
+      const itens = await ctx.db
+        .select()
+        .from(finAuditoria)
+        .where(and(...filtros))
+        .orderBy(desc(finAuditoria.createdAt))
+        .limit(input.porPagina)
+        .offset(offset)
+
+      const [{ total }] = await ctx.db
+        .select({ total: sql<number>`COUNT(*)` })
+        .from(finAuditoria)
+        .where(and(...filtros))
+
+      return { itens, total: Number(total), pagina: input.pagina, porPagina: input.porPagina }
+    }),
+})
+
 // ─── ROUTER PRINCIPAL ─────────────────────────────────────────────────────────
 
 export const finRouter = router({
@@ -2909,4 +2948,5 @@ export const finRouter = router({
   graficos:      graficosRouter,
   relatorios:    relatoriosRouter,
   alerta:        alertaRouter,
+  auditoria:     auditoriaRouter,
 })
