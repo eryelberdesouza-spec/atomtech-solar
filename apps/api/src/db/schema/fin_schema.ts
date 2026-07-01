@@ -184,6 +184,20 @@ export const finAuditoria = mysqlTable('fin_auditoria', {
   idxCreatedAt: index('idx_fin_audit_created').on(t.createdAt),
 }))
 
+// ─── PERÍODO FECHADO ──────────────────────────────────────────────────────────
+export const finPeriodoFechado = mysqlTable('fin_periodo_fechado', {
+  id:          int('id').primaryKey().autoincrement(),
+  empresaId:   int('empresa_id').notNull(),
+  ano:         int('ano').notNull(),
+  mes:         int('mes').notNull(),   // 1-12
+  fechadoPor:  int('fechado_por'),
+  fechadoPorNome: varchar('fechado_por_nome', { length: 150 }),
+  createdAt:   timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (t) => ({
+  idxEmpresa:  index('idx_fin_periodo_empresa').on(t.empresaId),
+  uqPeriodo:   index('uq_fin_periodo').on(t.empresaId, t.ano, t.mes),
+}))
+
 // ─── TRANSFERÊNCIA ────────────────────────────────────────────────────────────
 export const finTransferencia = mysqlTable('fin_transferencia', {
   id:              int('id').primaryKey().autoincrement(),

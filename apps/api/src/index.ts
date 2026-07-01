@@ -728,6 +728,34 @@ app.get('/run-migration-fin-alerta', async (_, res) => {
   }
 })
 
+app.get('/run-migration-fin-periodo-fechado', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_periodo_fechado (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id       INT NOT NULL,
+        ano              INT NOT NULL,
+        mes              INT NOT NULL,
+        fechado_por      INT,
+        fechado_por_nome VARCHAR(150),
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fin_periodo_empresa (empresa_id),
+        UNIQUE KEY uq_fin_periodo (empresa_id, ano, mes)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela fin_periodo_fechado criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 app.get('/run-migration-fin-auditoria', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')

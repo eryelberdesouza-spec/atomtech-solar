@@ -20,6 +20,7 @@ import {
   finParcela,
   finTransferencia,
   finAuditoria,
+  finPeriodoFechado,
   empresa,
   usuario,
   proposta,
@@ -51,6 +52,29 @@ async function registrarAuditoria(
     dadosAntes:  params.dadosAntes !== undefined ? JSON.stringify(params.dadosAntes) : null,
     dadosDepois: params.dadosDepois !== undefined ? JSON.stringify(params.dadosDepois) : null,
   })
+}
+
+// ─── FECHAMENTO DE PERÍODO — helper ───────────────────────────────────────────
+// Bloqueia lançar/baixar/estornar/excluir com data dentro de um mês já fechado.
+async function verificarPeriodoAberto(db: any, empresaId: number, dataStr: string | null | undefined) {
+  if (!dataStr) return
+  const [ano, mes] = String(dataStr).slice(0, 10).split('-').map(Number)
+  if (!ano || !mes) return
+  const [fechado] = await db
+    .select({ id: finPeriodoFechado.id })
+    .from(finPeriodoFechado)
+    .where(and(
+      eq(finPeriodoFechado.empresaId, empresaId),
+      eq(finPeriodoFechado.ano, ano),
+      eq(finPeriodoFechado.mes, mes),
+    ))
+    .limit(1)
+  if (fechado) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: `Período ${String(mes).padStart(2, '0')}/${ano} está fechado. Reabra o período antes de lançar, editar ou excluir.`,
+    })
+  }
 }
 
 // ─── CONTAS BANCÁRIAS ─────────────────────────────────────────────────────────
@@ -999,6 +1023,10 @@ const tituloRouter = router({
       const empId = ctx.usuario.empresaId
       const { parcelas, ...tituloData } = input
 
+      for (const p of parcelas) {
+        await verificarPeriodoAberto(ctx.db, empId, p.vencimento)
+      }
+
       const [res] = await ctx.db.insert(finTitulo).values({
         empresaId:      empId,
         tipo:           tituloData.tipo,
@@ -1131,6 +1159,10 @@ const tituloRouter = router({
 
       if (!titulo) throw new TRPCError({ code: 'NOT_FOUND' })
 
+      for (const p of input.parcelas) {
+        await verificarPeriodoAberto(ctx.db, empId, p.vencimento)
+      }
+
       const existentes = input.parcelas.filter(p => p.parcelaId !== undefined)
       const novas      = input.parcelas.filter(p => p.parcelaId === undefined)
 
@@ -1230,6 +1262,15 @@ const tituloRouter = router({
         .limit(1)
 
       if (paga) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Título possui parcelas pagas. Estorne os pagamentos antes de excluir.' })
+
+      // Bloqueia exclusão se qualquer parcela cair num período já fechado
+      const parcelasDoTitulo = await ctx.db
+        .select({ vencimento: finParcela.vencimento })
+        .from(finParcela)
+        .where(eq(finParcela.tituloId, input.tituloId))
+      for (const p of parcelasDoTitulo) {
+        await verificarPeriodoAberto(ctx.db, empId, p.vencimento as any)
+      }
 
       await ctx.db.delete(finTitulo).where(eq(finTitulo.id, input.tituloId))
       await registrarAuditoria(ctx.db, ctx, {
@@ -1342,6 +1383,8 @@ const parcelaRouter = router({
       if (parcela.status === 'PAGA') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Parcela já está paga' })
       if (parcela.status === 'CANCELADA') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Parcela cancelada não pode ser baixada' })
 
+      await verificarPeriodoAberto(ctx.db, empId, input.dataPagamento)
+
       const [parcelaAntes] = await ctx.db.select().from(finParcela).where(eq(finParcela.id, input.parcelaId)).limit(1)
 
       const depois = {
@@ -1384,6 +1427,7 @@ const parcelaRouter = router({
       if (parcela.status !== 'PAGA') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Somente parcelas pagas podem ser estornadas' })
 
       const [parcelaAntes] = await ctx.db.select().from(finParcela).where(eq(finParcela.id, input.parcelaId)).limit(1)
+      await verificarPeriodoAberto(ctx.db, empId, parcelaAntes.dataPagamento as any)
 
       await ctx.db
         .update(finParcela)
@@ -2888,6 +2932,78 @@ const alertaRouter = router({
   }),
 })
 
+// ─── FECHAMENTO DE PERÍODO ─────────────────────────────────────────────────────
+
+const periodoRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const empId = ctx.usuario.empresaId
+    return ctx.db
+      .select()
+      .from(finPeriodoFechado)
+      .where(eq(finPeriodoFechado.empresaId, empId))
+      .orderBy(desc(finPeriodoFechado.ano), desc(finPeriodoFechado.mes))
+  }),
+
+  fechar: protectedProcedure
+    .input(z.object({ ano: z.number().int(), mes: z.number().int().min(1).max(12) }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const [jaFechado] = await ctx.db
+        .select({ id: finPeriodoFechado.id })
+        .from(finPeriodoFechado)
+        .where(and(
+          eq(finPeriodoFechado.empresaId, empId),
+          eq(finPeriodoFechado.ano, input.ano),
+          eq(finPeriodoFechado.mes, input.mes),
+        ))
+        .limit(1)
+      if (jaFechado) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Este período já está fechado' })
+
+      await ctx.db.insert(finPeriodoFechado).values({
+        empresaId:      empId,
+        ano:            input.ano,
+        mes:            input.mes,
+        fechadoPor:     ctx.usuario.id,
+        fechadoPorNome: ctx.usuario.nome,
+      })
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'CREATE', entidade: 'fin_periodo_fechado', entidadeId: 0,
+        dadosDepois: { ano: input.ano, mes: input.mes },
+      })
+      return { ok: true }
+    }),
+
+  // Reabrir um período exige senha de admin — reativa a possibilidade de editar o histórico
+  reabrir: protectedProcedure
+    .input(z.object({ ano: z.number().int(), mes: z.number().int().min(1).max(12), senhaAdmin: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const senhaHash = createHash('sha256').update(input.senhaAdmin + 'atomtech_salt').digest('hex')
+      const [admin] = await ctx.db
+        .select({ id: usuario.id })
+        .from(usuario)
+        .where(and(
+          eq(usuario.empresaId, empId),
+          eq(usuario.role, 'admin'),
+          eq(usuario.senhaHash, senhaHash),
+        ))
+        .limit(1)
+      if (!admin) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Senha de administrador incorreta' })
+
+      await ctx.db.delete(finPeriodoFechado).where(and(
+        eq(finPeriodoFechado.empresaId, empId),
+        eq(finPeriodoFechado.ano, input.ano),
+        eq(finPeriodoFechado.mes, input.mes),
+      ))
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'DELETE', entidade: 'fin_periodo_fechado', entidadeId: 0,
+        dadosAntes: { ano: input.ano, mes: input.mes },
+      })
+      return { ok: true }
+    }),
+})
+
 // ─── AUDITORIA (consulta do log) ──────────────────────────────────────────────
 
 const auditoriaRouter = router({
@@ -2949,4 +3065,5 @@ export const finRouter = router({
   relatorios:    relatoriosRouter,
   alerta:        alertaRouter,
   auditoria:     auditoriaRouter,
+  periodo:       periodoRouter,
 })
