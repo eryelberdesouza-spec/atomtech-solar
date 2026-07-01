@@ -13,6 +13,7 @@ const NAV = [
   { path: '/propostas',    label: 'Propostas',     icon: '◑', color: '#F59E0B', desc: 'Importar propostas aceitas' },
   { path: '/extrato',      label: 'Extrato',       icon: '⇅', color: '#60A5FA', desc: 'Importar extrato bancário' },
   { path: '/relatorios',   label: 'Relatórios',    icon: '📊', color: '#A78BFA', desc: 'Relatórios e gráficos' },
+  { path: '/auditoria',    label: 'Auditoria',     icon: '🕵️', color: '#FCA5A5', desc: 'Quem alterou o quê' },
   { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#6B9E87', desc: 'Contas, Plano, Custos' },
 ]
 

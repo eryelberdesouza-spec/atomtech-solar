@@ -17,6 +17,7 @@ import { ExtratoPage } from './pages/ExtratoPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
 import { ProjetosPage } from './pages/projetos/ProjetosPage'
 import { ProjetoDetailPage } from './pages/projetos/ProjetoDetailPage'
+import { AuditoriaPage } from './pages/AuditoriaPage'
 
 const PROPOSTAS_URL = 'https://atomtech-solar-web.vercel.app'
 
@@ -147,6 +148,7 @@ export default function App() {
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/projetos" element={<ProjetosPage />} />
               <Route path="/projetos/:id" element={<ProjetoDetailPage />} />
+              <Route path="/auditoria" element={<AuditoriaPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
