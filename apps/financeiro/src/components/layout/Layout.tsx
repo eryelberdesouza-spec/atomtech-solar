@@ -2,6 +2,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { C } from '../ui'
 import { trpc } from '../../lib/trpc'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const NAV = [
   { path: '/dashboard',    label: 'Dashboard',     icon: '◈', color: '#34D399', desc: 'Visão geral' },
@@ -125,8 +126,13 @@ function logout() {
 }
 
 export function Layout() {
+  const isMobile = useIsMobile()
   const [collapsed, setCollapsed] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+
+  // Fecha a sidebar mobile ao trocar de rota
+  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
   // Badge de alertas não lidos (OS concluídas com recebimento pendente)
   const { data: alertaCount } = (trpc as any).fin.alerta.count.useQuery(
@@ -150,14 +156,26 @@ export function Layout() {
       fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
     }}>
 
+      {/* ── OVERLAY MOBILE ───────────────────────────────────── */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: '#00000070', zIndex: 40 }}
+        />
+      )}
+
       {/* ── SIDEBAR ──────────────────────────────────────────── */}
       <aside style={{
-        width: collapsed ? 68 : 240,
+        width: isMobile ? 240 : (collapsed ? 68 : 240),
         background: 'linear-gradient(180deg, #0D1C17 0%, #091410 100%)',
         borderRight: '1px solid ' + C.border,
         display: 'flex', flexDirection: 'column',
-        transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-        flexShrink: 0, zIndex: 10,
+        transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1), width 0.25s cubic-bezier(0.4,0,0.2,1)',
+        flexShrink: 0, zIndex: 50,
+        ...(isMobile ? {
+          position: 'fixed', top: 0, left: 0, bottom: 0,
+          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        } : {}),
       }}>
 
         {/* Logo */}
@@ -296,17 +314,19 @@ export function Layout() {
             </button>
           )}
 
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            style={{
-              width: '100%', padding: '8px', borderRadius: 8,
-              border: '1px solid ' + C.border, background: 'transparent',
-              color: C.textDim, cursor: 'pointer', fontSize: 12,
-              transition: 'all 0.15s', fontFamily: 'inherit',
-            }}
-          >
-            {collapsed ? '→' : '← Recolher'}
-          </button>
+          {!isMobile && (
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              style={{
+                width: '100%', padding: '8px', borderRadius: 8,
+                border: '1px solid ' + C.border, background: 'transparent',
+                color: C.textDim, cursor: 'pointer', fontSize: 12,
+                transition: 'all 0.15s', fontFamily: 'inherit',
+              }}
+            >
+              {collapsed ? '→' : '← Recolher'}
+            </button>
+          )}
         </div>
       </aside>
 
@@ -319,50 +339,67 @@ export function Layout() {
           borderBottom: '1px solid ' + C.border,
           display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 28px', flexShrink: 0,
+          padding: isMobile ? '0 14px' : '0 28px', flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, minWidth: 0 }}>
+            {/* Hambúrguer — só mobile */}
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(v => !v)}
+                style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  background: 'transparent', border: '1px solid ' + C.border,
+                  color: C.textMuted, cursor: 'pointer', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, lineHeight: 1,
+                }}
+              >☰</button>
+            )}
             <div style={{
-              width: 4, height: 20, borderRadius: 2,
+              width: 4, height: 20, borderRadius: 2, flexShrink: 0,
               background: 'linear-gradient(180deg, ' + pageColor + ', ' + pageColor + '88)',
             }} />
-            <div>
-              <h1 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ color: C.text, fontSize: isMobile ? 14 : 16, fontWeight: 700, margin: 0, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {pageTitle}
               </h1>
-              <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>
-                SIGECO · Gestão Financeira
-              </div>
+              {!isMobile && (
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>
+                  SIGECO · Gestão Financeira
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Link para a plataforma de propostas */}
-            <a
-              href="https://atomtech-solar-web.vercel.app"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 7,
-                border: '1px solid ' + C.border,
-                color: C.textMuted, fontSize: 11, fontWeight: 600,
-                textDecoration: 'none', transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                const el = e.currentTarget as HTMLAnchorElement
-                el.style.borderColor = C.emerald + '60'
-                el.style.color = C.emerald
-              }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLAnchorElement
-                el.style.borderColor = C.border
-                el.style.color = C.textMuted
-              }}
-              title="Ir para SIGECO Propostas"
-            >
-              ☀ SIGECO Propostas
-            </a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, flexShrink: 0 }}>
+            {/* Link para a plataforma de propostas — some no mobile pra economizar espaço */}
+            {!isMobile && (
+              <a
+                href="https://atomtech-solar-web.vercel.app"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 7,
+                  border: '1px solid ' + C.border,
+                  color: C.textMuted, fontSize: 11, fontWeight: 600,
+                  textDecoration: 'none', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLAnchorElement
+                  el.style.borderColor = C.emerald + '60'
+                  el.style.color = C.emerald
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLAnchorElement
+                  el.style.borderColor = C.border
+                  el.style.color = C.textMuted
+                }}
+                title="Ir para SIGECO Propostas"
+              >
+                ☀ SIGECO Propostas
+              </a>
+            )}
 
             {/* Avatar */}
             <div style={{
@@ -370,7 +407,7 @@ export function Layout() {
               background: 'linear-gradient(135deg, #10B981, #60A5FA)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 13, fontWeight: 800, color: '#fff',
-              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+              boxShadow: '0 2px 8px rgba(16,185,129,0.3)', flexShrink: 0,
             }}>
               {(usuario?.nome || 'U')[0].toUpperCase()}
             </div>
@@ -378,7 +415,7 @@ export function Layout() {
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: C.bg }}>
           <Outlet />
         </div>
       </div>

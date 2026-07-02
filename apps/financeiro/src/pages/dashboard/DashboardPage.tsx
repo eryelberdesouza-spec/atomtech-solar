@@ -7,6 +7,7 @@ import { trpc } from '../../lib/trpc'
 import { PageWrapper, Card, KpiCard, Spinner, C } from '../../components/ui'
 import { fmtBRLFull } from '../../lib/masks'
 import { fmtData } from '../../lib/utils'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ function TooltipBRL({ active, payload, label }: any) {
 // ─── página ────────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
+  const isMobile = useIsMobile()
   const [mesesEvolucao, setMesesEvolucao] = useState(12)
   const [tipoStatus, setTipoStatus]       = useState('AMBOS')
 
@@ -177,7 +179,7 @@ export function DashboardPage() {
       )}
 
       {/* ── KPIs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 16, marginBottom: 24 }}>
         <KpiCard label="Saldo Total"       value={fmtBRLFull(r.saldoTotal)} icon="💰" color={r.saldoTotal >= 0 ? C.emerald : C.danger} sub="Soma de todas as contas" />
         <KpiCard label="A Receber"         value={fmtBRLFull(r.aReceber)}   icon="📥" color="#34D399" sub="Contas em aberto" />
         <KpiCard label="A Pagar"           value={fmtBRLFull(r.aPagar)}     icon="📤" color="#F87171" sub="Contas em aberto" />
@@ -186,7 +188,7 @@ export function DashboardPage() {
 
       {/* ── Alertas ── */}
       {(r.vencendoHoje > 0 || r.vencidos > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
           {r.vencendoHoje > 0 && (
             <Card accent="#FBBF24" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ fontSize: 28 }}>⏰</div>
@@ -254,7 +256,7 @@ export function DashboardPage() {
       )}
 
       {/* ── G3 + G4 — Distribuição de Despesas + Status ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 24 }}>
 
         {/* G3 — Distribuição de Despesas */}
         <Card style={{ padding: '20px 24px' }}>
@@ -330,7 +332,8 @@ export function DashboardPage() {
           </Card>
         ) : (
           <Card style={{ overflow: 'hidden', padding: 0 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid ' + C.border }}>
                   {['Tipo','Descrição','Pessoa','Data','Valor'].map(h => (
@@ -355,6 +358,7 @@ export function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </Card>
         )}
       </div>

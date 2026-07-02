@@ -411,39 +411,41 @@ export function Table({ columns, rows, onRowClick, emptyMessage }: TableProps) {
     )
   }
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          {columns.map(col => (
-            <th key={col.key} style={{
-              padding: '10px 14px', textAlign: col.align ?? 'left', fontSize: 10,
-              color: C.textDim, fontWeight: 600, letterSpacing: '0.08em',
-              textTransform: 'uppercase', borderBottom: '1px solid ' + C.border,
-              width: col.width,
-            }}>{col.label}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr
-            key={i}
-            onClick={() => onRowClick?.(i)}
-            style={{
-              borderBottom: i < rows.length - 1 ? '1px solid ' + C.border + '60' : 'none',
-              cursor: onRowClick ? 'pointer' : undefined,
-              transition: 'background 0.1s',
-            }}
-            onMouseEnter={e => onRowClick && ((e.currentTarget as HTMLTableRowElement).style.background = C.bgHover)}
-            onMouseLeave={e => onRowClick && ((e.currentTarget as HTMLTableRowElement).style.background = 'transparent')}
-          >
+    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+        <thead>
+          <tr>
             {columns.map(col => (
-              <td key={col.key} style={{ padding: '11px 14px', textAlign: col.align ?? 'left', fontSize: 13, color: C.text }}>{row[col.key]}</td>
+              <th key={col.key} style={{
+                padding: '10px 14px', textAlign: col.align ?? 'left', fontSize: 10,
+                color: C.textDim, fontWeight: 600, letterSpacing: '0.08em',
+                textTransform: 'uppercase', borderBottom: '1px solid ' + C.border,
+                width: col.width, whiteSpace: 'nowrap',
+              }}>{col.label}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr
+              key={i}
+              onClick={() => onRowClick?.(i)}
+              style={{
+                borderBottom: i < rows.length - 1 ? '1px solid ' + C.border + '60' : 'none',
+                cursor: onRowClick ? 'pointer' : undefined,
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => onRowClick && ((e.currentTarget as HTMLTableRowElement).style.background = C.bgHover)}
+              onMouseLeave={e => onRowClick && ((e.currentTarget as HTMLTableRowElement).style.background = 'transparent')}
+            >
+              {columns.map(col => (
+                <td key={col.key} style={{ padding: '11px 14px', textAlign: col.align ?? 'left', fontSize: 13, color: C.text }}>{row[col.key]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -473,7 +475,7 @@ export function EmptyState({ icon, title, description, action }: { icon?: string
 
 // ─── PAGE WRAPPER ─────────────────────────────────────────────────────────────
 export function PageWrapper({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div className="fade-in" style={{ padding: '24px 28px', ...style }}>{children}</div>
+  return <div className="fade-in page-wrapper" style={style}>{children}</div>
 }
 
 // ─── SECTION HEADER ───────────────────────────────────────────────────────────
