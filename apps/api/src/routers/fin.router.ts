@@ -2161,8 +2161,13 @@ const dreRouter = router({
       `) as any[]
 
       // ── Monta estrutura de resposta ────────────────────────────────────────
-      const data = Array.isArray(rows) ? rows : (rows as any).rows ?? []
-      const meses = Array.isArray(mesesRaw) ? mesesRaw : (mesesRaw as any).rows ?? []
+      // mysql2 retorna [rows, fields] — extrai só as linhas (ver propostaFinRouter.listar)
+      const data: any[] = Array.isArray(rows) && Array.isArray(rows[0])
+        ? rows[0]
+        : Array.isArray(rows) ? rows : (rows as any).rows ?? []
+      const meses: any[] = Array.isArray(mesesRaw) && Array.isArray(mesesRaw[0])
+        ? mesesRaw[0]
+        : Array.isArray(mesesRaw) ? mesesRaw : (mesesRaw as any).rows ?? []
 
       type Conta = { id: number; codigo: string; nome: string; total: number; qtd: number }
       const receitas:   Conta[] = []
@@ -2945,9 +2950,12 @@ const alertaRouter = router({
     const empId = ctx.usuario.empresaId
     const rows = await ctx.db.execute(
       sql`SELECT COUNT(*) AS total FROM fin_alerta WHERE empresa_id = ${empId} AND lido = 0`
-    )
-    const data = (rows as any).rows ?? rows
-    return { total: Number((data as any[])[0]?.total ?? 0) }
+    ) as any
+    // mysql2 retorna [rows, fields] — extrai só as linhas (ver propostaFinRouter.listar)
+    const data: any[] = Array.isArray(rows) && Array.isArray(rows[0])
+      ? rows[0]
+      : Array.isArray(rows) ? rows : (rows as any).rows ?? []
+    return { total: Number(data[0]?.total ?? 0) }
   }),
 
   // Lista alertas (não lidos primeiro, depois lidos)
@@ -2972,7 +2980,11 @@ const alertaRouter = router({
                 WHERE empresa_id = ${empId}
                 ORDER BY lido ASC, created_at DESC LIMIT 50`
           )
-      return ((rows as any).rows ?? rows) as any[]
+      // mysql2 retorna [rows, fields] — extrai só as linhas (ver propostaFinRouter.listar)
+      const data: any[] = Array.isArray(rows) && Array.isArray((rows as any)[0])
+        ? (rows as any)[0]
+        : Array.isArray(rows) ? rows : (rows as any).rows ?? []
+      return data
     }),
 
   // Marca alerta como lido/resolvido
