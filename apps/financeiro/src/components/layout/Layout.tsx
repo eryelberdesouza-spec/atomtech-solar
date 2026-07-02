@@ -4,18 +4,123 @@ import { C } from '../ui'
 import { trpc } from '../../lib/trpc'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
+// ── Ícones SVG por seção — mesmo padrão do apps/web (Feather-style, 24x24, stroke) ──
+const s = (w = 18, h = 18) => ({ width: w, height: h, display: 'block' as const })
+
+// Dashboard — barras + linha de tendência
+const IcoDashboard = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="12" width="4" height="9" rx="1"/>
+    <rect x="10" y="7" width="4" height="14" rx="1"/>
+    <rect x="17" y="3" width="4" height="18" rx="1"/>
+    <polyline points="3 6 9 3 15 5 21 2" strokeWidth="1.5"/>
+  </svg>
+)
+
+// Lançamentos — setas opostas (entra/sai, pagar/receber)
+const IcoLancamentos = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 1l4 4-4 4"/>
+    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+    <path d="M7 23l-4-4 4-4"/>
+    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+  </svg>
+)
+
+// Fluxo de Caixa — linha de projeção subindo
+const IcoFluxoCaixa = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+    <polyline points="17 6 23 6 23 12"/>
+  </svg>
+)
+
+// DRE — documento com linhas de resultado
+const IcoDRE = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="8" y1="13" x2="16" y2="13"/>
+    <line x1="8" y1="17" x2="13" y2="17"/>
+  </svg>
+)
+
+// Projetos — pasta
+const IcoProjetos = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+  </svg>
+)
+
+// Pessoas — dois usuários
+const IcoPessoas = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+)
+
+// Propostas — documento com aprovação
+const IcoPropostas = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="9" y1="13" x2="15" y2="13"/>
+    <line x1="9" y1="17" x2="13" y2="17"/>
+    <polyline points="9 9 10 9" strokeWidth="2"/>
+  </svg>
+)
+
+// Extrato — banco (colunas)
+const IcoExtrato = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="21" x2="21" y2="21"/>
+    <line x1="5" y1="21" x2="5" y2="10"/>
+    <line x1="10" y1="21" x2="10" y2="10"/>
+    <line x1="14" y1="21" x2="14" y2="10"/>
+    <line x1="19" y1="21" x2="19" y2="10"/>
+    <polygon points="12 2 21 8 3 8"/>
+  </svg>
+)
+
+// Relatórios — gráfico de pizza
+const IcoRelatorios = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+    <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+  </svg>
+)
+
+// Auditoria — lupa
+const IcoAuditoria = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+)
+
+// Configurações — engrenagem
+const IcoConfiguracoes = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+)
+
 const NAV = [
-  { path: '/dashboard',    label: 'Dashboard',     icon: '◈', color: '#34D399', desc: 'Visão geral' },
-  { path: '/lancamentos',  label: 'Lançamentos',   icon: '↕', color: '#60A5FA', desc: 'CP / CR / Extrato' },
-  { path: '/fluxo-caixa', label: 'Fluxo de Caixa',icon: '⇌', color: '#F59E0B', desc: 'Projeção de caixa' },
-  { path: '/dre',         label: 'DRE',           icon: '◫', color: '#34D399', desc: 'Resultado do exercício' },
-  { path: '/projetos',    label: 'Projetos',      icon: '📁', color: '#FBBF24', desc: 'Orçamento por contrato' },
-  { path: '/pessoas',      label: 'Pessoas',       icon: '◉', color: '#A78BFA', desc: 'Clientes e Fornecedores' },
-  { path: '/propostas',    label: 'Propostas',     icon: '◑', color: '#F59E0B', desc: 'Importar propostas aceitas' },
-  { path: '/extrato',      label: 'Extrato',       icon: '⇅', color: '#60A5FA', desc: 'Importar extrato bancário' },
-  { path: '/relatorios',   label: 'Relatórios',    icon: '📊', color: '#A78BFA', desc: 'Relatórios e gráficos' },
-  { path: '/auditoria',    label: 'Auditoria',     icon: '🕵️', color: '#FCA5A5', desc: 'Quem alterou o quê' },
-  { path: '/configuracoes',label: 'Configurações', icon: '◎', color: '#6B9E87', desc: 'Contas, Plano, Custos' },
+  { path: '/dashboard',    label: 'Dashboard',     Icon: IcoDashboard,     color: '#34D399', desc: 'Visão geral' },
+  { path: '/lancamentos',  label: 'Lançamentos',   Icon: IcoLancamentos,   color: '#60A5FA', desc: 'CP / CR / Extrato' },
+  { path: '/fluxo-caixa', label: 'Fluxo de Caixa',Icon: IcoFluxoCaixa,     color: '#F59E0B', desc: 'Projeção de caixa' },
+  { path: '/dre',         label: 'DRE',           Icon: IcoDRE,           color: '#34D399', desc: 'Resultado do exercício' },
+  { path: '/projetos',    label: 'Projetos',      Icon: IcoProjetos,      color: '#FBBF24', desc: 'Orçamento por contrato' },
+  { path: '/pessoas',      label: 'Pessoas',       Icon: IcoPessoas,       color: '#A78BFA', desc: 'Clientes e Fornecedores' },
+  { path: '/propostas',    label: 'Propostas',     Icon: IcoPropostas,     color: '#F59E0B', desc: 'Importar propostas aceitas' },
+  { path: '/extrato',      label: 'Extrato',       Icon: IcoExtrato,       color: '#60A5FA', desc: 'Importar extrato bancário' },
+  { path: '/relatorios',   label: 'Relatórios',    Icon: IcoRelatorios,    color: '#A78BFA', desc: 'Relatórios e gráficos' },
+  { path: '/auditoria',    label: 'Auditoria',     Icon: IcoAuditoria,     color: '#FCA5A5', desc: 'Quem alterou o quê' },
+  { path: '/configuracoes',label: 'Configurações', Icon: IcoConfiguracoes, color: '#6B9E87', desc: 'Contas, Plano, Custos' },
 ]
 
 // Logo Atom Tech — sol com raios (identidade SIGECO)
@@ -74,11 +179,11 @@ function NavItem({ item, collapsed, badge }: { item: typeof NAV[0]; collapsed: b
         background: isActive ? item.color + '22' : 'transparent',
         border: '1px solid ' + (isActive ? item.color + '44' : 'transparent'),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, color: isActive ? item.color : C.textDim,
+        color: isActive ? item.color : C.textDim,
         transition: 'all 0.15s',
         boxShadow: isActive ? '0 0 12px ' + item.color + '30' : 'none',
       }}>
-        {item.icon}
+        <item.Icon />
       </div>
       {!collapsed && (
         <div style={{ flex: 1, minWidth: 0 }}>
