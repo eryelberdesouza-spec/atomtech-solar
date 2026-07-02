@@ -29,12 +29,16 @@ export function ContasBancariasPage() {
   const [form, setForm] = useState<ContaForm>(EMPTY_FORM)
   const [editId, setEditId] = useState<number | null>(null)
   const [erro, setErro] = useState('')
+  const [toggleErro, setToggleErro] = useState('')
 
   const { data: contas = [], isLoading, refetch } = (trpc as any).fin.conta.list.useQuery()
 
   const create = (trpc as any).fin.conta.create.useMutation({ onSuccess: () => { refetch(); setModal(false); setForm(EMPTY_FORM) }, onError: (e: any) => setErro(e.message) })
   const update = (trpc as any).fin.conta.update.useMutation({ onSuccess: () => { refetch(); setModal(false); setForm(EMPTY_FORM); setEditId(null) }, onError: (e: any) => setErro(e.message) })
-  const toggle = (trpc as any).fin.conta.toggle.useMutation({ onSuccess: () => refetch() })
+  const toggle = (trpc as any).fin.conta.toggle.useMutation({
+    onSuccess: () => { refetch(); setToggleErro('') },
+    onError: (e: any) => setToggleErro(e.message),
+  })
 
   function openNew() { setForm(EMPTY_FORM); setEditId(null); setErro(''); setModal(true) }
   function openEdit(c: any) {
@@ -91,6 +95,12 @@ export function ContasBancariasPage() {
       <Alert type="info">
         O <strong>Saldo Inicial</strong> representa o valor da conta no momento de entrada no sistema. Após a migração, os saldos serão calculados automaticamente a partir dos lançamentos.
       </Alert>
+
+      {toggleErro && (
+        <div style={{ marginTop: 12 }}>
+          <Alert type="danger">{toggleErro}</Alert>
+        </div>
+      )}
 
       <Card style={{ marginTop: 20 }}>
         {isLoading ? (
