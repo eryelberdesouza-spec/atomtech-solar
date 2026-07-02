@@ -142,15 +142,73 @@ const contaRouter = router({
   toggle: protectedProcedure
     .input(z.object({ id: z.number(), ativo: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // Inativar uma conta a remove dos cálculos de saldo/relatórios (todos filtram ativo=1).
+      // Se ela tiver histórico de pagamentos, inativar faria esse dinheiro "sumir" dos relatórios.
+      if (!input.ativo) {
+        const [conta] = await ctx.db
+          .select({ id: finContaBancaria.id })
+          .from(finContaBancaria)
+          .where(and(eq(finContaBancaria.id, input.id), eq(finContaBancaria.empresaId, empId)))
+          .limit(1)
+        if (!conta) throw new TRPCError({ code: 'NOT_FOUND' })
+
+        const [paga] = await ctx.db
+          .select({ id: finParcela.id })
+          .from(finParcela)
+          .where(and(eq(finParcela.contaId, input.id), eq(finParcela.status, 'PAGA')))
+          .limit(1)
+        if (paga) throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Esta conta possui pagamentos registrados. Inativá-la removeria esse histórico dos relatórios e do saldo total. Transfira o saldo para outra conta antes de inativar, se necessário.',
+        })
+      }
+
       await ctx.db
         .update(finContaBancaria)
         .set({ ativo: input.ativo, updatedAt: new Date() })
-        .where(and(eq(finContaBancaria.id, input.id), eq(finContaBancaria.empresaId, ctx.usuario.empresaId)))
+        .where(and(eq(finContaBancaria.id, input.id), eq(finContaBancaria.empresaId, empId)))
       return { ok: true }
     }),
 })
 
-// ─── PLANO DE CONTAS ─────────────────────────────────────────────────────────
+// ─── PLANO DE CONTAS — validação de hierarquia ────────────────────────────────
+// Impede paiId inexistente/de outra empresa e ciclos (uma conta virar ancestral de si mesma).
+async function verificarHierarquiaPlanoContas(
+  db: any, empresaId: number, paiId: number | null | undefined, idAtual?: number,
+) {
+  if (paiId == null) return
+  if (paiId === idAtual) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Uma conta não pode ser pai de si mesma' })
+  }
+
+  const todos = await db
+    .select({ id: finPlanoContas.id, paiId: finPlanoContas.paiId })
+    .from(finPlanoContas)
+    .where(eq(finPlanoContas.empresaId, empresaId))
+
+  const mapaPai = new Map(todos.map((t: any) => [t.id, t.paiId]))
+  if (!mapaPai.has(paiId)) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Conta-pai não encontrada' })
+  }
+
+  if (idAtual !== undefined) {
+    let atual: number | null = paiId
+    const visitados = new Set<number>()
+    while (atual != null) {
+      if (atual === idAtual) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Essa hierarquia criaria um ciclo — uma conta não pode ficar subordinada a um descendente dela mesma.',
+        })
+      }
+      if (visitados.has(atual)) break
+      visitados.add(atual)
+      atual = (mapaPai.get(atual) as number | null) ?? null
+    }
+  }
+}
 
 const planoContasRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -169,8 +227,11 @@ const planoContasRouter = router({
       paiId:  z.number().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      await verificarHierarquiaPlanoContas(ctx.db, empId, input.paiId)
+
       await ctx.db.insert(finPlanoContas).values({
-        empresaId: ctx.usuario.empresaId,
+        empresaId: empId,
         codigo: input.codigo, nome: input.nome, tipo: input.tipo,
         paiId: input.paiId ?? null, ativo: true,
       })
@@ -186,10 +247,13 @@ const planoContasRouter = router({
       paiId:  z.number().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      await verificarHierarquiaPlanoContas(ctx.db, empId, input.paiId, input.id)
+
       await ctx.db
         .update(finPlanoContas)
         .set({ codigo: input.codigo, nome: input.nome, tipo: input.tipo, paiId: input.paiId ?? null })
-        .where(and(eq(finPlanoContas.id, input.id), eq(finPlanoContas.empresaId, ctx.usuario.empresaId)))
+        .where(and(eq(finPlanoContas.id, input.id), eq(finPlanoContas.empresaId, empId)))
       return { ok: true }
     }),
 
