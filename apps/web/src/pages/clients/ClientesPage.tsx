@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
-import { formatDate } from '../../lib/utils'
+import { formatDate, formatTimestampDate } from '../../lib/utils'
 import {
   Btn, Card, Input, Select, Badge,
   PageWrapper, SectionHeader, EmptyState, Spinner, C,
@@ -450,7 +450,7 @@ export function ClienteDetailPage() {
             ['CPF/CNPJ', cliente.cpfCnpj], ['Telefone', cliente.telefone], ['E-mail', cliente.email],
             ['CEP', cliente.cep], ['Endereço', [cliente.endereco, cliente.numero, cliente.complemento].filter(Boolean).join(', ')],
             ['Bairro', cliente.bairro], ['Cidade/UF', cliente.cidade && cliente.estado ? `${cliente.cidade}/${cliente.estado}` : null],
-            ['Distribuidora', cliente.distribuidora], ['Cadastrado em', formatDate(cliente.createdAt)],
+            ['Distribuidora', cliente.distribuidora], ['Cadastrado em', formatTimestampDate(cliente.createdAt)],
           ].filter(([, v]) => v).map(([k, v]) => (
             <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.darkBorder}30` }}>
               <span style={{ color: C.textMuted, fontSize: 11 }}>{k}</span>

@@ -39,8 +39,21 @@ export function formatPayback(meses: number): string {
   return `${anos}a ${m}m`
 }
 
-// Data BR
+// Data BR — para campos DATE puros (dataEmissao, dataValidade, dataConclusao etc).
+// Extrai ano/mês/dia direto da string sem passar pelo construtor `Date`: campos DATE do MySQL
+// chegam como "YYYY-MM-DD..." (UTC-meia-noite), e `new Date(s)` desloca para o dia anterior
+// em fusos negativos (Brasília, UTC-3). Parse manual evita esse deslocamento.
 export function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  const match = String(dateStr).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return '—'
+  const [, y, m, d] = match
+  return `${d}/${m}/${y}`
+}
+
+// Data BR — para campos TIMESTAMP reais (createdAt, canceladoEm etc), onde a hora importa
+// e a conversão de fuso horário UTC → local é o comportamento correto (não um bug).
+export function formatTimestampDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   const date = new Date(dateStr)
   if (isNaN(date.getTime())) return '—'
