@@ -767,6 +767,8 @@ export function OrdemServicoDetailPage() {
   const osId = Number(id)
   const navigate  = useNavigate()
   const isMobile  = useIsMobile()
+  const usuario: any = (() => { try { return JSON.parse(localStorage.getItem('atomtech_usuario') || '{}') } catch { return {} } })()
+  const isAdmin   = usuario?.role === 'admin'
 
   const utils = (trpc as any).useUtils()
   const refresh = () => utils.os.byId.invalidate({ id: osId })
@@ -872,9 +874,11 @@ export function OrdemServicoDetailPage() {
                   {mudandoStatus ? '⏳' : proximoStatus === 'em_execucao' ? (isMobile ? '▶' : '▶ Iniciar') : (isMobile ? '✔' : '✔ Concluir')}
                 </button>
               )}
-              <button onClick={handleCancelar} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: '1px solid #F8514960', background: '#F8514918', color: '#F85149', cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 600 }}>
-                {isMobile ? '✕' : '✕ Cancelar'}
-              </button>
+              {isAdmin && (
+                <button onClick={handleCancelar} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: '1px solid #F8514960', background: '#F8514918', color: '#F85149', cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 600 }}>
+                  {isMobile ? '✕' : '✕ Cancelar'}
+                </button>
+              )}
             </div>
           )}
         </div>

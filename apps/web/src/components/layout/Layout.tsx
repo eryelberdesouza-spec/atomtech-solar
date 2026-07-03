@@ -270,7 +270,7 @@ export function Layout() {
               padding: '4px 10px 10px',
             }}>Menu</div>
           )}
-          {NAV.map(item => (
+          {(usuario?.role === 'tecnico' ? NAV.filter(n => n.path === '/ordens-servico') : NAV).map(item => (
             <NavItem key={item.path} item={item} collapsed={collapsed} />
           ))}
         </nav>
@@ -430,7 +430,7 @@ export function Layout() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10 }}>
-            {!isMobile && <NovaPropostaDropdown />}
+            {!isMobile && usuario?.role !== 'tecnico' && <NovaPropostaDropdown />}
 
             {/* Link para Financeiro — visível apenas para admin */}
             {!isMobile && (() => {

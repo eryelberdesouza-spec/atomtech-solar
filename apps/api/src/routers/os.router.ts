@@ -374,6 +374,10 @@ export const osRouter = router({
       status: z.enum(['aberta','em_execucao','concluida','cancelada']),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.status === 'cancelada' && ctx.usuario.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem cancelar uma OS.' })
+      }
+
       const pool = getRawPool()
 
       const [check]: any = await pool.execute(
