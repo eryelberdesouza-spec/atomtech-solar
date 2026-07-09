@@ -1644,6 +1644,8 @@ function ModalNovoLancamento({
     if (valor <= 0)             return setErro('Valor deve ser maior que zero')
     const semVenc = parcelas.findIndex(p => !p.vencimento)
     if (semVenc >= 0) return setErro(`Informe o vencimento da parcela ${semVenc + 1}`)
+    const semValor = parcelas.findIndex(p => p.valor <= 0)
+    if (semValor >= 0) return setErro(`Informe o valor da parcela ${semValor + 1}`)
 
     create.mutate({
       tipo,
@@ -1653,7 +1655,9 @@ function ModalNovoLancamento({
       planoContasId: form.planoContasId ? parseInt(form.planoContasId) : undefined,
       centroCustoId: form.centroCustoId ? parseInt(form.centroCustoId) : undefined,
       categoriaCustoId: form.categoriaCustoId ? parseInt(form.categoriaCustoId) : undefined,
-      valorOriginal: valor,
+      // Soma real das parcelas — garante consistência mesmo que os valores tenham sido
+      // customizados individualmente e não batam mais com uma divisão igualitária do total.
+      valorOriginal: totalParcelas,
       emissao:       form.emissao,
       observacoes:   form.observacoes.trim() || undefined,
       parcelas:      parcelas.map(p => ({ numero: p.numero, valor: p.valor, vencimento: p.vencimento })),
@@ -1748,16 +1752,16 @@ function ModalNovoLancamento({
         />
       </FormRow>
 
-      {/* Parcelas com datas editáveis */}
+      {/* Parcelas com datas e valores editáveis */}
       {valor > 0 && (
         <div style={{ background: C.bg, borderRadius: 8, border: '1px solid ' + C.border, padding: '12px 14px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Vencimentos das Parcelas
+              Parcelas
             </p>
             {parcelas.length > 1 && (
               <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>
-                Preencha o 1º e os demais serão sugeridos ▶
+                Valores e datas divididos automaticamente — edite livremente ▶
               </p>
             )}
           </div>
@@ -1765,7 +1769,7 @@ function ModalNovoLancamento({
           <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr', gap: 8, marginBottom: 6 }}>
             <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>#</div>
             <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Vencimento *</div>
-            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>Valor</div>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', textAlign: 'right' }}>Valor *</div>
           </div>
 
           {parcelas.map((p, i) => (
@@ -1788,15 +1792,22 @@ function ModalNovoLancamento({
                   color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const,
                 }}
               />
-              <div style={{ textAlign: 'right', fontWeight: 600, color: tipo === 'PAGAR' ? C.debit : C.credit, fontSize: 13 }}>
-                {fmtBRLFull(p.valor)}
-              </div>
+              <InputMoeda
+                value={maskMoeda(p.valor)}
+                onChange={v => setParcelas(prev => prev.map((x, j) => j === i ? { ...x, valor: parseMoeda(v) } : x))}
+                style={{ textAlign: 'right', color: tipo === 'PAGAR' ? C.debit : C.credit, fontWeight: 600 }}
+              />
             </div>
           ))}
 
           {parcelas.length > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid ' + C.border + '60', paddingTop: 8, marginTop: 6 }}>
-              <span style={{ color: C.textMuted, fontSize: 12 }}>Total {parcelas.length} parcelas</span>
+              <span style={{ color: C.textMuted, fontSize: 12 }}>
+                Total {parcelas.length} parcelas
+                {Math.abs(totalParcelas - valor) > 0.001 && (
+                  <span style={{ color: C.danger, fontWeight: 700 }}> · difere do Valor Total em {fmtBRLFull(Math.abs(totalParcelas - valor))}</span>
+                )}
+              </span>
               <span style={{ color: tipo === 'PAGAR' ? C.debit : C.credit, fontWeight: 700 }}>{fmtBRLFull(totalParcelas)}</span>
             </div>
           )}
