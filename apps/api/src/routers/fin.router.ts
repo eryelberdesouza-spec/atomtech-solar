@@ -2853,7 +2853,13 @@ const extratoRouter = router({
     }),
 
   // ── Verifica potenciais duplicatas contra lançamentos manuais já existentes ──
-  // Retorna: { fingerprint -> [{ parcelaId, tituloId, descricao, valor, vencimento, status }] }
+  // Busca por valor+data em AMBOS os tipos (PAGAR e RECEBER) — não exige mais que o
+  // tipo bata exatamente. Extratos nem sempre trazem informação clara de entrada/saída,
+  // e exigir tipo exato fazia o sistema "não achar" o lançamento manual correspondente
+  // sempre que a classificação C/D do extrato divergia da do lançamento já cadastrado,
+  // resultando em duplicidade. O front sinaliza quando o tipo encontrado diverge do
+  // sugerido pelo extrato, para o usuário confirmar visualmente qual está certo.
+  // Retorna: { fingerprint -> [{ parcelaId, tituloId, descricao, valor, vencimento, status, tipo }] }
   verificarPotenciais: protectedProcedure
     .input(z.object({
       itens: z.array(z.object({
@@ -2881,19 +2887,20 @@ const extratoRouter = router({
             valor:      finParcela.valor,
             vencimento: finParcela.vencimento,
             status:     finParcela.status,
+            tipo:       finTitulo.tipo,
           })
           .from(finParcela)
           .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
           .where(
             and(
               eq(finTitulo.empresaId, empId),
-              eq(finTitulo.tipo, item.tipo),
               isNull(finParcela.extratoFingerprint),           // apenas lançamentos manuais
               sql`ABS(CAST(${finParcela.valor} AS DECIMAL(10,2)) - ${item.valor}) < 0.02`,
               gte(finParcela.vencimento, dFrom.toISOString().slice(0, 10) as any),
               lte(finParcela.vencimento, dTo.toISOString().slice(0, 10) as any),
             )
           )
+          .orderBy(sql`(${finTitulo.tipo} = ${item.tipo}) DESC`) // matches do mesmo tipo primeiro
           .limit(5)
 
         if (matches.length > 0) resultado[item.fingerprint] = matches
