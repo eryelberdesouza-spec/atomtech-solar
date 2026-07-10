@@ -728,6 +728,52 @@ app.get('/run-migration-fin-alerta', async (_, res) => {
   }
 })
 
+// ── Migração: liga fin_pessoa ao cadastro de cliente da Plataforma de Propostas ──
+// Cadastro único (Onda 2 / pedido do usuário 2026-07-02) — evita cadastrar o mesmo
+// cliente duas vezes. Faz backfill: liga fin_pessoa já existentes ao cliente
+// correspondente por CPF/CNPJ, quando encontrar.
+app.get('/run-migration-fin-pessoa-cliente-id', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fin_pessoa' AND COLUMN_NAME = 'cliente_id'`
+    )
+
+    if (cols.length === 0) {
+      await conn.execute(`
+        ALTER TABLE fin_pessoa
+          ADD COLUMN cliente_id INT NULL AFTER is_fornecedor,
+          ADD INDEX idx_fin_pessoa_cliente (cliente_id)
+      `)
+    }
+
+    // Backfill: liga fin_pessoa órfãs ao cliente correspondente por CPF/CNPJ
+    const [backfill]: any = await conn.execute(`
+      UPDATE fin_pessoa p
+      INNER JOIN cliente c
+        ON c.empresa_id = p.empresa_id
+        AND c.cpf_cnpj = p.cpf_cnpj
+      SET p.cliente_id = c.id
+      WHERE p.cliente_id IS NULL
+        AND p.cpf_cnpj IS NOT NULL AND p.cpf_cnpj != ''
+        AND c.cpf_cnpj IS NOT NULL AND c.cpf_cnpj != ''
+    `)
+
+    await conn.end()
+    res.json({
+      ok: true,
+      message: 'Coluna cliente_id pronta',
+      pessoasVinculadasNoBackfill: backfill.affectedRows ?? 0,
+    })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/run-migration-fin-periodo-fechado', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')

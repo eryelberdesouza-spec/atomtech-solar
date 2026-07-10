@@ -29,6 +29,7 @@ import {
   parcelaPagamento,
   precificacao,
 } from '../db/schema'
+import { acharOuCriarClienteParaFinPessoa, propagarFinPessoaParaCliente } from '../lib/pessoaSync'
 
 // ─── AUDITORIA — helper de log ────────────────────────────────────────────────
 async function registrarAuditoria(
@@ -699,10 +700,24 @@ const pessoaRouter = router({
       tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      // Cadastro único: se marcado como cliente, acha (por CPF/CNPJ) ou cria o
+      // cliente correspondente na Plataforma de Propostas e liga os dois.
+      let clienteId: number | null = null
+      if (input.isCliente) {
+        clienteId = await acharOuCriarClienteParaFinPessoa(ctx.db, empId, ctx.usuario.id, {
+          nome: input.nome, cpfCnpj: input.cpfCnpj, email: input.email || null,
+          telefone: input.telefone, tipoPessoa: input.tipoPessoa,
+          cep: input.cep, logradouro: input.logradouro, numero: input.numero,
+          complemento: input.complemento, bairro: input.bairro, cidade: input.cidade, estado: input.estado,
+        })
+      }
+
       // Nota: NÃO usar spread ...input com Drizzle+MySQL — booleanos devem ser
       // convertidos explicitamente para 0/1, senão o INSERT falha silenciosamente
       const [res] = await ctx.db.insert(finPessoa).values({
-        empresaId:    ctx.usuario.empresaId,
+        empresaId:    empId,
         tipoPessoa:   input.tipoPessoa,
         nome:         input.nome,
         fantasia:     input.fantasia ?? null,
@@ -711,6 +726,7 @@ const pessoaRouter = router({
         telefone:     input.telefone ?? null,
         isCliente:    input.isCliente ? 1 : 0,
         isFornecedor: input.isFornecedor ? 1 : 0,
+        clienteId,
         cep:          input.cep ?? null,
         logradouro:   input.logradouro ?? null,
         numero:       input.numero ?? null,
@@ -755,6 +771,26 @@ const pessoaRouter = router({
       tipoPagamento: z.string().nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [existente] = await ctx.db
+        .select({ clienteId: finPessoa.clienteId })
+        .from(finPessoa)
+        .where(and(eq(finPessoa.id, input.id), eq(finPessoa.empresaId, empId)))
+        .limit(1)
+      if (!existente) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      // Cadastro único: se virou cliente agora e ainda não tinha link, acha/cria o cliente
+      let clienteId = existente.clienteId
+      if (input.isCliente && !clienteId) {
+        clienteId = await acharOuCriarClienteParaFinPessoa(ctx.db, empId, ctx.usuario.id, {
+          nome: input.nome, cpfCnpj: input.cpfCnpj, email: input.email || null,
+          telefone: input.telefone, tipoPessoa: input.tipoPessoa,
+          cep: input.cep, logradouro: input.logradouro, numero: input.numero,
+          complemento: input.complemento, bairro: input.bairro, cidade: input.cidade, estado: input.estado,
+        })
+      }
+
       // Nota: NÃO usar spread com Drizzle+MySQL para booleanos
       await ctx.db
         .update(finPessoa)
@@ -767,6 +803,7 @@ const pessoaRouter = router({
           telefone:     input.telefone ?? null,
           isCliente:    input.isCliente ? 1 : 0,
           isFornecedor: input.isFornecedor ? 1 : 0,
+          clienteId,
           cep:          input.cep ?? null,
           logradouro:   input.logradouro ?? null,
           numero:       input.numero ?? null,
@@ -782,7 +819,19 @@ const pessoaRouter = router({
           tipoPagamento:input.tipoPagamento ?? null,
           updatedAt:    new Date(),
         })
-        .where(and(eq(finPessoa.id, input.id), eq(finPessoa.empresaId, ctx.usuario.empresaId)))
+        .where(and(eq(finPessoa.id, input.id), eq(finPessoa.empresaId, empId)))
+
+      // Propaga a identidade (nome, cpf, contato, endereço) de volta pro cadastro de cliente
+      if (clienteId) {
+        await propagarFinPessoaParaCliente(ctx.db, empId, clienteId, {
+          nome: input.nome, cpfCnpj: input.cpfCnpj ?? null, email: input.email || null,
+          telefone: input.telefone ?? null, tipoPessoa: input.tipoPessoa,
+          cep: input.cep ?? null, logradouro: input.logradouro ?? null, numero: input.numero ?? null,
+          complemento: input.complemento ?? null, bairro: input.bairro ?? null,
+          cidade: input.cidade ?? null, estado: input.estado ?? null,
+        })
+      }
+
       return { ok: true }
     }),
 
@@ -1959,18 +2008,28 @@ const propostaFinRouter = router({
         .where(eq(cliente.id, prop.clienteId)).limit(1)
       if (!cli) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
 
-      // 4. Busca ou cria finPessoa pelo CPF/CNPJ
+      // 4. Busca ou cria finPessoa vinculada a este cliente (cadastro único)
       let pessoaId: number | null = null
-      if (cli.cpfCnpj) {
-        const [pessoaExist] = await ctx.db.select({ id: finPessoa.id }).from(finPessoa)
-          .where(and(eq(finPessoa.empresaId, empId), eq(finPessoa.cpfCnpj, cli.cpfCnpj)))
+
+      // 4a. Já existe uma finPessoa linkada a este cliente?
+      const [pessoaLinkada] = await ctx.db.select({ id: finPessoa.id }).from(finPessoa)
+        .where(and(eq(finPessoa.empresaId, empId), eq(finPessoa.clienteId, cli.id)))
+        .limit(1)
+      if (pessoaLinkada) pessoaId = pessoaLinkada.id
+
+      // 4b. Legado: existe uma finPessoa com o mesmo CPF/CNPJ ainda não linkada? Liga agora.
+      if (!pessoaId && cli.cpfCnpj) {
+        const [pessoaOrfa] = await ctx.db.select({ id: finPessoa.id }).from(finPessoa)
+          .where(and(eq(finPessoa.empresaId, empId), eq(finPessoa.cpfCnpj, cli.cpfCnpj), isNull(finPessoa.clienteId)))
           .limit(1)
-        if (pessoaExist) {
-          pessoaId = pessoaExist.id
+        if (pessoaOrfa) {
+          pessoaId = pessoaOrfa.id
+          await ctx.db.update(finPessoa).set({ clienteId: cli.id }).where(eq(finPessoa.id, pessoaOrfa.id))
         }
       }
+
+      // 4c. Nenhuma encontrada — cria nova finPessoa já linkada ao cliente
       if (!pessoaId) {
-        // Cria nova finPessoa a partir do cliente
         const ins = await ctx.db.insert(finPessoa).values({
           empresaId:   empId,
           nome:        cli.nome,
@@ -1978,8 +2037,9 @@ const propostaFinRouter = router({
           email:       cli.email ?? null,
           telefone:    cli.telefone ?? null,
           tipoPessoa:  cli.cpfCnpj && cli.cpfCnpj.replace(/\D/g, '').length <= 11 ? 'FISICA' : 'JURIDICA',
-          isCliente:   true,
-          isFornecedor: false,
+          isCliente:    1,
+          isFornecedor: 0,
+          clienteId:   cli.id,
         })
         pessoaId = Number((ins as any).insertId ?? (ins[0] as any)?.insertId ?? 0)
       }

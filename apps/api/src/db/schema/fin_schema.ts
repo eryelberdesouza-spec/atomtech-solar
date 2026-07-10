@@ -7,7 +7,7 @@ import {
   mysqlTable, int, varchar, text, boolean, decimal, timestamp, date, mysqlEnum, index,
 } from 'drizzle-orm/mysql-core'
 import { sql } from 'drizzle-orm'
-import { empresa } from './index'
+import { empresa, cliente } from './index'
 
 // ─── CONTA BANCÁRIA ───────────────────────────────────────────────────────────
 export const finContaBancaria = mysqlTable('fin_conta_bancaria', {
@@ -94,6 +94,9 @@ export const finPessoa = mysqlTable('fin_pessoa', {
   telefone:    varchar('telefone', { length: 20 }),
   isCliente:   boolean('is_cliente').default(false).notNull(),
   isFornecedor:boolean('is_fornecedor').default(false).notNull(),
+  // Liga esta pessoa ao cadastro de cliente da Plataforma de Propostas (cadastro único —
+  // ver [[pessoaSync]]). Nulo para pessoas que só existem no financeiro (ex.: fornecedores).
+  clienteId:   int('cliente_id').references(() => cliente.id),
   cep:         varchar('cep', { length: 9 }),
   logradouro:  varchar('logradouro', { length: 300 }),
   numero:      varchar('numero', { length: 10 }),
@@ -114,6 +117,7 @@ export const finPessoa = mysqlTable('fin_pessoa', {
   idxEmpresa:  index('idx_fin_pessoa_empresa').on(t.empresaId),
   idxCpfCnpj:  index('idx_fin_pessoa_cpf').on(t.cpfCnpj),
   idxNome:     index('idx_fin_pessoa_nome').on(t.nome),
+  idxCliente:  index('idx_fin_pessoa_cliente').on(t.clienteId),
 }))
 
 // ─── TÍTULO (Conta a Pagar / Conta a Receber) ─────────────────────────────────

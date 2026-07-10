@@ -7,6 +7,7 @@ import { eq, and, like, or, ne, asc } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure } from './trpc'
 import { cliente, empresa } from '../db/schema'
+import { propagarClienteParaFinPessoa, vincularFinPessoaOrfaAoCliente } from '../lib/pessoaSync'
 
 // ─── SCHEMA DE VALIDAÇÃO ─────────────────────────────────────────────
 
@@ -258,6 +259,12 @@ export const clienteRouter = router({
 
       const novoId = (result as { insertId: number }).insertId
 
+      // Cadastro único: se já existia um cadastro no financeiro com o mesmo CPF/CNPJ
+      // (ainda não linkado), liga os dois em vez de deixar duplicado.
+      if (input.cpfCnpj) {
+        await vincularFinPessoaOrfaAoCliente(ctx.db, empresaId, novoId, input.cpfCnpj)
+      }
+
       const [novo] = await ctx.db
         .select()
         .from(cliente)
@@ -302,6 +309,23 @@ export const clienteRouter = router({
         })
         .where(eq(cliente.id, id))
         .execute()
+
+      // Cadastro único: propaga nome/documento/contato/endereço pro cadastro
+      // financeiro vinculado (se houver) — mantém os dois sempre iguais.
+      await propagarClienteParaFinPessoa(ctx.db, empresaId, id, {
+        nome:       dados.nome ? dados.nome.toUpperCase() : undefined,
+        cpfCnpj:    dados.cpfCnpj,
+        email:      dados.email || undefined,
+        telefone:   dados.telefone,
+        tipoPessoa: dados.tipoPessoa,
+        cep:         dados.cep,
+        endereco:    dados.endereco,
+        numero:      dados.numero,
+        complemento: dados.complemento,
+        bairro:      dados.bairro,
+        cidade:      dados.cidade,
+        estado:      dados.estado,
+      })
 
       const [atualizado] = await ctx.db
         .select()
