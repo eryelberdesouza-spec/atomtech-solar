@@ -7,9 +7,11 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 | App | Função | Deploy |
 |-----|--------|--------|
 | apps/api | Backend tRPC + Drizzle ORM + MySQL | Railway — auto-deploy no push (https://atomtech-solar-production.up.railway.app) |
-| apps/web | Plataforma de Propostas (React) | Vercel — https://atomtech-solar-web.vercel.app |
-| apps/financeiro | Módulo Financeiro SIGECO (React) | Vercel — https://financeiro-two-mu.vercel.app |
+| apps/web | **AGO — Atom Gestão Operacional** (propostas, clientes, OS; ex-"SIGECO Propostas") | Vercel — https://atomtech-solar-web.vercel.app |
+| apps/financeiro | **AGF — Atom Gestão Financeira** (ex-"SIGECO Gestão") | Vercel — https://financeiro-two-mu.vercel.app |
 | n8n/ | Bot WhatsApp (docs/prompt; o workflow vive no n8n do Railway) | — |
+
+> Rebranding 2026-07-10: SIGECO → AGO/AGF. Os nomes de pastas, URLs e tabelas NÃO mudaram — só a marca visível (janelas, PWA, PDFs, telas).
 
 - Deploy Vercel SEMPRE via CLI: `cmd /c "cd apps\financeiro && npx vercel --prod --yes"` (o botão Redeploy do dashboard reusa build antigo).
 - API: `git push origin main` basta.
@@ -45,12 +47,12 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 - Números BR podem não ter o nono dígito no WhatsApp — resolver via `/api/contacts/check-exists`. Contatos podem chegar como `@lid`; número real em `payload._data.key.remoteJidAlt`.
 
 ## Backlog priorizado
-1. **Fase 3 bot**: integração com SIGECO (criar leads/OS via API tRPC)
+1. **Fase 3 bot**: integração com AGO/AGF (criar leads/OS via API tRPC)
 2. Buffer de mensagens picadas (~8s, Redis) — hoje cada mensagem gera uma resposta
 3. Transcrição de áudio (mensagens de voz caem com body vazio)
 4. Chatwoot + WAHA (central de atendimento web) — plano B se coexistência com WhatsApp Web degradar
 5. Limpeza: linhas de teste na planilha Leads (números `55619000000xx`); serviço `atomtech-solar` crashado no projeto Railway do bot (duplicado, remover)
-6. SIGECO: P1–P14 (relatórios PDF, conciliação, mobile etc. — ver histórico)
+6. AGF: P1–P14 (relatórios PDF, conciliação, mobile etc. — ver histórico)
 
 ## Contexto de máquina
 - Memória local do Claude Code (PC casa): `C:\Users\usuario\.claude\projects\C--Projetos-atomtech-solar\memory\` — mais detalhada que este arquivo; este CLAUDE.md é o resumo portátil.

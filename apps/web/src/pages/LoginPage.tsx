@@ -53,7 +53,7 @@ export function LoginPage() {
             </div>
           </div>
           <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
-            Sistema de Propostas Fotovoltaicas
+            AGO — Atom Gestão Operacional
           </p>
         </div>
 

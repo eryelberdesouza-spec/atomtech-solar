@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['atomtech-icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Atom Tech Solar — Propostas',
-        short_name: 'Atom Tech',
-        description: 'Sistema de propostas fotovoltaicas da Atom Tech',
+        name: 'AGO — Atom Gestão Operacional',
+        short_name: 'AGO',
+        description: 'Atom Gestão Operacional — propostas, clientes e ordens de serviço',
         theme_color: '#0C1421',
         background_color: '#0C1421',
         display: 'standalone',

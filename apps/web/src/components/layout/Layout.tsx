@@ -4,7 +4,7 @@ import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../ui/NovaPropostaDropdown'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
-// Logo Atom Tech — identidade SIGECO
+// Logo Atom Tech — identidade AGO
 const IconAtom = ({ size = 36 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="80" fill="#111D2E"/>
@@ -250,10 +250,10 @@ export function Layout() {
               {!collapsed && (
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#E2EAF5', lineHeight: 1.1 }}>
-                    <span style={{ color: '#F5A623' }}>SIGE</span><span style={{ color: '#3EBB7A' }}>CO</span>
+                    <span style={{ color: '#F5A623' }}>A</span><span style={{ color: '#3EBB7A' }}>GO</span>
                   </div>
                   <div style={{ fontSize: 9, color: '#3EBB7A', letterSpacing: '0.18em', marginTop: 3, fontWeight: 700 }}>
-                    PROPOSTAS
+                    GESTÃO OPERACIONAL
                   </div>
                 </div>
               )}
@@ -423,7 +423,7 @@ export function Layout() {
               </h1>
               {!isMobile && (
                 <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>
-                  SIGECO · Plataforma Comercial
+                  AGO · Atom Gestão Operacional
                 </div>
               )}
             </div>
@@ -461,9 +461,9 @@ export function Layout() {
                     el.style.background = 'transparent'
                     el.style.borderColor = '#1E4033'
                   } : undefined}
-                  title={isAdmin ? 'Abrir SIGECO Gestão' : 'Acesso restrito a administradores'}
+                  title={isAdmin ? 'Abrir AGF — Atom Gestão Financeira' : 'Acesso restrito a administradores'}
                 >
-                  ◈ SIGECO Gestão
+                  ◈ AGF Financeiro
                   {!isAdmin && <span style={{ fontSize: 9, color: '#4A6080' }}>🔒</span>}
                 </a>
               )

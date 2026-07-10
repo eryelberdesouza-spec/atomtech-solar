@@ -77,7 +77,7 @@ function cabecalho(titulo: string, sub: string, empresa: any) {
 }
 
 function rodape() {
-  return `<div class="footer">Atom Tech · Controle Financeiro · Documento gerado automaticamente</div>`
+  return `<div class="footer">Atom Tech · AGF — Atom Gestão Financeira · Documento gerado automaticamente</div>`
 }
 
 function abrirJanela(html: string) {

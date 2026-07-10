@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['atomtech-icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'SIGECO Gestão',
-        short_name: 'SIGECO',
-        description: 'Sistema de Gestão Financeira da Atom Tech',
+        name: 'AGF — Atom Gestão Financeira',
+        short_name: 'AGF',
+        description: 'Atom Gestão Financeira',
         theme_color: '#0D1C17',
         background_color: '#0D1C17',
         display: 'standalone',

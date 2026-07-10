@@ -123,7 +123,7 @@ const NAV = [
   { path: '/configuracoes',label: 'Configurações', Icon: IcoConfiguracoes, color: '#6B9E87', desc: 'Contas, Plano, Custos' },
 ]
 
-// Logo Atom Tech — sol com raios (identidade SIGECO)
+// Logo Atom Tech — sol com raios (identidade AGF)
 const IconAtom = ({ size = 36 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
     <rect width="512" height="512" rx="80" fill="#0D1C17"/>
@@ -297,10 +297,10 @@ export function Layout() {
           {!collapsed && (
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
-                <span style={{ color: '#F5A623' }}>SIGE</span><span style={{ color: C.emerald }}>CO</span>
+                <span style={{ color: '#F5A623' }}>A</span><span style={{ color: C.emerald }}>GF</span>
               </div>
               <div style={{ fontSize: 9, color: C.emeraldFg, letterSpacing: '0.18em', marginTop: 3, fontWeight: 700 }}>
-                GESTÃO
+                GESTÃO FINANCEIRA
               </div>
             </div>
           )}
@@ -318,7 +318,7 @@ export function Layout() {
             fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
             textAlign: 'center',
           }}>
-            SIGECO · Gestão Financeira
+            AGF · Atom Gestão Financeira
           </div>
         )}
 
@@ -470,7 +470,7 @@ export function Layout() {
               </h1>
               {!isMobile && (
                 <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>
-                  SIGECO · Gestão Financeira
+                  AGF · Atom Gestão Financeira
                 </div>
               )}
             </div>
@@ -500,9 +500,9 @@ export function Layout() {
                   el.style.borderColor = C.border
                   el.style.color = C.textMuted
                 }}
-                title="Ir para SIGECO Propostas"
+                title="Ir para AGO — Atom Gestão Operacional"
               >
-                ☀ SIGECO Propostas
+                ☀ AGO Operacional
               </a>
             )}
 

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// Gestão de Usuários — SIGECO Gestão Financeira
+// Gestão de Usuários — AGF (Atom Gestão Financeira)
 // Mesmo endpoint da plataforma de Propostas (usuarioRouter compartilhado)
 // ═══════════════════════════════════════════════════════════════════
 
@@ -24,8 +24,8 @@ const ROLE_CORES: Record<string, string> = {
 }
 
 const ROLE_DESCRICOES: Record<string, string> = {
-  admin:        'Acesso total — SIGECO Gestão + Propostas, configurações e usuários',
-  comercial:    'Acesso à plataforma de Propostas. Sem acesso ao Financeiro',
+  admin:        'Acesso total — AGF + AGO, configurações e usuários',
+  comercial:    'Acesso à plataforma AGO (Operacional). Sem acesso ao Financeiro',
   tecnico:      'Visualiza e opera Ordens de Serviço. Sem acesso ao Financeiro',
   visualizador: 'Somente leitura — visualiza propostas e clientes',
 }

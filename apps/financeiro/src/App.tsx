@@ -57,7 +57,7 @@ function AcessoBloqueado() {
           Acesso Restrito
         </h1>
         <p style={{ color: '#64748B', fontSize: 14, margin: '0 0 20px', lineHeight: 1.6 }}>
-          O módulo <strong style={{ color: '#10B981' }}>Financeiro</strong> é exclusivo para
+          O <strong style={{ color: '#10B981' }}>AGF — Atom Gestão Financeira</strong> é exclusivo para
           administradores do sistema.
         </p>
         <div style={{
@@ -83,7 +83,7 @@ function AcessoBloqueado() {
             boxShadow: '0 4px 16px rgba(16,185,129,0.3)',
           }}
         >
-          ☀ Voltar para Propostas
+          ☀ Voltar para o AGO
         </a>
       </div>
     </div>

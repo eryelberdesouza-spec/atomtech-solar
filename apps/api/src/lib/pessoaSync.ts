@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// Sincronização de identidade entre cliente (Propostas) e fin_pessoa (SIGECO)
+// Sincronização de identidade entre cliente (AGO) e fin_pessoa (AGF)
 // ═══════════════════════════════════════════════════════════════════
 //
 // As duas plataformas usam tabelas separadas com propósitos diferentes:
@@ -88,7 +88,7 @@ export async function propagarClienteParaFinPessoa(db: any, empresaId: number, c
     .where(and(eq(finPessoa.clienteId, clienteId), eq(finPessoa.empresaId, empresaId)))
 }
 
-// Propaga edição de fin_pessoa (SIGECO) para o cliente vinculado
+// Propaga edição de fin_pessoa (AGF) para o cliente vinculado
 export async function propagarFinPessoaParaCliente(db: any, empresaId: number, clienteId: number, dados: FinPessoaIdentidade) {
   const campos = mapFinPessoaParaCliente(dados)
   if (Object.keys(campos).length === 0) return

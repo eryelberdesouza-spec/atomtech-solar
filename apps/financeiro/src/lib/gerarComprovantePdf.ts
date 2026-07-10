@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// Gerador de Comprovante / OS — SIGECO / Atom Finance
+// Gerador de Comprovante / OS — AGF (Atom Gestão Financeira)
 // Usa window.print() em uma nova janela para gerar o PDF
 // ═══════════════════════════════════════════════════════════════════
 
@@ -195,7 +195,7 @@ function headerHtml(empresa: EmpresaInfo, logoDataUrl: string | null): string {
           ${empresa.nome}
         </div>
         <div style="font-size:10px;color:#64748B;margin-top:2px;letter-spacing:0.02em;">
-          SIGECO — Sistema Integrado de Gestão de Engenharia, Contratos e Operações
+          AGF — Atom Gestão Financeira
         </div>
         <div style="margin-top:5px;font-size:10.5px;color:#475569;line-height:1.6;">
           CNPJ: ${fmtCnpj(empresa.cnpj)}
@@ -512,7 +512,7 @@ export async function gerarComprovantePdf(params: {
     <html lang="pt-BR">
     <head>
       <meta charset="UTF-8">
-      <title>SIGECO — ${empresa.nome}</title>
+      <title>AGF — ${empresa.nome}</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -536,7 +536,7 @@ export async function gerarComprovantePdf(params: {
       ${conteudo}
 
       <div style="margin-top:28px;padding-top:12px;border-top:1px solid #E2E8F0;text-align:center;font-size:9px;color:#94A3B8;">
-        SIGECO / ${empresa.nome} &nbsp;·&nbsp; Emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        AGF / ${empresa.nome} &nbsp;·&nbsp; Emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
       </div>
       ${rodape}
 

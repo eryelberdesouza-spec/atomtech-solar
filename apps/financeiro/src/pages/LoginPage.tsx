@@ -61,10 +61,10 @@ export function LoginPage() {
             <IconAtom size={56} />
           </div>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
-            <span style={{ color: '#F5A623' }}>SIGE</span><span style={{ color: C.emerald }}>CO</span>
+            <span style={{ color: '#F5A623' }}>A</span><span style={{ color: C.emerald }}>GF</span>
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, letterSpacing: '0.1em' }}>
-            GESTÃO FINANCEIRA
+            ATOM GESTÃO FINANCEIRA
           </div>
         </div>
 
@@ -123,7 +123,7 @@ export function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: C.textDim }}>
-          Atom Tech · SIGECO
+          Atom Tech · AGF
         </p>
       </div>
     </div>

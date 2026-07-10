@@ -26,5 +26,5 @@
   <line x1="310" y1="340" x2="310" y2="430" stroke="#F5A62330" stroke-width="2"/>
   <line x1="96"  y1="385" x2="416" y2="385" stroke="#F5A62330" stroke-width="2"/>
   <!-- Texto -->
-  <text x="256" y="472" font-family="Arial Black, Arial" font-weight="900" font-size="44" fill="#F5A623" text-anchor="middle" letter-spacing="6">ATOMTECH</text>
+  <text x="256" y="472" font-family="Arial Black, Arial" font-weight="900" font-size="56" fill="#F5A623" text-anchor="middle" letter-spacing="10">AGO</text>
 </svg>
