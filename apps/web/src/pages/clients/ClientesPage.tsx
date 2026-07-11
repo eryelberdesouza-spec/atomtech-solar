@@ -40,8 +40,11 @@ const FORM_VAZIO: ClienteForm = {
 const ESTADOS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
 const DISTRIBUIDORAS = ['Neoenergia Brasília','Neoenergia Pernambuco','Neoenergia Coelba','Neoenergia Cosern','Equatorial Goiás','Equatorial Pará','Equatorial Piauí','Equatorial Maranhão','CEMIG','COPEL','CPFL','Enel São Paulo','Enel Rio','Enel Ceará','Light','Energisa','CELPE','COELCE','CELESC','CEMAT','Outra']
 
-function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
+function ClienteFormModal({ inicial, onSave, onClose, loading, erro, editandoId }: {
   inicial: ClienteForm; onSave: (data: ClienteForm) => void; onClose: () => void; loading?: boolean; erro?: string
+  // Na edição: id do cliente sendo editado — a checagem de duplicidade precisa
+  // ignorá-lo, senão o cadastro acusa duplicata dele mesmo e bloqueia o salvamento.
+  editandoId?: number
 }) {
   const [form, setForm] = useState<ClienteForm>(inicial)
   const [cepLoading, setCepLoading] = useState(false)
@@ -71,7 +74,7 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro }: {
   }
 
   const { data: dup } = trpc.cliente.checkDuplicidade.useQuery(
-    { nome: form.nome, cpfCnpj: form.cpfCnpj, email: form.email || undefined },
+    { nome: form.nome, cpfCnpj: form.cpfCnpj, email: form.email || undefined, ignorarId: editandoId },
     { enabled: form.nome.length > 2 }
   )
 
@@ -545,7 +548,7 @@ export function ClienteDetailPage() {
         </div>
       )}
 
-      {showEdit && <ClienteFormModal inicial={clienteParaForm(cliente)} onSave={form => { setUpdateErro(''); updateMutation.mutate({ id: clienteId, ...form } as any) }} onClose={() => { setShowEdit(false); setUpdateErro('') }} loading={updateMutation.isLoading} erro={updateErro} />}
+      {showEdit && <ClienteFormModal inicial={clienteParaForm(cliente)} editandoId={clienteId} onSave={form => { setUpdateErro(''); updateMutation.mutate({ id: clienteId, ...form } as any) }} onClose={() => { setShowEdit(false); setUpdateErro('') }} loading={updateMutation.isLoading} erro={updateErro} />}
     </PageWrapper>
   )
 }
