@@ -29,6 +29,148 @@ function ProgressBar({ feitos, total }: { feitos: number; total: number }) {
   )
 }
 
+// ─── Modal Nova OS Avulsa ─────────────────────────────────────────────────────
+// OS sem proposta/contrato: pós-venda, visita técnica, manutenção, retorno etc.
+function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSucesso: (id: number, numero: string) => void }) {
+  const isMobile = useIsMobile()
+  const [form, setForm] = useState({
+    clienteId: '', titulo: '', resumoServico: '', localizacao: '',
+    tecnicoResponsavel: '', dataPrevistaInicio: '', dataPrevistaFim: '',
+  })
+  const [buscaCliente, setBuscaCliente] = useState('')
+  const [erro, setErro] = useState('')
+
+  const { data: clientesData } = (trpc as any).cliente.list.useQuery({ porPagina: 200 })
+  const clientes: any[] = (clientesData?.data ?? []).filter((c: any) => !c.cancelado)
+
+  const criarMut = (trpc as any).os.criar.useMutation({
+    onSuccess: (res: any) => onSucesso(res.id, res.numero),
+    onError: (e: any) => setErro(e.message ?? 'Erro ao criar OS'),
+  })
+
+  const clienteSelecionado = clientes.find(c => String(c.id) === form.clienteId)
+  const clientesFiltrados = buscaCliente.trim()
+    ? clientes.filter(c => c.nome.toLowerCase().includes(buscaCliente.toLowerCase()))
+    : []
+
+  const salvar = () => {
+    setErro('')
+    if (!form.clienteId) return setErro('Selecione o cliente')
+    if (!form.titulo.trim()) return setErro('Informe o título da OS (ex.: Visita técnica, Pós-venda, Manutenção)')
+    criarMut.mutate({
+      clienteId:          parseInt(form.clienteId),
+      titulo:             form.titulo.trim(),
+      resumoServico:      form.resumoServico.trim() || undefined,
+      localizacao:        form.localizacao.trim() || undefined,
+      tecnicoResponsavel: form.tecnicoResponsavel.trim() || undefined,
+      dataPrevistaInicio: form.dataPrevistaInicio || undefined,
+      dataPrevistaFim:    form.dataPrevistaFim || undefined,
+      temAgendamento:     false,
+    })
+  }
+
+  const inputSt: React.CSSProperties = {
+    width: '100%', padding: '8px 12px', borderRadius: 8, boxSizing: 'border-box',
+    border: '1px solid #1E3050', background: '#0C1828', color: '#C8D8EC',
+    fontSize: 13, outline: 'none', fontFamily: 'inherit',
+  }
+  const labelSt: React.CSSProperties = {
+    display: 'block', fontSize: 10, color: '#4A6080', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+      <div style={{ background: '#111D2E', borderRadius: 14, border: '1px solid #1E3050', width: isMobile ? '96vw' : 560, maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? 18 : 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <h2 style={{ color: '#C8D8EC', fontSize: 15, fontWeight: 800, margin: 0 }}>🛠 Nova OS Avulsa</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4A6080', fontSize: 18, cursor: 'pointer' }}>×</button>
+        </div>
+        <p style={{ color: '#4A6080', fontSize: 11, margin: '0 0 16px', lineHeight: 1.5 }}>
+          Para pós-venda, visita técnica, manutenção ou qualquer serviço sem contrato vinculado.
+          OS de instalação continua sendo gerada pela proposta.
+        </p>
+
+        {erro && (
+          <div style={{ background: '#7F1D1D20', border: '1px solid #B91C1C', borderRadius: 8, padding: '8px 12px', marginBottom: 14, color: '#FCA5A5', fontSize: 12 }}>
+            ⚠ {erro}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Cliente */}
+          <div>
+            <label style={labelSt}>Cliente *</label>
+            {clienteSelecionado ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#3EBB7A12', border: '1px solid #3EBB7A40', borderRadius: 8, padding: '8px 12px' }}>
+                <span style={{ fontSize: 13, color: '#C8D8EC', fontWeight: 600 }}>{clienteSelecionado.nome}</span>
+                <button onClick={() => setForm(f => ({ ...f, clienteId: '' }))} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 15 }}>×</button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <input value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)} placeholder="Buscar cliente pelo nome..." style={inputSt} />
+                {clientesFiltrados.length > 0 && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#131F30', border: '1px solid #1E3050', borderRadius: 8, marginTop: 4, maxHeight: 180, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                    {clientesFiltrados.slice(0, 8).map(c => (
+                      <div key={c.id}
+                        onClick={() => { setForm(f => ({ ...f, clienteId: String(c.id) })); setBuscaCliente('') }}
+                        style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: '#C8D8EC', borderBottom: '1px solid #1E305040' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#1A2438')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >{c.nome}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label style={labelSt}>Título da OS *</label>
+            <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
+              placeholder="Ex.: Visita técnica, Pós-venda, Limpeza de painéis..." style={inputSt} />
+          </div>
+
+          <div>
+            <label style={labelSt}>Resumo do serviço (orientação do técnico)</label>
+            <textarea value={form.resumoServico} onChange={e => setForm(f => ({ ...f, resumoServico: e.target.value }))}
+              placeholder="O que deve ser feito no local..." style={{ ...inputSt, minHeight: 70, resize: 'vertical' }} />
+          </div>
+
+          <div>
+            <label style={labelSt}>Localização do serviço</label>
+            <input value={form.localizacao} onChange={e => setForm(f => ({ ...f, localizacao: e.target.value }))}
+              placeholder="Endereço, coordenadas ou link do Google Maps" style={inputSt} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={labelSt}>Técnico responsável</label>
+              <input value={form.tecnicoResponsavel} onChange={e => setForm(f => ({ ...f, tecnicoResponsavel: e.target.value }))} style={inputSt} />
+            </div>
+            <div>
+              <label style={labelSt}>Previsão início</label>
+              <input type="date" value={form.dataPrevistaInicio} onChange={e => setForm(f => ({ ...f, dataPrevistaInicio: e.target.value }))} style={inputSt} />
+            </div>
+            <div>
+              <label style={labelSt}>Previsão fim</label>
+              <input type="date" value={form.dataPrevistaFim} onChange={e => setForm(f => ({ ...f, dataPrevistaFim: e.target.value }))} style={inputSt} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#4A6080', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={salvar} disabled={criarMut.isLoading}
+            style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+            {criarMut.isLoading ? 'Criando...' : '✓ Criar OS'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Modal Contratos Históricos ──────────────────────────────────────────────
 
 const LINHA_VAZIA = () => ({
@@ -458,6 +600,7 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
 }) {
   const status = STATUS_OS.find(s => s.id === os.status) ?? STATUS_OS[0]
   const isHistorico = os.origem === 'historico'
+  const isAvulsa    = os.origem === 'avulsa'
   return (
     <div
       {...dragHandleProps}
@@ -478,6 +621,9 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
           <span style={{ fontSize: 11, fontFamily: 'monospace', color: status.color, fontWeight: 700 }}>{os.numero}</span>
           {isHistorico && (
             <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#8A9BB520', color: '#8A9BB5', border: '1px solid #8A9BB540' }}>HIST</span>
+          )}
+          {isAvulsa && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#A371F720', color: '#A371F7', border: '1px solid #A371F740' }}>AVULSA</span>
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -562,6 +708,7 @@ export function OrdensServicoPage() {
   const [view, setView]   = useState<'kanban' | 'lista'>(isMobile ? 'lista' : 'kanban')
   const [kanbanCol, setKanbanCol] = useState(0) // coluna ativa no kanban mobile
   const [showModalHistorico, setShowModalHistorico] = useState(false)
+  const [showModalNovaOS, setShowModalNovaOS] = useState(false)
   const [osEtiquetas, setOsEtiquetas] = useState<any | null>(null) // OS aberta no modal de etiquetas
   const [draggingOs, setDraggingOs] = useState<any | null>(null)
 
@@ -624,6 +771,7 @@ export function OrdensServicoPage() {
           {/* Botões lado direito — desktop */}
           {!isMobile && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={() => setShowModalNovaOS(true)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>+ Nova OS</button>
               <button onClick={() => setShowModalHistorico(true)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>📦 Contratos Históricos</button>
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar OS, cliente..."
                 style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #1E3050', background: '#0C1828', color: '#C8D8EC', fontSize: 13, outline: 'none', width: 220, fontFamily: 'inherit' }} />
@@ -638,7 +786,10 @@ export function OrdensServicoPage() {
           )}
           {/* Mobile: só o botão histórico como ícone */}
           {isMobile && (
-            <button onClick={() => setShowModalHistorico(true)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>📦</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setShowModalNovaOS(true)} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>+ OS</button>
+              <button onClick={() => setShowModalHistorico(true)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>📦</button>
+            </div>
           )}
         </div>
 
@@ -769,6 +920,20 @@ export function OrdensServicoPage() {
         <ModalHistorico
           onClose={() => setShowModalHistorico(false)}
           onSucesso={() => setShowModalHistorico(false)}
+        />
+      )}
+
+      {/* ── Modal Nova OS Avulsa ── */}
+      {showModalNovaOS && (
+        <ModalNovaOSAvulsa
+          onClose={() => setShowModalNovaOS(false)}
+          onSucesso={(id, numero) => {
+            setShowModalNovaOS(false)
+            utils.os.list.invalidate()
+            if (window.confirm(`OS ${numero} criada com sucesso!\n\nDeseja abrir a Ordem de Serviço agora?`)) {
+              navigate(`/ordens-servico/${id}`)
+            }
+          }}
         />
       )}
 

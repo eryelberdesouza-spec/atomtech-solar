@@ -500,7 +500,10 @@ export const itemServicoProposta = mysqlTable('item_servico_proposta', {
 export const ordemServico = mysqlTable('ordem_servico', {
   id:                  int('id').primaryKey().autoincrement(),
   empresaId:           int('empresa_id').notNull(),
-  propostaId:          int('proposta_id').notNull(),
+  // Opcional: OS avulsa (pós-venda, visita técnica, manutenção) não tem proposta —
+  // nesse caso o vínculo é direto pelo clienteId abaixo.
+  propostaId:          int('proposta_id'),
+  clienteId:           int('cliente_id'),
   numero:              varchar('numero', { length: 20 }).notNull().unique(),
   status:              mysqlEnum('status', ['aberta', 'em_execucao', 'concluida', 'cancelada']).default('aberta').notNull(),
   titulo:              varchar('titulo', { length: 200 }),

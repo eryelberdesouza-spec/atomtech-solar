@@ -1013,6 +1013,38 @@ app.post('/extrato/parse-ofx', upload.single('ofx'), async (req, res) => {
   }
 })
 
+// ── Migração: OS avulsa (sem proposta/contrato) ───────────────────────────────
+// Pós-venda, visita técnica, manutenção etc. — OS vinculada direto ao cliente.
+app.get('/run-migration-os-avulsa', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    // proposta_id vira opcional + origem ganha o valor 'avulsa'
+    await conn.execute(`ALTER TABLE ordem_servico MODIFY COLUMN proposta_id INT NULL`)
+    await conn.execute(`ALTER TABLE ordem_servico MODIFY COLUMN origem ENUM('plataforma','historico','avulsa') NOT NULL DEFAULT 'plataforma'`)
+
+    // cliente_id direto na OS (para OS sem proposta)
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ordem_servico' AND COLUMN_NAME = 'cliente_id'`
+    )
+    if (cols.length === 0) {
+      await conn.execute(`
+        ALTER TABLE ordem_servico
+          ADD COLUMN cliente_id INT NULL AFTER proposta_id,
+          ADD INDEX idx_os_cliente (cliente_id)
+      `)
+    }
+
+    await conn.end()
+    res.json({ ok: true, message: 'OS avulsa habilitada: proposta_id opcional, cliente_id e origem=avulsa criados' })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: resumo do serviço + localização na OS ──────────────────────────
 app.get('/run-migration-os-resumo-localizacao', async (_, res) => {
   try {

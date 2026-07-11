@@ -38,7 +38,10 @@ async function gerarNumeroOS(empresaId: number): Promise<string> {
 // ─── Schemas ─────────────────────────────────────────────────────────
 
 const criarInput = z.object({
-  propostaId:         z.number().int().positive(),
+  // Um dos dois é obrigatório: propostaId (OS de contrato) OU clienteId (OS avulsa —
+  // pós-venda, visita técnica, manutenção etc., sem exigir contrato formalizado)
+  propostaId:         z.number().int().positive().optional(),
+  clienteId:          z.number().int().positive().optional(),
   titulo:             z.string().max(200).optional(),
   descricao:          z.string().optional(),
   tecnicoResponsavel: z.string().max(100).optional(),
@@ -134,7 +137,7 @@ export const osRouter = router({
            (SELECT COUNT(*) FROM os_agendamento ag WHERE ag.ordem_servico_id = os.id)                  AS totalAgendamentos
          FROM ordem_servico os
          LEFT JOIN proposta p ON p.id = os.proposta_id
-         LEFT JOIN cliente  c ON c.id = p.cliente_id
+         LEFT JOIN cliente  c ON c.id = COALESCE(p.cliente_id, os.cliente_id)
          WHERE ${where}
          ORDER BY os.created_at DESC
          LIMIT ${lim} OFFSET ${off}`,
@@ -204,7 +207,7 @@ export const osRouter = router({
            c.endereco              AS clienteEndereco
          FROM ordem_servico os
          LEFT JOIN proposta p ON p.id = os.proposta_id
-         LEFT JOIN cliente  c ON c.id = p.cliente_id
+         LEFT JOIN cliente  c ON c.id = COALESCE(p.cliente_id, os.cliente_id)
          WHERE os.id = ? AND os.empresa_id = ?
          LIMIT 1`,
         [input.id, ctx.usuario.empresaId],
@@ -252,16 +255,32 @@ export const osRouter = router({
       const pool  = getRawPool()
       const empId = ctx.usuario.empresaId
 
-      // Verifica se proposta existe e pertence à empresa
-      const [propRows]: any = await pool.execute(
-        `SELECT id, status, contrato_formalizado, cliente_id
-         FROM proposta WHERE id = ? AND empresa_id = ? LIMIT 1`,
-        [input.propostaId, empId],
-      )
-      const prop = (propRows as any[])[0]
-      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
-      if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Só é possível criar OS para propostas aceitas.' })
-      if (Number(prop.contrato_formalizado) !== 1) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O contrato ainda não foi formalizado.' })
+      if (!input.propostaId && !input.clienteId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Informe a proposta ou o cliente da OS.' })
+      }
+
+      const isAvulsa = !input.propostaId
+
+      if (input.propostaId) {
+        // OS de contrato: exige proposta aceita e formalizada (fluxo original)
+        const [propRows]: any = await pool.execute(
+          `SELECT id, status, contrato_formalizado, cliente_id
+           FROM proposta WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.propostaId, empId],
+        )
+        const prop = (propRows as any[])[0]
+        if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+        if (prop.status !== 'aceita') throw new TRPCError({ code: 'BAD_REQUEST', message: 'Só é possível criar OS para propostas aceitas.' })
+        if (Number(prop.contrato_formalizado) !== 1) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O contrato ainda não foi formalizado.' })
+      } else {
+        // OS avulsa: pós-venda, visita técnica, manutenção — vínculo direto ao cliente,
+        // sem exigir contrato (reabrir OS antiga para um retorno seria problemático)
+        const [cliRows]: any = await pool.execute(
+          `SELECT id FROM cliente WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.clienteId ?? null, empId],
+        )
+        if (!(cliRows as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+      }
 
       // Múltiplas OS por proposta são permitidas (projetos em etapas)
 
@@ -269,14 +288,16 @@ export const osRouter = router({
 
       await pool.execute(
         `INSERT INTO ordem_servico
-           (empresa_id, proposta_id, numero, status, titulo, descricao,
+           (empresa_id, proposta_id, cliente_id, origem, numero, status, titulo, descricao,
             tecnico_responsavel, resumo_servico, localizacao,
             data_prevista_inicio, data_prevista_fim,
             tem_agendamento, observacoes)
-         VALUES (?, ?, ?, 'aberta', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, 'aberta', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           empId,
-          input.propostaId,
+          input.propostaId ?? null,
+          isAvulsa ? (input.clienteId ?? null) : null,
+          isAvulsa ? 'avulsa' : 'plataforma',
           numero,
           input.titulo ?? null,
           input.descricao ?? null,
@@ -298,12 +319,15 @@ export const osRouter = router({
       const osId = (idRows as any[])[0]?.id
       if (!osId) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Erro ao criar OS' })
 
-      // Cria marcos padrão
-      for (let i = 0; i < MARCOS_PADRAO.length; i++) {
-        await pool.execute(
-          `INSERT INTO os_marco (ordem_servico_id, titulo, ordem) VALUES (?, ?, ?)`,
-          [osId, MARCOS_PADRAO[i], i],
-        )
+      // Marcos padrão (etapas de instalação) só fazem sentido na OS de contrato —
+      // na avulsa (visita técnica, pós-venda) o usuário adiciona as etapas que precisar
+      if (!isAvulsa) {
+        for (let i = 0; i < MARCOS_PADRAO.length; i++) {
+          await pool.execute(
+            `INSERT INTO os_marco (ordem_servico_id, titulo, ordem) VALUES (?, ?, ?)`,
+            [osId, MARCOS_PADRAO[i], i],
+          )
+        }
       }
 
       // Cria agendamento inicial se fornecido
