@@ -3,6 +3,39 @@ import { useState, useRef, useEffect } from 'react'
 import { trpc } from '../../lib/trpc'
 import { NovaPropostaDropdown } from '../ui/NovaPropostaDropdown'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { usePullToRefresh } from '../../hooks/usePullToRefresh'
+
+// Indicador visual do puxar-para-atualizar (mobile/PWA)
+function PullIndicator({ pull, refreshing, pronto }: { pull: number; refreshing: boolean; pronto: boolean }) {
+  if (pull <= 0) return null
+  return (
+    <div style={{
+      position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
+      display: 'flex', justifyContent: 'center', pointerEvents: 'none',
+      transform: `translateY(${pull - 44}px)`,
+      opacity: Math.min(1, pull / 55),
+      transition: refreshing ? 'none' : 'opacity 0.1s',
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%',
+        background: '#111D2E', border: '1px solid #1E3050',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: pronto || refreshing ? '#F5A623' : '#5A7090', fontSize: 16,
+      }}>
+        {refreshing ? (
+          <div style={{
+            width: 16, height: 16, borderRadius: '50%',
+            border: '2px solid #1E3050', borderTopColor: '#F5A623',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+        ) : (
+          <span style={{ display: 'inline-block', transform: pronto ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>↓</span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // Logo Atom Tech — identidade AGO
 const IconAtom = ({ size = 36 }: { size?: number }) => (
@@ -160,6 +193,7 @@ function NavItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 
 export function Layout() {
   const isMobile = useIsMobile()
+  const ptr = usePullToRefresh<HTMLDivElement>()
   const [collapsed, setCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -530,9 +564,12 @@ export function Layout() {
           </div>
         </div>
 
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', background: '#0C1421' }}>
-          <Outlet />
+        {/* Content — com puxar-para-atualizar no mobile/PWA */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <PullIndicator pull={ptr.pull} refreshing={ptr.refreshing} pronto={ptr.pronto} />
+          <div ref={ptr.ref} style={{ flex: 1, overflowY: 'auto', background: '#0C1421' }}>
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

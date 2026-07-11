@@ -38,6 +38,14 @@ function fmtBRL(v: number): string {
   return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
 
+// Saudação conforme o horário local: manhã (5h–11h59), tarde (12h–17h59), noite (18h–4h59)
+function saudacao(): string {
+  const h = new Date().getHours()
+  if (h >= 5 && h < 12) return 'Bom dia! ☀️'
+  if (h >= 12 && h < 18) return 'Boa tarde! 🌤️'
+  return 'Boa noite! 🌙'
+}
+
 function KpiCard({ label, value, valor, sub, icon, color }: {
   label: string; value: string | number; valor?: number; sub?: string; icon: string; color: string
 }) {
@@ -178,7 +186,7 @@ export function DashboardPage() {
       {/* Greeting + filtro período */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isMobile ? 16 : 28, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 18 : 22, fontWeight: 800, margin: '0 0 4px' }}>Bom dia! ☀️</h2>
+          <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 18 : 22, fontWeight: 800, margin: '0 0 4px' }}>{saudacao()}</h2>
           <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>
             {(empresa as any)?.nome ?? 'Atom Tech'} · Aqui está o resumo de hoje
           </p>
