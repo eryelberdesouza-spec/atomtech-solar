@@ -177,6 +177,118 @@ function InfoRow({ label, value, mono }: { label: string; value?: string | null;
   )
 }
 
+// Monta o link do Google Maps a partir do texto de localização
+// (aceita endereço, coordenadas ou um link já pronto)
+function linkMaps(localizacao: string): string {
+  if (/^https?:\/\//i.test(localizacao)) return localizacao
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(localizacao)}`
+}
+
+// ─── Bloco: Resumo do Serviço + Localização (orientação da equipe em campo) ───
+function BlocoServicoCampo({ os, osId, onRefresh }: any) {
+  const [editando, setEditando] = useState(false)
+  const [resumo, setResumo] = useState('')
+  const [localizacao, setLocalizacao] = useState('')
+
+  const updateMut = (trpc as any).os.update.useMutation({
+    onSuccess: () => { setEditando(false); onRefresh() },
+    onError: (e: any) => alert('Erro ao salvar: ' + e.message),
+  })
+
+  const abrirEdicao = () => {
+    setResumo(os.resumoServico ?? '')
+    setLocalizacao(os.localizacao ?? '')
+    setEditando(true)
+  }
+
+  const salvar = () => updateMut.mutate({ id: osId, resumoServico: resumo, localizacao })
+
+  const podeEditar = os.status !== 'cancelada'
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #1A2438 0%, #131D30 100%)',
+      border: '1px solid #F5A62340', borderLeft: '3px solid #F5A623',
+      borderRadius: 12, padding: '16px 18px', marginBottom: 16,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#F5A623', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          🛠 Serviço em Campo
+        </span>
+        {podeEditar && !editando && (
+          <button onClick={abrirEdicao} style={sectionActionStyle}>✏ Editar</button>
+        )}
+      </div>
+
+      {editando ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
+            <label style={labelStyle}>Resumo do serviço a ser realizado</label>
+            <textarea
+              value={resumo}
+              onChange={e => setResumo(e.target.value)}
+              placeholder="Ex.: Instalar 12 módulos de 550Wp no telhado cerâmico, inversor de 5kW na garagem, aterramento novo. Cliente estará presente após as 9h."
+              style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Localização do serviço</label>
+            <input
+              value={localizacao}
+              onChange={e => setLocalizacao(e.target.value)}
+              placeholder="Endereço completo, coordenadas ou link do Google Maps"
+              style={inputStyle}
+            />
+            <p style={{ fontSize: 10, color: '#4A6080', margin: '4px 0 0' }}>
+              Cole um link do Maps ou digite o endereço — a equipe abre a rota com um toque.
+            </p>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button onClick={() => setEditando(false)} style={cancelBtnStyle}>Cancelar</button>
+            <button onClick={salvar} disabled={updateMut.isLoading} style={saveBtnStyle}>
+              {updateMut.isLoading ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {os.resumoServico ? (
+            <p style={{ color: '#C8D8EC', fontSize: 14, margin: '0 0 10px', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+              {os.resumoServico}
+            </p>
+          ) : (
+            <p style={{ color: '#4A6080', fontSize: 12, margin: '0 0 10px', fontStyle: 'italic' }}>
+              Nenhum resumo do serviço ainda — clique em Editar para orientar o técnico.
+            </p>
+          )}
+
+          {os.localizacao ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#8A9BB5' }}>📍 {os.localizacao}</span>
+              <a
+                href={linkMaps(os.localizacao)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{
+                  padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                  background: '#3EBB7A18', border: '1px solid #3EBB7A60', color: '#3EBB7A',
+                  textDecoration: 'none',
+                }}
+              >
+                🗺 Abrir rota no Maps
+              </a>
+            </div>
+          ) : (
+            <span style={{ fontSize: 11, color: '#4A6080', fontStyle: 'italic' }}>📍 Sem localização cadastrada</span>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Aba: Visão Geral ─────────────────────────────────────────────────────────
 function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
   const totalMarcos  = os.marcos?.length ?? 0
@@ -195,6 +307,8 @@ function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
   }
 
   return (
+    <>
+    <BlocoServicoCampo os={os} osId={osId} onRefresh={onRefresh} />
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
       {/* Coluna esquerda: Informações */}
       <div>
@@ -276,6 +390,7 @@ function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
         </Section>
       </div>
     </div>
+    </>
   )
 }
 

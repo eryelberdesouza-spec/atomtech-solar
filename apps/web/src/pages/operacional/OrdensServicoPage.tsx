@@ -497,6 +497,29 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
       {os.titulo && (
         <div style={{ fontSize: 11, color: '#4A6080', marginBottom: 6 }}>{os.titulo}</div>
       )}
+      {os.resumoServico && (
+        <div style={{
+          fontSize: 11, color: '#8A9BB5', marginBottom: 6, lineHeight: 1.4,
+          background: '#F5A62310', border: '1px solid #F5A62325', borderRadius: 6,
+          padding: '5px 8px',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
+          overflow: 'hidden',
+        }} title={os.resumoServico}>
+          🛠 {os.resumoServico}
+        </div>
+      )}
+      {os.localizacao && (
+        <a
+          href={/^https?:\/\//i.test(os.localizacao) ? os.localizacao : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(os.localizacao)}`}
+          target="_blank"
+          rel="noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{ display: 'inline-block', fontSize: 10, color: '#3EBB7A', textDecoration: 'none', marginBottom: 6 }}
+          title={os.localizacao}
+        >
+          📍 Abrir rota no Maps
+        </a>
+      )}
       {(os.totalMarcos ?? 0) > 0 && (
         <ProgressBar feitos={os.marcosFeitos ?? 0} total={os.totalMarcos ?? 0} />
       )}

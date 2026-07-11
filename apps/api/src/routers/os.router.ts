@@ -42,6 +42,8 @@ const criarInput = z.object({
   titulo:             z.string().max(200).optional(),
   descricao:          z.string().optional(),
   tecnicoResponsavel: z.string().max(100).optional(),
+  resumoServico:      z.string().optional(),           // orientação pro técnico em campo
+  localizacao:        z.string().max(500).optional(),  // endereço/link/coordenadas do local
   dataPrevistaInicio: z.string().optional(), // ISO YYYY-MM-DD
   dataPrevistaFim:    z.string().optional(),
   temAgendamento:     z.boolean().default(true),
@@ -114,6 +116,8 @@ export const osRouter = router({
            os.id, os.numero, os.status, os.titulo, os.origem,
            os.numero_contrato_externo AS numeroContratoExterno,
            os.tecnico_responsavel  AS tecnicoResponsavel,
+           os.resumo_servico       AS resumoServico,
+           os.localizacao,
            os.data_prevista_inicio AS dataPrevistaInicio,
            os.data_prevista_fim    AS dataPrevistaFim,
            os.data_inicio          AS dataInicio,
@@ -179,6 +183,8 @@ export const osRouter = router({
         `SELECT
            os.id, os.numero, os.status, os.titulo, os.descricao,
            os.tecnico_responsavel  AS tecnicoResponsavel,
+           os.resumo_servico       AS resumoServico,
+           os.localizacao,
            os.data_prevista_inicio AS dataPrevistaInicio,
            os.data_prevista_fim    AS dataPrevistaFim,
            os.data_inicio          AS dataInicio,
@@ -264,9 +270,10 @@ export const osRouter = router({
       await pool.execute(
         `INSERT INTO ordem_servico
            (empresa_id, proposta_id, numero, status, titulo, descricao,
-            tecnico_responsavel, data_prevista_inicio, data_prevista_fim,
+            tecnico_responsavel, resumo_servico, localizacao,
+            data_prevista_inicio, data_prevista_fim,
             tem_agendamento, observacoes)
-         VALUES (?, ?, ?, 'aberta', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, 'aberta', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           empId,
           input.propostaId,
@@ -274,6 +281,8 @@ export const osRouter = router({
           input.titulo ?? null,
           input.descricao ?? null,
           input.tecnicoResponsavel ?? null,
+          input.resumoServico ?? null,
+          input.localizacao ?? null,
           input.dataPrevistaInicio ?? null,
           input.dataPrevistaFim ?? null,
           input.temAgendamento ? 1 : 0,
@@ -322,12 +331,17 @@ export const osRouter = router({
     }),
 
   // ── Atualizar dados da OS ────────────────────────────────────────
+  // Update PARCIAL: só altera os campos presentes no input (campo omitido = não mexe;
+  // string vazia = limpa o campo). Permite edições pontuais — ex.: só o resumo do
+  // serviço — sem apagar os demais campos da OS.
   update: protectedProcedure
     .input(z.object({
       id:                 z.number().int().positive(),
       titulo:             z.string().max(200).optional(),
       descricao:          z.string().optional(),
       tecnicoResponsavel: z.string().max(100).optional(),
+      resumoServico:      z.string().optional(),
+      localizacao:        z.string().max(500).optional(),
       dataPrevistaInicio: z.string().optional(),
       dataPrevistaFim:    z.string().optional(),
       dataInicio:         z.string().optional(),
@@ -345,24 +359,34 @@ export const osRouter = router({
       )
       if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
 
+      const colunas: Record<string, string> = {
+        titulo:             'titulo',
+        descricao:          'descricao',
+        tecnicoResponsavel: 'tecnico_responsavel',
+        resumoServico:      'resumo_servico',
+        localizacao:        'localizacao',
+        dataPrevistaInicio: 'data_prevista_inicio',
+        dataPrevistaFim:    'data_prevista_fim',
+        dataInicio:         'data_inicio',
+        dataConclusao:      'data_conclusao',
+        observacoes:        'observacoes',
+      }
+
+      const sets: string[] = []
+      const params: any[] = []
+      for (const [campo, coluna] of Object.entries(colunas)) {
+        const valor = (fields as any)[campo]
+        if (valor !== undefined) {
+          sets.push(`${coluna} = ?`)
+          params.push(valor === '' ? null : valor)
+        }
+      }
+      if (sets.length === 0) return { ok: true }
+
       await pool.execute(
-        `UPDATE ordem_servico SET
-           titulo = ?, descricao = ?, tecnico_responsavel = ?,
-           data_prevista_inicio = ?, data_prevista_fim = ?,
-           data_inicio = ?, data_conclusao = ?,
-           observacoes = ?, updated_at = NOW()
+        `UPDATE ordem_servico SET ${sets.join(', ')}, updated_at = NOW()
          WHERE id = ? AND empresa_id = ?`,
-        [
-          fields.titulo             ?? null,
-          fields.descricao          ?? null,
-          fields.tecnicoResponsavel ?? null,
-          fields.dataPrevistaInicio ?? null,
-          fields.dataPrevistaFim    ?? null,
-          fields.dataInicio         ?? null,
-          fields.dataConclusao      ?? null,
-          fields.observacoes        ?? null,
-          id, ctx.usuario.empresaId,
-        ],
+        [...params, id, ctx.usuario.empresaId],
       )
       return { ok: true }
     }),

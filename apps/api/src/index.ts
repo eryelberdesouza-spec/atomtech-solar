@@ -1013,6 +1013,35 @@ app.post('/extrato/parse-ofx', upload.single('ofx'), async (req, res) => {
   }
 })
 
+// ── Migração: resumo do serviço + localização na OS ──────────────────────────
+app.get('/run-migration-os-resumo-localizacao', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ordem_servico' AND COLUMN_NAME = 'resumo_servico'`
+    )
+
+    if (cols.length === 0) {
+      await conn.execute(`
+        ALTER TABLE ordem_servico
+          ADD COLUMN resumo_servico TEXT NULL AFTER tecnico_responsavel,
+          ADD COLUMN localizacao VARCHAR(500) NULL AFTER resumo_servico
+      `)
+      await conn.end()
+      res.json({ ok: true, message: 'Colunas resumo_servico e localizacao adicionadas a ordem_servico' })
+    } else {
+      await conn.end()
+      res.json({ ok: true, message: 'Colunas já existiam — nenhuma alteração necessária' })
+    }
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: cria tabela os_anexo ───────────────────────────────────────────
 app.get('/run-migration-os-anexo', async (_, res) => {
   try {

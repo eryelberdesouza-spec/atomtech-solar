@@ -506,6 +506,10 @@ export const ordemServico = mysqlTable('ordem_servico', {
   titulo:              varchar('titulo', { length: 200 }),
   descricao:           text('descricao'),
   tecnicoResponsavel:  varchar('tecnico_responsavel', { length: 100 }),
+  // Resumo do serviço a ser realizado — orientação rápida pro técnico em campo
+  resumoServico:       text('resumo_servico'),
+  // Endereço/link/coordenadas do local do serviço — facilita o deslocamento da equipe
+  localizacao:         varchar('localizacao', { length: 500 }),
   dataPrevistaInicio:  date('data_prevista_inicio'),
   dataPrevistaFim:     date('data_prevista_fim'),
   dataInicio:          date('data_inicio'),
