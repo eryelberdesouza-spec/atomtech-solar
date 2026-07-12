@@ -17,6 +17,7 @@ import { NovaFaturaPage } from './pages/invoices/NovaFaturaPage'
 import { ConfiguracoesPage } from './pages/settings/ConfiguracoesPage'
 import { OrdensServicoPage } from './pages/operacional/OrdensServicoPage'
 import { OrdemServicoDetailPage } from './pages/operacional/OrdemServicoDetailPage'
+import { ManutencoesPage } from './pages/operacional/ManutencoesPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('atomtech_token')
@@ -27,7 +28,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const usuario: any = (() => {
     try { return JSON.parse(localStorage.getItem('atomtech_usuario') || '{}') } catch { return {} }
   })()
-  if (usuario?.role === 'tecnico' && !location.pathname.startsWith('/ordens-servico')) {
+  if (usuario?.role === 'tecnico' && !location.pathname.startsWith('/ordens-servico') && !location.pathname.startsWith('/manutencoes')) {
     return <Navigate to="/ordens-servico" replace />
   }
 
@@ -62,6 +63,7 @@ export default function App() {
               <Route path="/faturas/nova" element={<NovaFaturaPage />} />
               <Route path="/ordens-servico" element={<OrdensServicoPage />} />
               <Route path="/ordens-servico/:id" element={<OrdemServicoDetailPage />} />
+              <Route path="/manutencoes" element={<ManutencoesPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

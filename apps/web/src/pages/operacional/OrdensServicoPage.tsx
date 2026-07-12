@@ -717,6 +717,9 @@ export function OrdensServicoPage() {
     { porPagina: 200 },
     { staleTime: 0 },
   )
+  // Badge de manutenções vencidas/vencendo (próximos 15 dias)
+  const { data: manutCount } = (trpc as any).os.manutencao.count.useQuery(undefined, { staleTime: 60_000 })
+  const totalManut = Number(manutCount?.total ?? 0)
   const updateStatus = (trpc as any).os.updateStatus.useMutation({ onSuccess: () => utils.os.list.invalidate() })
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -772,6 +775,12 @@ export function OrdensServicoPage() {
           {!isMobile && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button onClick={() => setShowModalNovaOS(true)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>+ Nova OS</button>
+              <button onClick={() => navigate('/manutencoes')} style={{ position: 'relative', padding: '7px 14px', borderRadius: 8, border: '1px solid #39C5CF40', background: '#39C5CF10', color: '#39C5CF', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>
+                🔁 Manutenções
+                {totalManut > 0 && (
+                  <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{totalManut}</span>
+                )}
+              </button>
               <button onClick={() => setShowModalHistorico(true)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>📦 Contratos Históricos</button>
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar OS, cliente..."
                 style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #1E3050', background: '#0C1828', color: '#C8D8EC', fontSize: 13, outline: 'none', width: 220, fontFamily: 'inherit' }} />
@@ -788,6 +797,12 @@ export function OrdensServicoPage() {
           {isMobile && (
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={() => setShowModalNovaOS(true)} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>+ OS</button>
+              <button onClick={() => navigate('/manutencoes')} style={{ position: 'relative', padding: '8px 12px', borderRadius: 8, border: '1px solid #39C5CF40', background: '#39C5CF10', color: '#39C5CF', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>
+                🔁
+                {totalManut > 0 && (
+                  <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{totalManut}</span>
+                )}
+              </button>
               <button onClick={() => setShowModalHistorico(true)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>📦</button>
             </div>
           )}

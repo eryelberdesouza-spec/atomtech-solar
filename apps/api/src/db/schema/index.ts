@@ -504,6 +504,9 @@ export const ordemServico = mysqlTable('ordem_servico', {
   // nesse caso o vínculo é direto pelo clienteId abaixo.
   propostaId:          int('proposta_id'),
   clienteId:           int('cliente_id'),
+  // OS gerada a partir de um plano de manutenção recorrente — concluir a OS
+  // recalcula automaticamente a próxima data do plano
+  manutencaoPlanoId:   int('manutencao_plano_id'),
   numero:              varchar('numero', { length: 20 }).notNull().unique(),
   status:              mysqlEnum('status', ['aberta', 'em_execucao', 'concluida', 'cancelada']).default('aberta').notNull(),
   titulo:              varchar('titulo', { length: 200 }),
@@ -564,6 +567,22 @@ export const osEtiquetaLink = mysqlTable('os_etiqueta_link', {
   id:             int('id').primaryKey().autoincrement(),
   ordemServicoId: int('ordem_servico_id').notNull(),
   etiquetaId:     int('etiqueta_id').notNull(),
+})
+
+// Plano de manutenção recorrente por cliente (ex.: limpeza de painéis a cada 6 meses).
+// Gera OS avulsas pré-preenchidas; concluir a OS vinculada recalcula proxima_data.
+export const osManutencaoPlano = mysqlTable('os_manutencao_plano', {
+  id:                 int('id').primaryKey().autoincrement(),
+  empresaId:          int('empresa_id').notNull(),
+  clienteId:          int('cliente_id').notNull(),
+  titulo:             varchar('titulo', { length: 200 }).notNull(),
+  resumo:             text('resumo'),
+  localizacao:        varchar('localizacao', { length: 500 }),
+  periodicidadeMeses: int('periodicidade_meses').default(6).notNull(),
+  proximaData:        date('proxima_data').notNull(),
+  ativo:              boolean('ativo').default(true).notNull(),
+  createdAt:          timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt:          timestamp('updated_at'),
 })
 
 // ─── FINANCEIRO ──────────────────────────────────────────────────────────────

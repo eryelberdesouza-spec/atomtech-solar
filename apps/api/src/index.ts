@@ -1013,6 +1013,52 @@ app.post('/extrato/parse-ofx', upload.single('ofx'), async (req, res) => {
   }
 })
 
+// ── Migração: planos de manutenção recorrente (limpeza de painéis etc.) ───────
+app.get('/run-migration-os-manutencao', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_manutencao_plano (
+        id                  INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id          INT NOT NULL,
+        cliente_id          INT NOT NULL,
+        titulo              VARCHAR(200) NOT NULL,
+        resumo              TEXT,
+        localizacao         VARCHAR(500),
+        periodicidade_meses INT NOT NULL DEFAULT 6,
+        proxima_data        DATE NOT NULL,
+        ativo               TINYINT(1) NOT NULL DEFAULT 1,
+        created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at          TIMESTAMP NULL,
+        INDEX idx_manut_empresa (empresa_id),
+        INDEX idx_manut_proxima (proxima_data),
+        INDEX idx_manut_cliente (cliente_id)
+      )
+    `)
+
+    // Vincula a OS gerada ao plano — permite histórico e recálculo automático
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ordem_servico' AND COLUMN_NAME = 'manutencao_plano_id'`
+    )
+    if (cols.length === 0) {
+      await conn.execute(`
+        ALTER TABLE ordem_servico
+          ADD COLUMN manutencao_plano_id INT NULL AFTER cliente_id,
+          ADD INDEX idx_os_manut_plano (manutencao_plano_id)
+      `)
+    }
+
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela os_manutencao_plano e vínculo na OS criados' })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: OS avulsa (sem proposta/contrato) ───────────────────────────────
 // Pós-venda, visita técnica, manutenção etc. — OS vinculada direto ao cliente.
 app.get('/run-migration-os-avulsa', async (_, res) => {

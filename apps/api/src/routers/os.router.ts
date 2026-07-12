@@ -454,6 +454,26 @@ export const osRouter = router({
 
       // ── Ao concluir: verifica recebimentos pendentes e gera alerta financeiro ──
       if (input.status === 'concluida') {
+        // Se a OS veio de um plano de manutenção, reagenda: hoje + periodicidade
+        try {
+          const [planoRows]: any = await pool.execute(
+            `SELECT manutencao_plano_id AS planoId FROM ordem_servico WHERE id = ? LIMIT 1`,
+            [input.id],
+          )
+          const planoId = (planoRows as any[])[0]?.planoId
+          if (planoId) {
+            await pool.execute(
+              `UPDATE os_manutencao_plano
+               SET proxima_data = DATE_ADD(CURDATE(), INTERVAL periodicidade_meses MONTH),
+                   updated_at = NOW()
+               WHERE id = ? AND empresa_id = ?`,
+              [planoId, ctx.usuario.empresaId],
+            )
+          }
+        } catch (recalcErr) {
+          console.error('Erro ao reagendar plano de manutenção:', recalcErr)
+        }
+
         try {
           // Busca proposta_id e dados da OS
           const [osInfo]: any = await pool.execute(
@@ -1117,6 +1137,173 @@ export const osRouter = router({
           [input.ordemServicoId, input.etiquetaId, ctx.usuario.empresaId],
         )
         return { ok: true }
+      }),
+  }),
+
+  // ── Planos de Manutenção Recorrente ──────────────────────────────
+  // Ex.: limpeza de painéis a cada 6 meses. Cada plano guarda a próxima data;
+  // "Gerar OS" cria uma OS avulsa pré-preenchida vinculada ao plano, e concluir
+  // essa OS reagenda o plano automaticamente (data conclusão + periodicidade).
+  manutencao: router({
+
+    // Badge: planos ativos vencidos ou vencendo nos próximos 15 dias
+    count: protectedProcedure.query(async ({ ctx }) => {
+      const pool = getRawPool()
+      const [rows]: any = await pool.execute(
+        `SELECT COUNT(*) AS total FROM os_manutencao_plano
+         WHERE empresa_id = ? AND ativo = 1
+           AND proxima_data <= DATE_ADD(CURDATE(), INTERVAL 15 DAY)`,
+        [ctx.usuario.empresaId],
+      )
+      return { total: Number((rows as any[])[0]?.total ?? 0) }
+    }),
+
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const pool = getRawPool()
+      const [rows]: any = await pool.execute(
+        `SELECT
+           mp.id, mp.cliente_id AS clienteId, mp.titulo, mp.resumo, mp.localizacao,
+           mp.periodicidade_meses AS periodicidadeMeses,
+           mp.proxima_data AS proximaData, mp.ativo,
+           c.nome AS clienteNome, c.telefone AS clienteTelefone,
+           DATEDIFF(mp.proxima_data, CURDATE()) AS diasRestantes,
+           (SELECT MAX(os1.data_conclusao) FROM ordem_servico os1
+             WHERE os1.manutencao_plano_id = mp.id AND os1.status = 'concluida') AS ultimaExecucao,
+           (SELECT os2.id FROM ordem_servico os2
+             WHERE os2.manutencao_plano_id = mp.id AND os2.status IN ('aberta','em_execucao')
+             ORDER BY os2.created_at DESC LIMIT 1) AS osAbertaId,
+           (SELECT os3.numero FROM ordem_servico os3
+             WHERE os3.manutencao_plano_id = mp.id AND os3.status IN ('aberta','em_execucao')
+             ORDER BY os3.created_at DESC LIMIT 1) AS osAbertaNumero
+         FROM os_manutencao_plano mp
+         JOIN cliente c ON c.id = mp.cliente_id
+         WHERE mp.empresa_id = ?
+         ORDER BY mp.ativo DESC, mp.proxima_data ASC`,
+        [ctx.usuario.empresaId],
+      )
+      return rows as any[]
+    }),
+
+    criar: protectedProcedure
+      .input(z.object({
+        clienteId:          z.number().int().positive(),
+        titulo:             z.string().min(1).max(200),
+        resumo:             z.string().optional(),
+        localizacao:        z.string().max(500).optional(),
+        periodicidadeMeses: z.number().int().min(1).max(60),
+        proximaData:        z.string(), // YYYY-MM-DD
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [cli]: any = await pool.execute(
+          `SELECT id FROM cliente WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.clienteId, ctx.usuario.empresaId],
+        )
+        if (!(cli as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' })
+
+        await pool.execute(
+          `INSERT INTO os_manutencao_plano
+             (empresa_id, cliente_id, titulo, resumo, localizacao, periodicidade_meses, proxima_data)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            ctx.usuario.empresaId, input.clienteId, input.titulo,
+            input.resumo ?? null, input.localizacao ?? null,
+            input.periodicidadeMeses, input.proximaData,
+          ],
+        )
+        return { ok: true }
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id:                 z.number().int().positive(),
+        titulo:             z.string().min(1).max(200).optional(),
+        resumo:             z.string().optional(),
+        localizacao:        z.string().max(500).optional(),
+        periodicidadeMeses: z.number().int().min(1).max(60).optional(),
+        proximaData:        z.string().optional(),
+        ativo:              z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const { id, ...fields } = input
+
+        const [check]: any = await pool.execute(
+          `SELECT id FROM os_manutencao_plano WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [id, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Plano não encontrado' })
+
+        const colunas: Record<string, string> = {
+          titulo: 'titulo', resumo: 'resumo', localizacao: 'localizacao',
+          periodicidadeMeses: 'periodicidade_meses', proximaData: 'proxima_data', ativo: 'ativo',
+        }
+        const sets: string[] = []
+        const params: any[] = []
+        for (const [campo, coluna] of Object.entries(colunas)) {
+          const valor = (fields as any)[campo]
+          if (valor !== undefined) {
+            sets.push(`${coluna} = ?`)
+            params.push(typeof valor === 'boolean' ? (valor ? 1 : 0) : (valor === '' ? null : valor))
+          }
+        }
+        if (sets.length === 0) return { ok: true }
+
+        await pool.execute(
+          `UPDATE os_manutencao_plano SET ${sets.join(', ')}, updated_at = NOW()
+           WHERE id = ? AND empresa_id = ?`,
+          [...params, id, ctx.usuario.empresaId],
+        )
+        return { ok: true }
+      }),
+
+    // Gera uma OS avulsa pré-preenchida a partir do plano
+    gerarOS: protectedProcedure
+      .input(z.object({ planoId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const empId = ctx.usuario.empresaId
+
+        const [planos]: any = await pool.execute(
+          `SELECT * FROM os_manutencao_plano WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.planoId, empId],
+        )
+        const plano = (planos as any[])[0]
+        if (!plano) throw new TRPCError({ code: 'NOT_FOUND', message: 'Plano não encontrado' })
+
+        // Evita duas OS abertas do mesmo plano
+        const [abertas]: any = await pool.execute(
+          `SELECT numero FROM ordem_servico
+           WHERE manutencao_plano_id = ? AND status IN ('aberta','em_execucao') LIMIT 1`,
+          [input.planoId],
+        )
+        if ((abertas as any[]).length) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: `Já existe uma OS em andamento para este plano (${(abertas as any[])[0].numero}). Conclua-a antes de gerar outra.` })
+        }
+
+        const numero = await gerarNumeroOS(empId)
+        // mysql2 devolve DATE como objeto Date — formatar como YYYY-MM-DD local
+        const pd = plano.proxima_data
+        const proximaData = pd instanceof Date
+          ? `${pd.getFullYear()}-${String(pd.getMonth() + 1).padStart(2, '0')}-${String(pd.getDate()).padStart(2, '0')}`
+          : String(pd).slice(0, 10)
+
+        await pool.execute(
+          `INSERT INTO ordem_servico
+             (empresa_id, proposta_id, cliente_id, manutencao_plano_id, origem, numero, status,
+              titulo, resumo_servico, localizacao, data_prevista_inicio, tem_agendamento)
+           VALUES (?, NULL, ?, ?, 'avulsa', ?, 'aberta', ?, ?, ?, ?, 0)`,
+          [
+            empId, plano.cliente_id, plano.id, numero,
+            plano.titulo, plano.resumo ?? null, plano.localizacao ?? null,
+            proximaData,
+          ],
+        )
+
+        const [idRows]: any = await pool.execute(
+          `SELECT id FROM ordem_servico WHERE numero = ? LIMIT 1`, [numero],
+        )
+        return { id: (idRows as any[])[0]?.id, numero }
       }),
   }),
 })
