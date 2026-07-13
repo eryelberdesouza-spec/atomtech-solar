@@ -53,22 +53,27 @@ export function sugerirCategoria(descricao: string, tipo: 'C' | 'D'): string {
   const d = descricao.toLowerCase()
 
   if (tipo === 'C') {
+    // Resgate/aplicação e transferência entre contas próprias vêm ANTES das regras
+    // de receita comum — senão "resgate"/"transferência" cai em receita operacional
+    // e distorce o DRE (dinheiro que já foi contabilizado, não é faturamento novo).
+    if (/resgat|^aplicaç[aã]o|rdc|cdb/i.test(d))                     return 'Investimentos'
+    if (/transfer[êe]ncia de recursos|transf\.? de recursos|mesma titularidade|mesma tit\.?/i.test(d)) return 'Transferência de Recursos'
+    if (/juros|rendimento/i.test(d))                                return 'Juros Recebidos'
     if (/pix receb|recebimento pix|pix recebido/i.test(d))         return 'Recebimentos PIX'
     if (/pagamento proposta|energia solar|instalação|manut/i.test(d)) return 'Receita de Serviços'
-    if (/juros|rendimento|aplicação|rdc|cdb|resgate/i.test(d))     return 'Rendimentos Financeiros'
     if (/liquidação cobrança|boleto|cobrança/i.test(d))            return 'Recebimentos'
-    if (/transferência receb|ted receb|doc receb/i.test(d))        return 'Transferências Recebidas'
     return 'Receitas Diversas'
   }
 
   // Débitos
+  if (/resgat|^aplicaç[aã]o|rdc|cdb/i.test(d))                            return 'Investimentos'
+  if (/transfer[êe]ncia de recursos|transf\.? de recursos/i.test(d))      return 'Transferência de Recursos'
   if (/folha|salário|salario|pagamento func|adiantamento/i.test(d))      return 'Pessoal'
   if (/fgts|inss|irrf|contribuição/i.test(d))                            return 'Encargos Trabalhistas'
   if (/tarifa|cpmf|iof|taxa manuten|taxa cob|anuidade/i.test(d))         return 'Encargos Bancários'
   if (/compra|débito|debito|mastercard|visa|elo|hipercard/i.test(d))     return 'Cartão de Débito'
   if (/pix emiti|pix enviad|pix pagamento/i.test(d))                     return 'Pagamentos PIX'
   if (/boleto|liquidação cobrança|liquidacao cobranca/i.test(d))         return 'Fornecedores'
-  if (/aplicação rdc|aplicação cdb|aplicar/i.test(d))                    return 'Aplicações Financeiras'
   if (/ted|doc|transferência/i.test(d))                                  return 'Transferências'
   if (/combustível|gasolina|posto/i.test(d))                             return 'Combustível'
   if (/aluguel|locação|locacao/i.test(d))                               return 'Aluguel'

@@ -1150,6 +1150,48 @@ app.get('/run-migration-os-anexo', async (_, res) => {
   }
 })
 
+// ── Migração: novo tipo 'TRANSFERENCIA' em fin_plano_contas + reclassifica
+//    lançamentos de transferência entre contas próprias e resgates de aplicação
+//    que estavam entrando como receita comum, distorcendo o DRE ─────────────────
+app.get('/run-migration-fin-plano-transferencia', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    await conn.execute(`
+      ALTER TABLE fin_plano_contas
+        MODIFY COLUMN tipo ENUM('RECEITA','DESPESA','FINANCEIRO','TRANSFERENCIA') NOT NULL
+    `)
+
+    // Plano "Transferência de Recursos" (id 44) deixa de ser RECEITA — passa a
+    // ser TRANSFERENCIA, um tipo que fica de fora do cálculo de resultado do DRE.
+    await conn.execute(`UPDATE fin_plano_contas SET tipo = 'TRANSFERENCIA' WHERE id = 44`)
+
+    // Lançamentos de "TRANSFERÊNCIA DE RECURSOS" que caíram em planos errados
+    // (Outras Receitas / Investimentos) por causa de categorização automática —
+    // move todos para o plano correto (44), agora corretamente excluído do DRE.
+    await conn.execute(
+      `UPDATE fin_titulo SET plano_contas_id = 44 WHERE id IN (277,300,369,1379,1094,1146,1372,1378)`
+    )
+
+    // Resgates de CDB/RDC que caíram em plano de receita comum — move para
+    // "Investimentos" (tipo FINANCEIRO), consistente com os demais resgates.
+    await conn.execute(
+      `UPDATE fin_titulo SET plano_contas_id = 35 WHERE id IN (592,325,1351)`
+    )
+
+    // "PARCELA DE SERVIÇO" que tinha caído por engano no plano de transferências —
+    // é receita de serviço de verdade, devolve para o plano correto.
+    await conn.execute(`UPDATE fin_titulo SET plano_contas_id = 3 WHERE id = 871`)
+
+    await conn.end()
+    res.json({ ok: true, message: 'Tipo TRANSFERENCIA criado e lançamentos históricos reclassificados' })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Upload de anexo em OS ─────────────────────────────────────────────────────
 const uploadAnexo = multer({
   storage: multer.memoryStorage(),

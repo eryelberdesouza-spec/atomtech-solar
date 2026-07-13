@@ -278,7 +278,7 @@ export function ModalEditarLancamento({
   // No contexto de edição/vinculação mostramos TODAS as pessoas (sem filtrar por papel)
   // O filtro por isFornecedor/isCliente fica apenas na criação de novos lançamentos
   const pessoasFiltradas = pessoas
-  const planosFiltrados  = planosContas.filter((p: any) => p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO')
+  const planosFiltrados  = planosContas.filter((p: any) => p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO' || p.tipo === 'TRANSFERENCIA')
   const label = tipo === 'PAGAR' ? 'Pagar' : 'Receber'
 
   return (
@@ -1617,7 +1617,7 @@ function ModalNovoLancamento({
     tipo === 'PAGAR' ? p.isFornecedor : p.isCliente
   )
   const planosFiltrados = planosContas.filter((p: any) =>
-    p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO'
+    p.tipo === (tipo === 'PAGAR' ? 'DESPESA' : 'RECEITA') || p.tipo === 'FINANCEIRO' || p.tipo === 'TRANSFERENCIA'
   )
 
   const qtd   = Math.max(1, parseInt(form.qtdParcelas) || 1)

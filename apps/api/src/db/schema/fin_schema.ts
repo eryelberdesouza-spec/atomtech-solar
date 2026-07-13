@@ -32,7 +32,7 @@ export const finPlanoContas = mysqlTable('fin_plano_contas', {
   empresaId: int('empresa_id').notNull().references(() => empresa.id),
   codigo:    varchar('codigo', { length: 20 }).notNull(),
   nome:      varchar('nome', { length: 200 }).notNull(),
-  tipo:      mysqlEnum('tipo', ['RECEITA', 'DESPESA', 'FINANCEIRO']).notNull(),
+  tipo:      mysqlEnum('tipo', ['RECEITA', 'DESPESA', 'FINANCEIRO', 'TRANSFERENCIA']).notNull(),
   paiId:     int('pai_id'),   // referência a outro finPlanoContas (auto-referência)
   ativo:     boolean('ativo').default(true).notNull(),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),

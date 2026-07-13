@@ -6,15 +6,17 @@ import {
 } from '../../components/ui'
 
 const TIPO_OPTIONS = [
-  { value: 'RECEITA',   label: '↑ Receita' },
-  { value: 'DESPESA',   label: '↓ Despesa' },
-  { value: 'FINANCEIRO',label: '⇄ Financeiro' },
+  { value: 'RECEITA',      label: '↑ Receita' },
+  { value: 'DESPESA',      label: '↓ Despesa' },
+  { value: 'FINANCEIRO',   label: '⇄ Financeiro' },
+  { value: 'TRANSFERENCIA', label: '↔ Transferência (fora do resultado)' },
 ]
 
 const TIPO_COLORS: Record<string, string> = {
-  RECEITA:    '#34D399',
-  DESPESA:    '#F87171',
-  FINANCEIRO: '#60A5FA',
+  RECEITA:       '#34D399',
+  DESPESA:       '#F87171',
+  FINANCEIRO:    '#60A5FA',
+  TRANSFERENCIA: '#A78BFA',
 }
 
 interface PlanoForm { codigo: string; nome: string; tipo: string; paiId: string }
