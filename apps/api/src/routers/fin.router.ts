@@ -31,6 +31,15 @@ import {
 } from '../db/schema'
 import { acharOuCriarClienteParaFinPessoa, propagarFinPessoaParaCliente } from '../lib/pessoaSync'
 
+// ─── DATA — mysql2 devolve colunas DATE como objeto Date (não string), mesmo com
+// drizzle mode 'string'; String(dateObj).slice(0,10) corrompe o valor. Formata local.
+function fmtDateISO(d: unknown): string {
+  if (d instanceof Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  return String(d).slice(0, 10)
+}
+
 // ─── AUDITORIA — helper de log ────────────────────────────────────────────────
 async function registrarAuditoria(
   db: any,
@@ -491,7 +500,7 @@ const projetoRouter = router({
         lancamentos: lancamentos.map(l => ({
           ...l,
           valor:   Number(l.valor),
-          emissao: String(l.emissao).slice(0, 10),
+          emissao: fmtDateISO(l.emissao),
         })),
       }
     }),
@@ -668,7 +677,7 @@ const pessoaRouter = router({
 
       return {
         pessoa,
-        titulos: titulos.map(t => ({ ...t, valorOriginal: Number(t.valorOriginal), emissao: String(t.emissao).slice(0, 10) })),
+        titulos: titulos.map(t => ({ ...t, valorOriginal: Number(t.valorOriginal), emissao: fmtDateISO(t.emissao) })),
         aReceberAberto,
         aPagarAberto,
         propostas,
@@ -963,7 +972,7 @@ const dashboardRouter = router({
         tituloId:   r.tituloId,
         tipo:       r.tipo,
         descricao:  r.descricao,
-        emissao:    String(r.emissao).slice(0, 10),
+        emissao:    fmtDateISO(r.emissao),
         valor:      Number(r.valor),
         pessoaNome: r.pessoaNome ?? null,
       })),
@@ -1109,7 +1118,7 @@ const tituloRouter = router({
         .where(eq(finParcela.tituloId, input.tituloId))
         .orderBy(asc(finParcela.numero))
 
-      return { titulo, parcelas }
+      return { titulo: { ...titulo, emissao: fmtDateISO(titulo.emissao) }, parcelas }
     }),
 
   // Cria título + parcelas

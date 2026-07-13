@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import {
   PageWrapper, SectionHeader, Card, Btn, Badge, Table, Spinner, C,
 } from '../../components/ui'
 import { maskCpfCnpj, maskTelefone, maskMoeda } from '../../lib/masks'
+import { fmtData } from '../../lib/utils'
+import { ModalEditarLancamento } from '../LancamentosPage'
 
 const PROPOSTAS_URL = 'https://atomtech-solar-web.vercel.app'
 
@@ -26,8 +29,10 @@ export function PessoaDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const pessoaId = Number(id)
+  const utils = (trpc as any).useUtils()
 
   const { data, isLoading } = (trpc as any).fin.pessoa.detalhe.useQuery({ id: pessoaId })
+  const [editandoTitulo, setEditandoTitulo] = useState<{ id: number; tipo: 'PAGAR' | 'RECEBER' } | null>(null)
 
   if (isLoading || !data) {
     return <PageWrapper><div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Spinner /></div></PageWrapper>
@@ -45,7 +50,7 @@ export function PessoaDetailPage() {
   const titulosRows = titulos.map((t: any) => ({
     descricao: <span style={{ color: C.text }}>{t.descricao}</span>,
     tipo: <Badge status={t.tipo} />,
-    emissao: <span style={{ color: C.textMuted, fontSize: 12 }}>{new Date(t.emissao + 'T12:00:00').toLocaleDateString('pt-BR')}</span>,
+    emissao: <span style={{ color: C.textMuted, fontSize: 12 }}>{fmtData(t.emissao)}</span>,
     valor: <span style={{ fontWeight: 700, color: t.tipo === 'PAGAR' ? C.debit : C.credit }}>{maskMoeda(t.valorOriginal)}</span>,
   }))
 
@@ -152,23 +157,36 @@ export function PessoaDetailPage() {
 
           {/* Lançamentos financeiros */}
           <Card style={{ padding: 20 }}>
-            <h3 style={{ color: C.text, fontSize: 13, fontWeight: 700, margin: '0 0 12px' }}>Lançamentos Financeiros Recentes</h3>
+            <h3 style={{ color: C.text, fontSize: 13, fontWeight: 700, margin: '0 0 4px' }}>Lançamentos Financeiros Recentes</h3>
             {titulosRows.length === 0 ? (
-              <p style={{ color: C.textMuted, fontSize: 12 }}>Nenhum lançamento vinculado a esta pessoa ainda.</p>
+              <p style={{ color: C.textMuted, fontSize: 12, marginTop: 12 }}>Nenhum lançamento vinculado a esta pessoa ainda.</p>
             ) : (
-              <Table
-                columns={[
-                  { key: 'descricao', label: 'Descrição' },
-                  { key: 'tipo',      label: 'Tipo',     width: '90px' },
-                  { key: 'emissao',   label: 'Emissão',  width: '100px' },
-                  { key: 'valor',     label: 'Valor',    width: '120px', align: 'right' },
-                ]}
-                rows={titulosRows}
-              />
+              <>
+                <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 12px' }}>Clique em um lançamento para ver o detalhe completo</p>
+                <Table
+                  columns={[
+                    { key: 'descricao', label: 'Descrição' },
+                    { key: 'tipo',      label: 'Tipo',     width: '90px' },
+                    { key: 'emissao',   label: 'Emissão',  width: '100px' },
+                    { key: 'valor',     label: 'Valor',    width: '120px', align: 'right' },
+                  ]}
+                  rows={titulosRows}
+                  onRowClick={(i: number) => setEditandoTitulo({ id: titulos[i].id, tipo: titulos[i].tipo })}
+                />
+              </>
             )}
           </Card>
         </div>
       </div>
+
+      {editandoTitulo && (
+        <ModalEditarLancamento
+          tituloId={editandoTitulo.id}
+          tipo={editandoTitulo.tipo}
+          onClose={() => setEditandoTitulo(null)}
+          onSuccess={() => utils.fin.pessoa.detalhe.invalidate({ id: pessoaId })}
+        />
+      )}
     </PageWrapper>
   )
 }

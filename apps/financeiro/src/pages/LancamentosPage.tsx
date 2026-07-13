@@ -169,7 +169,7 @@ function carregarAgLocal(parcelaId: number) {
 
 // ─── MODAL EDITAR LANÇAMENTO ──────────────────────────────────────────────────
 
-function ModalEditarLancamento({
+export function ModalEditarLancamento({
   tituloId,
   tipo,
   onClose,
