@@ -47,6 +47,13 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 - Todo node que envia sendText deve encadear Redis SET `bot_sent:{key.id}` (senão o eco pausa o chat).
 - Números BR podem não ter o nono dígito no WhatsApp — resolver via `/api/contacts/check-exists`. Contatos podem chegar como `@lid`; número real em `payload._data.key.remoteJidAlt`.
 
+## AGF — notas técnicas importantes
+
+- **mysql2 devolve colunas DATE como objeto `Date`, não string** (mesmo com drizzle `date()` sem `mode` explícito). `String(dateObj).slice(0,10)` corrompe o valor → vira "Invalid Date" no front. Usar sempre `fmtDateISO()` (helper em `fin.router.ts`) ou, no front, o helper `fmtData()` de `lib/utils.ts` (aceita string OU Date). Corrigido em 2026-07-13 em `pessoa.detalhe`, `projeto.byId`, `titulo.byId` — mas o padrão pode se repetir em código novo, ficar atento.
+- **Acesso ao MySQL de produção fora do Railway/app**: projeto Railway `satisfied-love` (id 461fba09-4deb-473b-a3d3-215cee0cf991), serviço `MySQL`. Variáveis via `railway variables --service MySQL --kv` (precisa `railway link` nesse projeto antes). Para conectar de fora (script Node local), usar o proxy público: host `RAILWAY_TCP_PROXY_DOMAIN`, porta `RAILWAY_TCP_PROXY_PORT` (não o host interno `mysql.railway.internal`, que só funciona dentro da rede Railway).
+- **DRE (`fin.dre.get`)**: soma `fin_titulo` agrupado por `fin_plano_contas.tipo`. Tipos: `RECEITA`, `DESPESA`, `FINANCEIRO` (ex.: juros, tarifas — entra no "resultado" mas separado da receita bruta), e desde 2026-07-13 **`TRANSFERENCIA`** (transferência entre contas próprias, ex. Inter↔Sicoob, e resgate de CDB/RDC — fica **fora** do resultado do DRE, mas continua contando no saldo de caixa normalmente porque `fin_parcela` não filtra por tipo de plano). O plano "Transferência de Recursos" (id 44) é TRANSFERENCIA; "Investimentos" (id 35) é FINANCEIRO e é onde resgates/aplicações de CDB/RDC devem cair.
+- **Import de OFX (`ofxParser.ts` → `sugerirCategoria`)**: as strings sugeridas precisam bater EXATAMENTE com o nome de um plano de contas já cadastrado (o match em `ExtratoPage.tsx` é fuzzy mas frágil) — por isso resgate/aplicação/CDB/RDC sugerem literalmente "Investimentos", e transferência (inclusive "mesma titularidade") sugere "Transferência de Recursos". Antes disso, ~R$100 mil em transferências e resgates estavam contando como receita comum no DRE (achado e corrigido em 2026-07-13, migração `/run-migration-fin-plano-transferencia`).
+
 ## Backlog priorizado
 1. **Fase 3 bot**: integração com AGO/AGF (criar leads/OS via API tRPC)
 2. Buffer de mensagens picadas (~8s, Redis) — hoje cada mensagem gera uma resposta
