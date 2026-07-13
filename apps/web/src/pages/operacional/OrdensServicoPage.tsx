@@ -5,6 +5,7 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Spinner } from '../../components/ui'
+import { CadastroRapidoCliente } from '../../components/ui/CadastroRapidoCliente'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
 const STATUS_OS = [
@@ -38,6 +39,8 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
     tecnicoResponsavel: '', dataPrevistaInicio: '', dataPrevistaFim: '',
   })
   const [buscaCliente, setBuscaCliente] = useState('')
+  const [mostraCadastro, setMostraCadastro] = useState(false)
+  const [clienteNomeLocal, setClienteNomeLocal] = useState('') // nome do recém-cadastrado (antes do refetch da lista)
   const [erro, setErro] = useState('')
 
   const { data: clientesData } = (trpc as any).cliente.list.useQuery({ porPagina: 200 })
@@ -101,27 +104,50 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
           {/* Cliente */}
           <div>
             <label style={labelSt}>Cliente *</label>
-            {clienteSelecionado ? (
+            {form.clienteId ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#3EBB7A12', border: '1px solid #3EBB7A40', borderRadius: 8, padding: '8px 12px' }}>
-                <span style={{ fontSize: 13, color: '#C8D8EC', fontWeight: 600 }}>{clienteSelecionado.nome}</span>
-                <button onClick={() => setForm(f => ({ ...f, clienteId: '' }))} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 15 }}>×</button>
+                <span style={{ fontSize: 13, color: '#C8D8EC', fontWeight: 600 }}>{clienteSelecionado?.nome ?? clienteNomeLocal}</span>
+                <button onClick={() => { setForm(f => ({ ...f, clienteId: '' })); setClienteNomeLocal('') }} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 15 }}>×</button>
               </div>
             ) : (
-              <div style={{ position: 'relative' }}>
-                <input value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)} placeholder="Buscar cliente pelo nome..." style={inputSt} />
-                {clientesFiltrados.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#131F30', border: '1px solid #1E3050', borderRadius: 8, marginTop: 4, maxHeight: 180, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-                    {clientesFiltrados.slice(0, 8).map(c => (
-                      <div key={c.id}
-                        onClick={() => { setForm(f => ({ ...f, clienteId: String(c.id) })); setBuscaCliente('') }}
-                        style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: '#C8D8EC', borderBottom: '1px solid #1E305040' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#1A2438')}
+              <>
+                <div style={{ position: 'relative' }}>
+                  <input value={buscaCliente} onChange={e => { setBuscaCliente(e.target.value); setMostraCadastro(false) }} placeholder="Buscar cliente pelo nome... ou cadastrar novo" style={inputSt} />
+                  {buscaCliente.trim() && !mostraCadastro && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: '#131F30', border: '1px solid #1E3050', borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                      {clientesFiltrados.slice(0, 8).map(c => (
+                        <div key={c.id}
+                          onClick={() => { setForm(f => ({ ...f, clienteId: String(c.id) })); setBuscaCliente('') }}
+                          style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: '#C8D8EC', borderBottom: '1px solid #1E305040' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#1A2438')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >{c.nome}</div>
+                      ))}
+                      {/* Sempre oferece cadastrar novo — o técnico de campo não tem acesso à tela de Clientes */}
+                      <div
+                        onClick={() => setMostraCadastro(true)}
+                        style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 12, color: '#3EBB7A', fontWeight: 700, borderTop: clientesFiltrados.length > 0 ? '1px solid #1E3050' : 'none' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#3EBB7A10')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >{c.nome}</div>
-                    ))}
-                  </div>
+                      >
+                        ＋ Cadastrar "{buscaCliente.trim()}" como novo cliente
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {mostraCadastro && (
+                  <CadastroRapidoCliente
+                    nomeInicial={buscaCliente.trim().toUpperCase()}
+                    onCriado={c => {
+                      setForm(f => ({ ...f, clienteId: String(c.id) }))
+                      setClienteNomeLocal(c.nome)
+                      setBuscaCliente('')
+                      setMostraCadastro(false)
+                    }}
+                    onCancelar={() => setMostraCadastro(false)}
+                  />
                 )}
-              </div>
+              </>
             )}
           </div>
 
