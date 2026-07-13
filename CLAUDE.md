@@ -37,7 +37,8 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 **Regras operacionais**:
 - Mensagens automáticas do WhatsApp Business (ausência/saudação) DESLIGADAS (são fromMe → pausam o bot).
 - WhatsApp Web coexiste com o bot (validado 08/07). Responder cliente manualmente = pausa o bot 24h naquele chat; `#ativa` reativa.
-- Se a sessão cair (`FAILED`): re-parear — logout → start → `GET /api/default/auth/qr?format=image` (header X-Api-Key) → abrir PNG e escanear.
+- Se a sessão cair (`FAILED`): PRIMEIRO tentar só `POST /api/sessions/default/start` (sem logout — logout apaga as credenciais e força re-pareamento; um restart simples às vezes reconecta sozinho). Se ficar em `SCAN_QR_CODE` ou seguir `FAILED`: re-parear — logout → start → `GET /api/default/auth/qr?format=image` (header X-Api-Key) → abrir PNG e escanear.
+- Incidente 2026-07-13: sessão estava `FAILED` desde ~09/07 e ninguém percebeu por 4 dias (clientes sem resposta). Resolvido com re-pareamento no escritório. Mitigação: tarefa agendada `monitor-waha-bot-whatsapp` no Claude Code do PC do escritório checa a sessão a cada 2h (enquanto o app estiver aberto), tenta restart automático e alerta se precisar de QR.
 
 **Armadilhas conhecidas (n8n/WAHA)**:
 - n8n é draft/publish: após PATCH via REST, fazer deactivate+activate para produção atualizar.
