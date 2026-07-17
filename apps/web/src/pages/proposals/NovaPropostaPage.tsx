@@ -165,6 +165,7 @@ const FORM_INICIAL = {
   custoKitFotovoltaico: 0, comissao: 0, descontoAvista: 0,
   marcoParcelas: MARCOES_PADRAO,
   observacoes: '',
+  titulo: '',
 }
 
 const STEPS = ['Cliente', 'Dados Técnicos', 'Precificação']
@@ -218,7 +219,8 @@ export function NovaPropostaPage() {
       potenciaInversorKw: form.potenciaInversorKw || undefined,
       overloadInversor: form.overloadInversor || 0, entradasPorMicro: form.entradasPorMicro || 1,
       quantidadeInversoresManual: form.quantidadeInversoresManual || undefined,
-      observacoesInternas: form.observacoes || undefined, descontoAvista: form.descontoAvista || undefined,
+      observacoesInternas: form.observacoes || undefined, tituloServico: form.titulo || undefined,
+      descontoAvista: form.descontoAvista || undefined,
       marcoParcelas: form.marcoParcelas,
     } as any)
   }
@@ -472,6 +474,8 @@ export function NovaPropostaPage() {
             </div>
 
             <div>
+              <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Título da Proposta</label>
+              <input value={form.titulo} onChange={(e: any) => set('titulo', e.target.value)} placeholder="Opcional — ex: Sistema 12 kWp — Casa de Praia (aparece na listagem)" style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Observações</label>
               <textarea value={form.observacoes} onChange={(e: any) => set('observacoes', e.target.value)} rows={2} placeholder="Informações adicionais ou peculiaridades da instalação..." style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
             </div>

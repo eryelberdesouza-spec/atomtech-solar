@@ -1312,7 +1312,7 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
     onSalvar({
       dataEmissao:         form.dataEmissao,
       dataValidade:        form.dataValidade || null,
-      tituloServico:       isServico ? (form.tituloServico || null) : undefined,
+      tituloServico:       form.tituloServico || null,
       observacoesInternas: form.observacoesInternas || null,
     })
   }
@@ -1335,12 +1335,11 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
           </div>
         </div>
 
-        {isServico && (
-          <div>
-            <label style={lblSt}>Título do Serviço</label>
-            <input value={form.tituloServico} onChange={e => setForm(f => ({ ...f, tituloServico: e.target.value }))} placeholder="Ex: Instalação de Sistema Fotovoltaico" style={inpSt} />
-          </div>
-        )}
+        <div>
+          <label style={lblSt}>{isServico ? 'Título do Serviço' : 'Título da Proposta'}</label>
+          <input value={form.tituloServico} onChange={e => setForm(f => ({ ...f, tituloServico: e.target.value }))} placeholder={isServico ? 'Ex: Instalação de CFTV — Bloco A' : 'Ex: Sistema Fotovoltaico 12 kWp — Casa de Praia'} style={inpSt} />
+          <div style={{ fontSize: 10, color: '#3A5070', marginTop: 3 }}>Aparece na listagem de propostas — use para diferenciar propostas do mesmo cliente</div>
+        </div>
 
         <div>
           <label style={lblSt}>Observações Internas</label>
@@ -1610,7 +1609,7 @@ export function PropostaDetailPage() {
                   {clienteData.nome}
                 </span>
               )}
-              {isServico && proposta.tituloServico && (
+              {proposta.tituloServico && (
                 <span style={{ color: C.textDim, fontSize: 11, background: `${C.green}15`, borderRadius: 5, padding: '1px 7px', border: `1px solid ${C.green}30`, flexShrink: 0 }}>🔧 {proposta.tituloServico}</span>
               )}
               {!isMobile && (

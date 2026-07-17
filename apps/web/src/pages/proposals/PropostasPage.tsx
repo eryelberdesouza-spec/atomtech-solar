@@ -64,7 +64,7 @@ export function PropostasPage() {
 
   const filtradas = lista.filter(p => {
     const passaStatus = filtro === 'todos' || p.status === filtro
-    const passaBusca  = !busca || p.clienteNome?.toLowerCase().includes(busca.toLowerCase()) || p.numero.includes(busca)
+    const passaBusca  = !busca || p.clienteNome?.toLowerCase().includes(busca.toLowerCase()) || p.numero.includes(busca) || p.tituloServico?.toLowerCase().includes(busca.toLowerCase())
     return passaStatus && passaBusca
   })
 

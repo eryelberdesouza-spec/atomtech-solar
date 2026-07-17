@@ -234,6 +234,7 @@ export const propostaRouter = router({
         comissao: z.number().default(0),
         templateOrigemId: z.number().optional(),
         observacoesInternas: z.string().optional(),
+        tituloServico: z.string().optional(),
         sobredimensionamento: z.number().min(0).max(100).default(50),
         descontoAvista: z.number().optional(),
         marcoParcelas: z.array(z.object({
@@ -373,6 +374,7 @@ export const propostaRouter = router({
         dataValidade: input.dataValidade,
         templateOrigemId: input.templateOrigemId,
         observacoesInternas: input.observacoesInternas,
+        tituloServico: input.tituloServico,
         createdBy: usuarioId,
       }).execute()
 
