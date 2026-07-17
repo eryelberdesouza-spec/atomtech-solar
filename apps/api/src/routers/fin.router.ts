@@ -896,6 +896,30 @@ const dashboardRouter = router({
 
     const vencendoHoje = parcelas.filter((p: any) => p.vencimento === hoje).length
     const vencidos = parcelas.filter((p: any) => p.vencimento < hoje).length
+    const em7dias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+    const vencendo7Dias = parcelas.filter((p: any) => p.vencimento > hoje && p.vencimento <= em7dias).length
+
+    // Duplicatas suspeitas: títulos ativos com mesmo tipo+descrição+valor emitidos em até 7 dias de diferença
+    const dupRows = await ctx.db.execute(sql`
+      SELECT COUNT(*) AS n FROM fin_titulo a
+      JOIN fin_titulo b ON b.empresa_id = a.empresa_id AND b.id > a.id
+        AND b.tipo = a.tipo AND b.valor_original = a.valor_original
+        AND UPPER(TRIM(b.descricao)) = UPPER(TRIM(a.descricao))
+        AND ABS(DATEDIFF(b.emissao, a.emissao)) <= 7
+        AND b.ativo = 1
+      WHERE a.empresa_id = ${empId} AND a.ativo = 1
+    `) as any
+    const dupArr: any[] = Array.isArray(dupRows) && Array.isArray(dupRows[0]) ? dupRows[0] : (Array.isArray(dupRows) ? dupRows : [])
+    const duplicatasSuspeitas = Number(dupArr[0]?.n ?? 0)
+
+    // Propostas formalizadas ainda não importadas para o financeiro
+    const aguardRows = await ctx.db.execute(sql`
+      SELECT COUNT(*) AS n FROM proposta p
+      WHERE p.empresa_id = ${empId} AND p.status = 'aceita' AND p.contrato_formalizado = 1
+        AND NOT EXISTS (SELECT 1 FROM fin_titulo t WHERE t.proposta_id = p.id AND t.empresa_id = ${empId})
+    `) as any
+    const aguardArr: any[] = Array.isArray(aguardRows) && Array.isArray(aguardRows[0]) ? aguardRows[0] : (Array.isArray(aguardRows) ? aguardRows : [])
+    const propostasAguardandoImportacao = Number(aguardArr[0]?.n ?? 0)
 
     // Soma todos os recebimentos e pagamentos já liquidados (acumulado total)
     const movimentos = await ctx.db
@@ -967,6 +991,9 @@ const dashboardRouter = router({
       resultado: aReceber - aPagar,
       vencendoHoje,
       vencidos,
+      vencendo7Dias,
+      duplicatasSuspeitas,
+      propostasAguardandoImportacao,
       contasResume,
       lancamentosRecentes: recentes.map(r => ({
         tituloId:   r.tituloId,
@@ -1140,6 +1167,7 @@ const tituloRouter = router({
         valor:      z.number().positive(),
         vencimento: z.string(),  // YYYY-MM-DD
       })).min(1),
+      ignorarDuplicata: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
@@ -1147,6 +1175,33 @@ const tituloRouter = router({
 
       for (const p of parcelas) {
         await verificarPeriodoAberto(ctx.db, empId, p.vencimento)
+      }
+
+      // Alerta de possível duplicata: mesmo tipo + valor + descrição (e pessoa,
+      // se informada) nos últimos 60 dias. O front confirma e reenvia com
+      // ignorarDuplicata=true se for intencional.
+      if (!input.ignorarDuplicata) {
+        const desde = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10)
+        const [possivel] = await ctx.db
+          .select({ id: finTitulo.id, emissao: finTitulo.emissao, descricao: finTitulo.descricao })
+          .from(finTitulo)
+          .where(and(
+            eq(finTitulo.empresaId, empId),
+            eq(finTitulo.tipo, tituloData.tipo),
+            eq(finTitulo.ativo, true),
+            eq(finTitulo.valorOriginal, tituloData.valorOriginal.toFixed(2)),
+            sql`UPPER(TRIM(${finTitulo.descricao})) = UPPER(TRIM(${tituloData.descricao}))`,
+            tituloData.pessoaId ? eq(finTitulo.pessoaId, tituloData.pessoaId) : undefined,
+            gte(finTitulo.emissao, desde as any),
+          ))
+          .limit(1)
+        if (possivel) {
+          const dataEx = String(possivel.emissao).slice(0, 10)
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `POSSIVEL_DUPLICATA|Já existe o título #${possivel.id} "${possivel.descricao}" com o mesmo valor, emitido em ${dataEx}. Confirme se este lançamento não é repetido.`,
+          })
+        }
       }
 
       const [res] = await ctx.db.insert(finTitulo).values({

@@ -2,7 +2,7 @@
 // Página de Lançamentos — A Pagar / A Receber / Transferências / Extrato
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { trpc } from '../lib/trpc'
 import {
   PageWrapper, C, Btn, KpiCard, Table, Modal, Tabs,
@@ -953,6 +953,9 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [statusFilter, setStatusFilter] = useState('')
   const [dataIni, setDataIni]           = useState(mesAtualIni())
   const [dataFim, setDataFim]           = useState('')
+  const [buscaTexto, setBuscaTexto]     = useState('')
+  const [pessoaFiltro, setPessoaFiltro] = useState('')
+  const [planoFiltro, setPlanoFiltro]   = useState('')
   const [showNovo, setShowNovo]         = useState(false)
   const [showRateio, setShowRateio]     = useState(false)
   const [editandoTituloId, setEditandoTituloId]   = useState<number | null>(null)
@@ -966,12 +969,26 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
   const [showDeleteLote, setShowDeleteLote] = useState(false)
 
-  const { data: rows = [], isLoading, refetch } = (trpc as any).fin.titulo.list.useQuery({
+  const { data: rowsRaw = [], isLoading, refetch } = (trpc as any).fin.titulo.list.useQuery({
     tipo,
     status:  statusFilter || undefined,
     dataIni: dataIni || undefined,
     dataFim: dataFim || undefined,
+    pessoaId:      pessoaFiltro ? parseInt(pessoaFiltro) : undefined,
+    planoContasId: planoFiltro ? parseInt(planoFiltro) : undefined,
   }) // staleTime herdado (60s) — invalidateQueries após mutations garante dados frescos
+
+  // Busca textual local: descrição, documento, pessoa ou valor
+  const rows = useMemo(() => {
+    if (!buscaTexto.trim()) return rowsRaw
+    const q = buscaTexto.trim().toLowerCase()
+    return rowsRaw.filter((r: any) =>
+      (r.descricao ?? '').toLowerCase().includes(q)
+      || (r.documento ?? '').toLowerCase().includes(q)
+      || (r.pessoaNome ?? '').toLowerCase().includes(q)
+      || String(r.valor ?? '').includes(q.replace(',', '.'))
+    )
+  }, [rowsRaw, buscaTexto])
 
   const { data: contas       = [] } = (trpc as any).fin.conta.list.useQuery()
   const { data: pessoas      = [] } = (trpc as any).fin.pessoa.list.useQuery()
@@ -1074,6 +1091,29 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
         </div>
         <div style={{ flex: '0 0 150px' }}>
           <Input label="Vencimento até" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+        </div>
+        <div style={{ flex: '0 0 190px' }}>
+          <Select
+            label={tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'}
+            value={pessoaFiltro}
+            onChange={e => setPessoaFiltro(e.target.value)}
+            options={[{ value: '', label: 'Todos' },
+              ...pessoas
+                .filter((p: any) => tipo === 'PAGAR' ? p.isFornecedor : p.isCliente)
+                .map((p: any) => ({ value: String(p.id), label: p.nome }))]}
+          />
+        </div>
+        <div style={{ flex: '0 0 190px' }}>
+          <Select
+            label="Plano de Contas"
+            value={planoFiltro}
+            onChange={e => setPlanoFiltro(e.target.value)}
+            options={[{ value: '', label: 'Todos' },
+              ...planosContas.map((p: any) => ({ value: String(p.id), label: `${p.codigo ?? ''} ${p.nome}`.trim() }))]}
+          />
+        </div>
+        <div style={{ flex: '1 1 200px', minWidth: 160 }}>
+          <Input label="Buscar" placeholder="Descrição, documento, pessoa ou valor..." value={buscaTexto} onChange={e => setBuscaTexto(e.target.value)} />
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           {selecionados.size > 0 && (
@@ -1607,8 +1647,20 @@ function ModalNovoLancamento({
 
   const create = (trpc as any).fin.titulo.create.useMutation({
     onSuccess,
-    onError: (e: any) => setErro(e.message ?? 'Erro ao criar lançamento'),
+    onError: (e: any) => {
+      const msg: string = e.message ?? 'Erro ao criar lançamento'
+      // Alerta de possível duplicata: pede confirmação e reenvia com ignorarDuplicata
+      if (msg.startsWith('POSSIVEL_DUPLICATA|')) {
+        const detalhe = msg.split('|')[1]
+        if (window.confirm(`⚠️ POSSÍVEL LANÇAMENTO DUPLICADO\n\n${detalhe}\n\nDeseja lançar mesmo assim?`)) {
+          create.mutate({ ...(ultimoPayload.current ?? {}), ignorarDuplicata: true })
+        }
+        return
+      }
+      setErro(msg)
+    },
   })
+  const ultimoPayload = useRef<any>(null)
 
   const f = (k: keyof typeof form, v: string) => setForm(prev => ({ ...prev, [k]: v }))
   const label = tipo === 'PAGAR' ? 'Pagar' : 'Receber'
@@ -1647,7 +1699,7 @@ function ModalNovoLancamento({
     const semValor = parcelas.findIndex(p => p.valor <= 0)
     if (semValor >= 0) return setErro(`Informe o valor da parcela ${semValor + 1}`)
 
-    create.mutate({
+    const payload = {
       tipo,
       descricao:     form.descricao.trim(),
       documento:     form.documento.trim() || undefined,
@@ -1661,7 +1713,9 @@ function ModalNovoLancamento({
       emissao:       form.emissao,
       observacoes:   form.observacoes.trim() || undefined,
       parcelas:      parcelas.map(p => ({ numero: p.numero, valor: p.valor, vencimento: p.vencimento })),
-    })
+    }
+    ultimoPayload.current = payload
+    create.mutate(payload)
   }
 
   // Preenche datas automaticamente pelo 1º vencimento

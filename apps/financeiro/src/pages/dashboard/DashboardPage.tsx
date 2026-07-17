@@ -187,8 +187,15 @@ export function DashboardPage() {
       </div>
 
       {/* ── Alertas ── */}
-      {(r.vencendoHoje > 0 || r.vencidos > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
+      {(r.vencendoHoje > 0 || r.vencidos > 0 || (r.vencendo7Dias ?? 0) > 0 || (r.duplicatasSuspeitas ?? 0) > 0 || (r.propostasAguardandoImportacao ?? 0) > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+          {r.vencidos > 0 && (
+            <Card accent="#F87171" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ fontSize: 28 }}>🚨</div>
+              <div><div style={{ color: '#F87171', fontSize: 20, fontWeight: 800 }}>{r.vencidos}</div>
+                <div style={{ color: C.textMuted, fontSize: 12 }}>parcela(s) vencidas em aberto</div></div>
+            </Card>
+          )}
           {r.vencendoHoje > 0 && (
             <Card accent="#FBBF24" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ fontSize: 28 }}>⏰</div>
@@ -196,11 +203,25 @@ export function DashboardPage() {
                 <div style={{ color: C.textMuted, fontSize: 12 }}>parcela(s) vencendo hoje</div></div>
             </Card>
           )}
-          {r.vencidos > 0 && (
-            <Card accent="#F87171" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ fontSize: 28 }}>🚨</div>
-              <div><div style={{ color: '#F87171', fontSize: 20, fontWeight: 800 }}>{r.vencidos}</div>
-                <div style={{ color: C.textMuted, fontSize: 12 }}>parcela(s) vencidas em aberto</div></div>
+          {(r.vencendo7Dias ?? 0) > 0 && (
+            <Card accent="#FB923C" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ fontSize: 28 }}>📅</div>
+              <div><div style={{ color: '#FB923C', fontSize: 20, fontWeight: 800 }}>{r.vencendo7Dias}</div>
+                <div style={{ color: C.textMuted, fontSize: 12 }}>parcela(s) vencendo em 7 dias</div></div>
+            </Card>
+          )}
+          {(r.duplicatasSuspeitas ?? 0) > 0 && (
+            <Card accent="#E879F9" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ fontSize: 28 }}>👯</div>
+              <div><div style={{ color: '#E879F9', fontSize: 20, fontWeight: 800 }}>{r.duplicatasSuspeitas}</div>
+                <div style={{ color: C.textMuted, fontSize: 12 }}>possível(is) lançamento(s) duplicado(s) — mesma descrição e valor em até 7 dias</div></div>
+            </Card>
+          )}
+          {(r.propostasAguardandoImportacao ?? 0) > 0 && (
+            <Card accent="#38BDF8" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ fontSize: 28 }}>📄</div>
+              <div><div style={{ color: '#38BDF8', fontSize: 20, fontWeight: 800 }}>{r.propostasAguardandoImportacao}</div>
+                <div style={{ color: C.textMuted, fontSize: 12 }}>proposta(s) formalizada(s) aguardando importação</div></div>
             </Card>
           )}
         </div>
