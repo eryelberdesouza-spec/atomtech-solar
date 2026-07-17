@@ -1586,8 +1586,12 @@ export const propostaRouter = router({
       }
 
       // ── 9. Copia blocos ───────────────────────────────────────────
+      // Se a origem tem condições comerciais ativas mas o bloco estava desligado,
+      // reativa no clone — evita gerar PDF sem as condições de pagamento sem perceber.
+      const temCondsAtivas = conds.some((c: any) => c.ativa !== false)
       for (const bloco of blocos) {
         const { id: _, propostaId: __, createdAt: ___, updatedAt: ____, ...bl } = bloco as any
+        if (bl.tipoBloco === 'condicoes_comerciais' && !bl.ativo && temCondsAtivas) bl.ativo = true
         await ctx.db.insert(blocoTable).values({ ...bl, propostaId: novaId }).execute()
       }
 

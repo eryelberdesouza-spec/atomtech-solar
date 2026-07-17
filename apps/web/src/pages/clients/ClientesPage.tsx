@@ -423,7 +423,7 @@ export function ClienteDetailPage() {
             <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#FCA5A5', background: '#7F1D1D40', border: '1px solid #B91C1C60', borderRadius: 6, padding: '3px 8px' }}>Cancelado</span>
           )}
           {!cliente.cancelado && <Btn variant="ghost" size="sm" onClick={() => setShowEdit(true)}>{isMobile ? '✏' : '✏ Editar'}</Btn>}
-          {!isMobile && !cliente.cancelado && <NovaPropostaDropdown size="sm" />}
+          {!isMobile && !cliente.cancelado && <NovaPropostaDropdown size="sm" clienteId={clienteId} />}
           {cliente.cancelado
             ? <Btn variant="ghost" size="sm" onClick={() => reativarMutation.mutate({ id: clienteId })} disabled={reativarMutation.isLoading}>Reativar</Btn>
             : <Btn variant="ghost" size="sm" onClick={() => setShowConfirmCancel(true)} style={{ color: '#FCA5A5', borderColor: '#B91C1C60' }}>{isMobile ? '✕' : '✕ Cancelar'}</Btn>
@@ -498,7 +498,7 @@ export function ClienteDetailPage() {
                 <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Propostas</p>
                 {(propostas?.data?.length ?? 0) > 0 && <span style={{ background: `${C.accent}20`, color: C.accent, fontSize: 10, fontWeight: 700, borderRadius: 5, padding: '2px 7px' }}>{propostas!.data.length}</span>}
               </div>
-              <NovaPropostaDropdown label="+ Nova" size="sm" />
+              <NovaPropostaDropdown label="+ Nova" size="sm" clienteId={clienteId} />
             </div>
             {!propostas?.data?.length ? (
               <div style={{ padding: '24px', textAlign: 'center', color: C.textDim, fontSize: 13 }}>Nenhuma proposta para este cliente</div>

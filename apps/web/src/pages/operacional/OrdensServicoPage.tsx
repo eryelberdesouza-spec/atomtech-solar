@@ -732,6 +732,7 @@ export function OrdensServicoPage() {
   const isMobile  = useIsMobile()
   const [busca, setBusca] = useState('')
   const [view, setView]   = useState<'kanban' | 'lista'>(isMobile ? 'lista' : 'kanban')
+  const [mostrarHistCanceladas, setMostrarHistCanceladas] = useState(false)
   const [kanbanCol, setKanbanCol] = useState(0) // coluna ativa no kanban mobile
   const [showModalHistorico, setShowModalHistorico] = useState(false)
   const [showModalNovaOS, setShowModalNovaOS] = useState(false)
@@ -760,11 +761,15 @@ export function OrdensServicoPage() {
     updateStatus.mutate({ id: os.id, status: novoStatus })
   }
 
+  // OS históricas canceladas poluem o Kanban — ocultas por padrão (toggle abaixo)
+  const histCanceladas = lista.filter((o: any) => o.origem === 'historico' && o.status === 'cancelada').length
+
   const filtradas = lista.filter((o: any) =>
-    !busca
+    (mostrarHistCanceladas || !(o.origem === 'historico' && o.status === 'cancelada'))
+    && (!busca
     || o.numero?.toLowerCase().includes(busca.toLowerCase())
     || o.clienteNome?.toLowerCase().includes(busca.toLowerCase())
-    || o.titulo?.toLowerCase().includes(busca.toLowerCase())
+    || o.titulo?.toLowerCase().includes(busca.toLowerCase()))
   )
 
   const colunas = STATUS_OS.map(s => ({
@@ -795,6 +800,12 @@ export function OrdensServicoPage() {
             <h1 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: 0 }}>Operacional</h1>
             <p style={{ color: '#7488A8', fontSize: 11, margin: '2px 0 0' }}>
               {total} ordem{total !== 1 ? 's' : ''} de serviço
+              {histCanceladas > 0 && (
+                <button onClick={() => setMostrarHistCanceladas(v => !v)}
+                  style={{ marginLeft: 10, padding: '1px 8px', borderRadius: 6, border: '1px solid #7488A840', background: mostrarHistCanceladas ? '#7488A825' : 'transparent', color: '#7488A8', cursor: 'pointer', fontSize: 10, fontWeight: 600, fontFamily: 'inherit' }}>
+                  {mostrarHistCanceladas ? '− ocultar' : `+ ${histCanceladas} históricas canceladas`}
+                </button>
+              )}
             </p>
           </div>
           {/* Botões lado direito — desktop */}

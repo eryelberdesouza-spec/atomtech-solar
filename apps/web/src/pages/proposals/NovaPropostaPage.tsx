@@ -179,7 +179,9 @@ export function NovaPropostaPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const [step, setStep] = useState(1)
-  const [form, setForm] = useState(FORM_INICIAL)
+  // Pré-seleciona o cliente quando aberto a partir da página do cliente (?clienteId=N)
+  const clienteIdParam = new URLSearchParams(window.location.search).get('clienteId') ?? ''
+  const [form, setForm] = useState({ ...FORM_INICIAL, clienteId: clienteIdParam })
   const [mostrarParcelamento, setMostrarParcela] = useState(false)
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 

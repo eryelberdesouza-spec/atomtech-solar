@@ -110,7 +110,7 @@ export function PropostasPage() {
         <input
           value={busca}
           onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar por número ou cliente..."
+          placeholder="Buscar por número, cliente ou título..."
           style={{
             width: '100%', maxWidth: isMobile ? '100%' : 360,
             padding: '9px 14px', borderRadius: 9, boxSizing: 'border-box',

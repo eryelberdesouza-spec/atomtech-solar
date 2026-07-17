@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom'
 interface NovaPropostaDropdownProps {
   label?: string
   size?: 'sm' | 'md'
+  clienteId?: number   // quando usado na página do cliente, pré-seleciona o cliente
 }
 
-export function NovaPropostaDropdown({ label = '+ Nova Proposta', size = 'md' }: NovaPropostaDropdownProps) {
+export function NovaPropostaDropdown({ label = '+ Nova Proposta', size = 'md', clienteId }: NovaPropostaDropdownProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -63,7 +64,7 @@ export function NovaPropostaDropdown({ label = '+ Nova Proposta', size = 'md' }:
           }}
         >
           <button
-            onClick={() => { setOpen(false); navigate('/propostas/nova') }}
+            onClick={() => { setOpen(false); navigate('/propostas/nova' + (clienteId ? `?clienteId=${clienteId}` : '')) }}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #1E3050' }}
             onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = '#F5A62310')}
             onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'none')}
@@ -72,7 +73,7 @@ export function NovaPropostaDropdown({ label = '+ Nova Proposta', size = 'md' }:
             <span style={{ color: '#7488A8', fontSize: 11, marginTop: 2 }}>Proposta com dimensionamento e análise financeira</span>
           </button>
           <button
-            onClick={() => { setOpen(false); navigate('/propostas/nova-servico') }}
+            onClick={() => { setOpen(false); navigate('/propostas/nova-servico' + (clienteId ? `?clienteId=${clienteId}` : '')) }}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer' }}
             onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = '#F5A62310')}
             onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'none')}

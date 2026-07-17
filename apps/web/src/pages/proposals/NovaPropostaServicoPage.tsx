@@ -90,7 +90,8 @@ export function NovaPropostaServicoPage() {
   const hoje = new Date().toISOString().split('T')[0]
   const validade = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  const [clienteId, setClienteId]           = useState('')
+  // Pré-seleciona o cliente quando aberto a partir da página do cliente (?clienteId=N)
+  const [clienteId, setClienteId]           = useState(new URLSearchParams(window.location.search).get('clienteId') ?? '')
   const [tituloServico, setTituloServico]   = useState('')
   const [dataEmissao, setDataEmissao]       = useState(hoje)
   const [dataValidade, setDataValidade]     = useState(validade)
