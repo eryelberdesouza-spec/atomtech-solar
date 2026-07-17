@@ -48,12 +48,12 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
 }
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 10, color: '#4A6080',
+  display: 'block', fontSize: 10, color: '#7488A8',
   fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
 }
 const cancelBtnStyle: React.CSSProperties = {
   padding: '7px 16px', borderRadius: 7, border: '1px solid #1E3050',
-  background: 'transparent', color: '#4A6080', cursor: 'pointer',
+  background: 'transparent', color: '#7488A8', cursor: 'pointer',
   fontSize: 12, fontFamily: 'inherit',
 }
 const saveBtnStyle: React.CSSProperties = {
@@ -171,7 +171,7 @@ function InfoRow({ label, value, mono }: { label: string; value?: string | null;
   if (!value) return null
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-      <span style={{ fontSize: 11, color: '#4A6080', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+      <span style={{ fontSize: 11, color: '#7488A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
       <span style={{ fontSize: 13, color: '#C8D8EC', fontWeight: 500, fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '65%', textAlign: 'right' }}>{value}</span>
     </div>
   )
@@ -240,7 +240,7 @@ function BlocoServicoCampo({ os, osId, onRefresh }: any) {
               placeholder="Endereço completo, coordenadas ou link do Google Maps"
               style={inputStyle}
             />
-            <p style={{ fontSize: 10, color: '#4A6080', margin: '4px 0 0' }}>
+            <p style={{ fontSize: 10, color: '#7488A8', margin: '4px 0 0' }}>
               Cole um link do Maps ou digite o endereço — a equipe abre a rota com um toque.
             </p>
           </div>
@@ -258,14 +258,14 @@ function BlocoServicoCampo({ os, osId, onRefresh }: any) {
               {os.resumoServico}
             </p>
           ) : (
-            <p style={{ color: '#4A6080', fontSize: 12, margin: '0 0 10px', fontStyle: 'italic' }}>
+            <p style={{ color: '#7488A8', fontSize: 12, margin: '0 0 10px', fontStyle: 'italic' }}>
               Nenhum resumo do serviço ainda — clique em Editar para orientar o técnico.
             </p>
           )}
 
           {os.localizacao ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#8A9BB5' }}>📍 {os.localizacao}</span>
+              <span style={{ fontSize: 12, color: '#9FB0C9' }}>📍 {os.localizacao}</span>
               <a
                 href={linkMaps(os.localizacao)}
                 target="_blank"
@@ -281,7 +281,7 @@ function BlocoServicoCampo({ os, osId, onRefresh }: any) {
               </a>
             </div>
           ) : (
-            <span style={{ fontSize: 11, color: '#4A6080', fontStyle: 'italic' }}>📍 Sem localização cadastrada</span>
+            <span style={{ fontSize: 11, color: '#7488A8', fontStyle: 'italic' }}>📍 Sem localização cadastrada</span>
           )}
         </>
       )}
@@ -326,8 +326,8 @@ function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
           {os.dataPrevistaFim && <InfoRow label="Previsão fim" value={formatDate(String(os.dataPrevistaFim).slice(0, 10))} />}
           {os.descricao && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 10, color: '#4A6080', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Descrição</div>
-              <p style={{ color: '#8A9BB5', fontSize: 13, margin: 0, lineHeight: 1.5 }}>{os.descricao}</p>
+              <div style={{ fontSize: 10, color: '#7488A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Descrição</div>
+              <p style={{ color: '#9FB0C9', fontSize: 13, margin: 0, lineHeight: 1.5 }}>{os.descricao}</p>
             </div>
           )}
         </Section>
@@ -346,7 +346,7 @@ function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
           {/* Barra de progresso */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: '#4A6080', fontWeight: 600 }}>Progresso</span>
+              <span style={{ fontSize: 11, color: '#7488A8', fontWeight: 600 }}>Progresso</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: progresso === 100 ? '#3EBB7A' : '#F5A623' }}>{progresso}%</span>
             </div>
             <div style={{ height: 6, background: '#1E3050', borderRadius: 3, overflow: 'hidden' }}>
@@ -372,15 +372,15 @@ function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
                     {feito && '✓'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: feito ? 400 : 600, color: feito ? '#4A6080' : '#C8D8EC', textDecoration: feito ? 'line-through' : 'none' }}>
-                      <span style={{ color: '#4A6080', fontFamily: 'monospace', marginRight: 6 }}>{String(idx + 1).padStart(2, '0')}.</span>
+                    <div style={{ fontSize: 13, fontWeight: feito ? 400 : 600, color: feito ? '#7488A8' : '#C8D8EC', textDecoration: feito ? 'line-through' : 'none' }}>
+                      <span style={{ color: '#7488A8', fontFamily: 'monospace', marginRight: 6 }}>{String(idx + 1).padStart(2, '0')}.</span>
                       {marco.titulo}
                     </div>
-                    {marco.descricao && <div style={{ fontSize: 11, color: '#4A6080', marginTop: 2 }}>{marco.descricao}</div>}
+                    {marco.descricao && <div style={{ fontSize: 11, color: '#7488A8', marginTop: 2 }}>{marco.descricao}</div>}
                     <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
-                      {marco.dataPrevista && <span style={{ fontSize: 10, color: '#4A6080' }}>📅 Previsto: {formatDate(String(marco.dataPrevista).slice(0, 10))}</span>}
+                      {marco.dataPrevista && <span style={{ fontSize: 10, color: '#7488A8' }}>📅 Previsto: {formatDate(String(marco.dataPrevista).slice(0, 10))}</span>}
                       {feito && marco.dataRealizada && <span style={{ fontSize: 10, color: '#3EBB7A' }}>✔ Concluído: {formatDate(String(marco.dataRealizada).slice(0, 10))}</span>}
-                      {marco.responsavel && <span style={{ fontSize: 10, color: '#4A6080' }}>👤 {marco.responsavel}</span>}
+                      {marco.responsavel && <span style={{ fontSize: 10, color: '#7488A8' }}>👤 {marco.responsavel}</span>}
                     </div>
                   </div>
                 </div>
@@ -404,7 +404,7 @@ function AbaAgendamentos({ os, osId, onRefresh, onShowModal }: any) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <h3 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 700, margin: 0 }}>Agendamentos</h3>
-          <p style={{ color: '#4A6080', fontSize: 12, margin: '3px 0 0' }}>{(os.agendamentos ?? []).length} agendamento(s) registrado(s)</p>
+          <p style={{ color: '#7488A8', fontSize: 12, margin: '3px 0 0' }}>{(os.agendamentos ?? []).length} agendamento(s) registrado(s)</p>
         </div>
         {(os.status === 'aberta' || os.status === 'em_execucao') && (
           <button onClick={onShowModal} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #58A6FF60', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
@@ -416,7 +416,7 @@ function AbaAgendamentos({ os, osId, onRefresh, onShowModal }: any) {
       {(!os.agendamentos || os.agendamentos.length === 0) ? (
         <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: '40px', textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
-          <div style={{ color: '#4A6080', fontSize: 13 }}>Nenhum agendamento ainda.</div>
+          <div style={{ color: '#7488A8', fontSize: 13 }}>Nenhum agendamento ainda.</div>
           {(os.status === 'aberta' || os.status === 'em_execucao') && (
             <button onClick={onShowModal} style={{ marginTop: 12, padding: '8px 20px', borderRadius: 8, border: '1px solid #58A6FF60', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
               + Criar primeiro agendamento
@@ -426,21 +426,21 @@ function AbaAgendamentos({ os, osId, onRefresh, onShowModal }: any) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {os.agendamentos.map((ag: any) => {
-            const agCor = AG_STATUS_COLOR[ag.status] ?? '#8A9BB5'
+            const agCor = AG_STATUS_COLOR[ag.status] ?? '#9FB0C9'
             return (
               <div key={ag.id} style={{ background: '#111D2E', borderRadius: 10, padding: '14px 16px', border: `1px solid ${agCor}30`, borderLeft: `3px solid ${agCor}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: '#C8D8EC' }}>{TIPO_AG_LABEL[ag.tipo] ?? ag.tipo}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: agCor + '18', color: agCor }}>{AG_STATUS_LABEL[ag.status] ?? ag.status}</span>
                 </div>
-                <div style={{ fontSize: 13, color: '#8A9BB5', marginBottom: 4 }}>
+                <div style={{ fontSize: 13, color: '#9FB0C9', marginBottom: 4 }}>
                   📅 {formatDate(String(ag.dataAgendada).slice(0, 10))}
                   {ag.horaInicio && ` · ${ag.horaInicio}`}
                   {ag.horaFim    && ` – ${ag.horaFim}`}
                 </div>
-                {ag.tecnico  && <div style={{ fontSize: 12, color: '#4A6080', marginBottom: 2 }}>👤 {ag.tecnico}</div>}
-                {ag.endereco && <div style={{ fontSize: 12, color: '#4A6080', marginBottom: 2 }}>📍 {ag.endereco}</div>}
-                {ag.observacoes && <div style={{ fontSize: 12, color: '#4A6080', marginTop: 4, fontStyle: 'italic' }}>{ag.observacoes}</div>}
+                {ag.tecnico  && <div style={{ fontSize: 12, color: '#7488A8', marginBottom: 2 }}>👤 {ag.tecnico}</div>}
+                {ag.endereco && <div style={{ fontSize: 12, color: '#7488A8', marginBottom: 2 }}>📍 {ag.endereco}</div>}
+                {ag.observacoes && <div style={{ fontSize: 12, color: '#7488A8', marginTop: 4, fontStyle: 'italic' }}>{ag.observacoes}</div>}
                 {ag.status !== 'cancelado' && ag.status !== 'realizado' && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                     {ag.status === 'agendado' && (
@@ -492,7 +492,7 @@ function AbaDiarioCampo({ os, osId, onRefresh }: any) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <h3 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 700, margin: 0 }}>📓 Diário de Campo</h3>
-          <p style={{ color: '#4A6080', fontSize: 12, margin: '3px 0 0' }}>Registro cronológico de atividades, observações e eventos em campo</p>
+          <p style={{ color: '#7488A8', fontSize: 12, margin: '3px 0 0' }}>Registro cronológico de atividades, observações e eventos em campo</p>
         </div>
       </div>
 
@@ -540,7 +540,7 @@ function AbaDiarioCampo({ os, osId, onRefresh }: any) {
       {notas.length === 0 ? (
         <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: '40px', textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📓</div>
-          <div style={{ color: '#4A6080', fontSize: 13 }}>Nenhuma entrada no diário ainda.</div>
+          <div style={{ color: '#7488A8', fontSize: 13 }}>Nenhuma entrada no diário ainda.</div>
           <div style={{ color: '#2A3F55', fontSize: 12, marginTop: 4 }}>Use o campo acima para registrar atividades de campo.</div>
         </div>
       ) : (
@@ -562,7 +562,7 @@ function AbaDiarioCampo({ os, osId, onRefresh }: any) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <div>
                         {nota.autor && <span style={{ fontSize: 12, fontWeight: 700, color: '#F5A623', marginRight: 8 }}>👤 {nota.autor}</span>}
-                        <span style={{ fontSize: 11, color: '#4A6080' }}>{dataStr}</span>
+                        <span style={{ fontSize: 11, color: '#7488A8' }}>{dataStr}</span>
                       </div>
                       {os.status !== 'cancelada' && (
                         <button
@@ -673,7 +673,7 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <h3 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 700, margin: 0 }}>📎 Anexos</h3>
-          <p style={{ color: '#4A6080', fontSize: 12, margin: '3px 0 0' }}>{anexos.length} arquivo(s) — fotos e PDFs do serviço</p>
+          <p style={{ color: '#7488A8', fontSize: 12, margin: '3px 0 0' }}>{anexos.length} arquivo(s) — fotos e PDFs do serviço</p>
         </div>
         {osStatus !== 'cancelada' && (
           <button
@@ -718,7 +718,7 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
       ) : anexos.length === 0 ? (
         <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: '40px', textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📎</div>
-          <div style={{ color: '#4A6080', fontSize: 13 }}>Nenhum anexo ainda.</div>
+          <div style={{ color: '#7488A8', fontSize: 13 }}>Nenhum anexo ainda.</div>
           <div style={{ color: '#2A3F55', fontSize: 12, marginTop: 4 }}>Adicione fotos ou PDFs do serviço.</div>
         </div>
       ) : (
@@ -765,7 +765,7 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
                 ) : isPDF(a.tipoMime) ? (
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 48 }}>📄</div>
-                    <div style={{ fontSize: 10, color: '#4A6080', marginTop: 4 }}>PDF</div>
+                    <div style={{ fontSize: 10, color: '#7488A8', marginTop: 4 }}>PDF</div>
                   </div>
                 ) : (
                   <div style={{ fontSize: 40 }}>📎</div>
@@ -777,16 +777,16 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
                 <div style={{ fontSize: 11, color: '#C8D8EC', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.nome}>
                   {a.nome}
                 </div>
-                <div style={{ fontSize: 10, color: '#4A6080', marginTop: 2 }}>{fmtTamanho(a.tamanho)}</div>
+                <div style={{ fontSize: 10, color: '#7488A8', marginTop: 2 }}>{fmtTamanho(a.tamanho)}</div>
                 <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
                   <button
                     onClick={() => setPreviewIdx(idx)}
-                    style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#8A9BB5', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit' }}
+                    style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#9FB0C9', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit' }}
                   >👁 Ver</button>
                   <a
                     href={downloadUrl(a.id)}
                     download={a.nome}
-                    style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#8A9BB5', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ flex: 1, padding: '4px', borderRadius: 5, border: '1px solid #1E3050', background: '#0C1828', color: '#9FB0C9', cursor: 'pointer', fontSize: 10, fontFamily: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >⬇</a>
                   {osStatus !== 'cancelada' && (
                     <button
@@ -815,7 +815,7 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
             style={{
               position: 'absolute', top: '50%', transform: 'translateY(-50%)',
               background: disabled ? '#1E305060' : '#1E3050EE',
-              border: 'none', borderRadius: 8, color: disabled ? '#4A6080' : '#C8D8EC',
+              border: 'none', borderRadius: 8, color: disabled ? '#7488A8' : '#C8D8EC',
               fontSize: isMobile ? 28 : 22, fontWeight: 700, cursor: disabled ? 'default' : 'pointer',
               padding: isMobile ? '14px 18px' : '12px 16px', zIndex: 10, fontFamily: 'inherit', lineHeight: 1,
               ...(label === '‹' ? { left: isMobile ? 4 : 12 } : { right: isMobile ? 4 : 12 }),
@@ -838,7 +838,7 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
             <div style={{ position: 'absolute', top: 16, left: 16, color: '#C8D8EC', fontSize: 13, fontWeight: 600, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               📎 {cur.nome}
             </div>
-            <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', color: '#4A6080', fontSize: 12 }}>
+            <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', color: '#7488A8', fontSize: 12 }}>
               {previewIdx + 1} / {allAnexos.length}
             </div>
 
@@ -910,7 +910,7 @@ export function OrdemServicoDetailPage() {
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}><Spinner /></div>
   if (!os) return <div style={{ padding: 32, color: '#F85149', fontSize: 14 }}>OS não encontrada.</div>
 
-  const cor = STATUS_COLOR[os.status] ?? '#8A9BB5'
+  const cor = STATUS_COLOR[os.status] ?? '#9FB0C9'
   const totalMarcos  = os.marcos?.length ?? 0
   const marcosFeitos = os.marcos?.filter((m: any) => Number(m.concluido) === 1).length ?? 0
   const progresso    = totalMarcos > 0 ? Math.round((marcosFeitos / totalMarcos) * 100) : 0
@@ -946,16 +946,16 @@ export function OrdemServicoDetailPage() {
 
         {/* Linha 1: voltar + número + status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 16, marginBottom: 10 }}>
-          <button onClick={() => navigate('/ordens-servico')} style={{ padding: isMobile ? '6px 10px' : '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: '#1E305030', color: '#4A6080', cursor: 'pointer', fontSize: isMobile ? 13 : 12, flexShrink: 0 }}>←</button>
+          <button onClick={() => navigate('/ordens-servico')} style={{ padding: isMobile ? '6px 10px' : '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: '#1E305030', color: '#7488A8', cursor: 'pointer', fontSize: isMobile ? 13 : 12, flexShrink: 0 }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
               <span style={{ color: cor, fontFamily: 'monospace', fontSize: isMobile ? 13 : 16, fontWeight: 800 }}>{os.numero}</span>
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: cor + '18', color: cor, border: `1px solid ${cor}40`, whiteSpace: 'nowrap' }}>{STATUS_LABEL[os.status] ?? os.status}</span>
-              {!isMobile && progresso > 0 && <span style={{ fontSize: 11, color: '#4A6080' }}>{marcosFeitos}/{totalMarcos} etapas · {progresso}%</span>}
+              {!isMobile && progresso > 0 && <span style={{ fontSize: 11, color: '#7488A8' }}>{marcosFeitos}/{totalMarcos} etapas · {progresso}%</span>}
             </div>
             <div style={{ color: '#C8D8EC', fontSize: isMobile ? 12 : 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {os.clienteNome ?? '—'}
-              {!isMobile && os.titulo && <span style={{ color: '#4A6080', fontWeight: 400, marginLeft: 8 }}>· {os.titulo}</span>}
+              {!isMobile && os.titulo && <span style={{ color: '#7488A8', fontWeight: 400, marginLeft: 8 }}>· {os.titulo}</span>}
             </div>
           </div>
 
@@ -1004,14 +1004,14 @@ export function OrdemServicoDetailPage() {
             <div style={{ flex: 1, height: 4, background: '#1E3050', borderRadius: 2 }}>
               <div style={{ width: `${progresso}%`, height: '100%', background: cor, borderRadius: 2 }} />
             </div>
-            <span style={{ fontSize: 11, color: '#4A6080', flexShrink: 0 }}>{marcosFeitos}/{totalMarcos} · {progresso}%</span>
+            <span style={{ fontSize: 11, color: '#7488A8', flexShrink: 0 }}>{marcosFeitos}/{totalMarcos} · {progresso}%</span>
           </div>
         )}
 
         {/* Abas — scroll horizontal no mobile */}
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none' as any }}>
           {ABAS.map(a => (
-            <button key={a.id} onClick={() => setAba(a.id as any)} style={{ padding: isMobile ? '6px 12px' : '7px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: isMobile ? 11 : 12, fontWeight: aba === a.id ? 700 : 400, color: aba === a.id ? cor : '#4A6080', borderBottom: aba === a.id ? `2px solid ${cor}` : '2px solid transparent', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <button key={a.id} onClick={() => setAba(a.id as any)} style={{ padding: isMobile ? '6px 12px' : '7px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: isMobile ? 11 : 12, fontWeight: aba === a.id ? 700 : 400, color: aba === a.id ? cor : '#7488A8', borderBottom: aba === a.id ? `2px solid ${cor}` : '2px solid transparent', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {a.label}
             </button>
           ))}

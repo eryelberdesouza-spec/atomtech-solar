@@ -70,12 +70,12 @@ function KpiCard({ label, value, valor, sub, icon, color }: {
       <div style={{ position: 'absolute', top: -30, right: -30, width: 100, height: 100, borderRadius: '50%', background: color + '10', pointerEvents: 'none' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
-          <p style={{ color: '#4A6080', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 10px' }}>{label}</p>
+          <p style={{ color: '#7488A8', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 10px' }}>{label}</p>
           <p style={{ color: '#E2EAF5', fontSize: 30, fontWeight: 800, lineHeight: 1, margin: '0 0 4px' }}>{value}</p>
           {valor !== undefined && valor > 0 && (
             <p style={{ color: color, fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>{fmtBRL(valor)}</p>
           )}
-          {sub && <p style={{ color: '#4A6080', fontSize: 11, margin: 0 }}>{sub}</p>}
+          {sub && <p style={{ color: '#7488A8', fontSize: 11, margin: 0 }}>{sub}</p>}
         </div>
         <div style={{
           width: 44, height: 44, borderRadius: 12, flexShrink: 0,
@@ -95,12 +95,12 @@ function FunilBar({ label, count, valor, total, color, icon }: { label: string; 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13 }}>{icon}</span>
-          <span style={{ color: '#8A9BB5', fontSize: 13 }}>{label}</span>
+          <span style={{ color: '#9FB0C9', fontSize: 13 }}>{label}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {valor > 0 && <span style={{ color: '#4A6080', fontSize: 11, fontWeight: 500 }}>{fmtBRL(valor)}</span>}
+          {valor > 0 && <span style={{ color: '#7488A8', fontSize: 11, fontWeight: 500 }}>{fmtBRL(valor)}</span>}
           <span style={{ color: color, fontWeight: 700, fontSize: 14, minWidth: 16, textAlign: 'right' }}>{count}</span>
-          <span style={{ color: '#3A5070', fontSize: 11, minWidth: 28, textAlign: 'right' }}>{pct}%</span>
+          <span style={{ color: '#6A80A2', fontSize: 11, minWidth: 28, textAlign: 'right' }}>{pct}%</span>
         </div>
       </div>
       <div style={{ height: 5, borderRadius: 3, background: '#1E3050' }}>
@@ -187,7 +187,7 @@ export function DashboardPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isMobile ? 16 : 28, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 18 : 22, fontWeight: 800, margin: '0 0 4px' }}>{saudacao()}</h2>
-          <p style={{ color: '#4A6080', fontSize: 13, margin: 0 }}>
+          <p style={{ color: '#7488A8', fontSize: 13, margin: 0 }}>
             {(empresa as any)?.nome ?? 'Atom Tech'} · Aqui está o resumo de hoje
           </p>
         </div>
@@ -198,7 +198,7 @@ export function DashboardPage() {
                 padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
                 border: `1px solid ${periodo === p.id ? '#F5A623' : '#1E3050'}`,
                 background: periodo === p.id ? '#F5A62318' : 'transparent',
-                color: periodo === p.id ? '#F5A623' : '#4A6080',
+                color: periodo === p.id ? '#F5A623' : '#7488A8',
                 cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
               }}>{p.label}</button>
           ))}
@@ -221,7 +221,7 @@ export function DashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid #1A2D45' }}>
             <div>
               <h3 style={{ color: '#E2EAF5', fontSize: 15, fontWeight: 700, margin: 0 }}>Últimas Propostas</h3>
-              <p style={{ color: '#3A5070', fontSize: 11, margin: '2px 0 0' }}>{propostas.length} proposta{propostas.length !== 1 ? 's' : ''} no período</p>
+              <p style={{ color: '#6A80A2', fontSize: 11, margin: '2px 0 0' }}>{propostas.length} proposta{propostas.length !== 1 ? 's' : ''} no período</p>
             </div>
             <button onClick={() => navigate('/propostas')}
               style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#F5A623', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
@@ -231,7 +231,7 @@ export function DashboardPage() {
           </div>
 
           {propostas.length === 0 ? (
-            <div style={{ padding: '48px 24px', textAlign: 'center', color: '#3A5070' }}>
+            <div style={{ padding: '48px 24px', textAlign: 'center', color: '#6A80A2' }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
               <p style={{ margin: '0 0 16px', fontSize: 14 }}>Nenhuma proposta ainda.</p>
               <NovaPropostaDropdown label="+ Criar primeira proposta" />
@@ -240,7 +240,7 @@ export function DashboardPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>{['Nº', 'Cliente', 'Valor', 'Status', 'Data', ''].map(c => (
-                  <th key={c} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, color: '#3A5070', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid #1A2D45' }}>{c}</th>
+                  <th key={c} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, color: '#6A80A2', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid #1A2D45' }}>{c}</th>
                 ))}</tr>
               </thead>
               <tbody>
@@ -256,14 +256,14 @@ export function DashboardPage() {
                     >
                       <td style={{ padding: '13px 16px', fontSize: 12, color: '#F5A623', fontWeight: 700, borderBottom: border }}>{p.numero}</td>
                       <td style={{ padding: '13px 16px', fontSize: 13, color: '#C8D8EC', borderBottom: border, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.clienteNome}</td>
-                      <td style={{ padding: '13px 16px', fontSize: 12, color: v > 0 ? '#3EBB7A' : '#3A5070', fontWeight: v > 0 ? 600 : 400, borderBottom: border, whiteSpace: 'nowrap' }}>{v > 0 ? fmtBRL(v) : '—'}</td>
+                      <td style={{ padding: '13px 16px', fontSize: 12, color: v > 0 ? '#3EBB7A' : '#6A80A2', fontWeight: v > 0 ? 600 : 400, borderBottom: border, whiteSpace: 'nowrap' }}>{v > 0 ? fmtBRL(v) : '—'}</td>
                       <td style={{ padding: '13px 16px', borderBottom: border }}>
                         <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: st.bg, color: st.color, textTransform: 'uppercase' }}>
                           {st.icon} {st.label}
                         </span>
                       </td>
-                      <td style={{ padding: '13px 16px', fontSize: 12, color: '#4A6080', borderBottom: border }}>{formatDate(p.dataEmissao)}</td>
-                      <td style={{ padding: '13px 16px', color: '#3A5070', borderBottom: border }}>›</td>
+                      <td style={{ padding: '13px 16px', fontSize: 12, color: '#7488A8', borderBottom: border }}>{formatDate(p.dataEmissao)}</td>
+                      <td style={{ padding: '13px 16px', color: '#6A80A2', borderBottom: border }}>›</td>
                     </tr>
                   )
                 })}
@@ -301,12 +301,12 @@ export function DashboardPage() {
                   display: 'flex', alignItems: 'center', gap: 10,
                   width: '100%', padding: '10px 12px', marginBottom: 6,
                   borderRadius: 9, border: '1px solid #1E3050',
-                  background: 'transparent', color: '#8A9BB5',
+                  background: 'transparent', color: '#9FB0C9',
                   cursor: 'pointer', fontSize: 13, fontWeight: 500,
                   fontFamily: 'inherit', transition: 'all 0.15s', textAlign: 'left',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = a.color + '12'; (e.currentTarget as HTMLButtonElement).style.color = a.color; (e.currentTarget as HTMLButtonElement).style.borderColor = a.color + '40' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#8A9BB5'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#1E3050' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#9FB0C9'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#1E3050' }}
               >
                 <span style={{ fontSize: 16 }}>{a.icon}</span>{a.label}
               </button>

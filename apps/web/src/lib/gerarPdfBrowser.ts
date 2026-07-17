@@ -105,7 +105,7 @@ const CSS = `
   .capa-topinfo {
     position: absolute; z-index: 3;
     top: 18mm; right: 17mm;
-    text-align: right; font-size: 8px; line-height: 1.35;
+    text-align: right; font-size: 9.5px; line-height: 1.4;
     color: rgba(255,255,255,0.62); letter-spacing: 0.4px;
     font-family: 'Montserrat', Calibri, sans-serif;
   }
@@ -119,16 +119,16 @@ const CSS = `
   }
   .capa-logo { width: 48mm; height: auto; object-fit: contain; }
   .capa-logo-text { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: 2px; line-height: 1.1; }
-  .capa-logo-sub { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.5); letter-spacing: 5px; text-transform: uppercase; margin-top: 4px; }
+  .capa-logo-sub { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.75); letter-spacing: 5px; text-transform: uppercase; margin-top: 4px; }
   .capa-eyebrow { font-size: 9px; letter-spacing: 5px; text-transform: uppercase; color: #f2c23b; font-weight: 600; margin-bottom: 9mm; }
   .capa-title { font-size: 32px; line-height: 1.05; font-weight: 800; text-transform: uppercase; color: #fff; margin: 0 0 8mm 0; max-width: 96mm; }
   .capa-accent { width: 18mm; height: 1.5mm; background: #f2c23b !important; margin-bottom: 9mm; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .capa-prepared { font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.58); margin-bottom: 4mm; }
+  .capa-prepared { font-size: 9.5px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.8); margin-bottom: 4mm; }
   .capa-cliente { font-size: 19px; line-height: 1.14; font-weight: 800; text-transform: uppercase; max-width: 102mm; margin-bottom: 12mm; color: #fff; }
   .capa-meta { display: grid; grid-template-columns: repeat(3, auto); gap: 10mm; align-items: start; max-width: 105mm; }
-  .capa-meta-label { font-size: 7.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.48); margin-bottom: 2mm; }
+  .capa-meta-label { font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.75); margin-bottom: 2mm; }
   .capa-meta-value { font-size: 10px; font-weight: 700; color: #fff; }
-  .capa-footer { display: flex; gap: 3mm; align-items: center; color: rgba(255,255,255,0.62); font-size: 7.5px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .capa-footer { display: flex; gap: 3mm; align-items: center; color: rgba(255,255,255,0.85); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; }
   .capa-footer-bar { width: 1.2mm; height: 8mm; background: #f2c23b !important; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   /* ─── HEADER INTERNO ─────────────────────────────────────────── */
@@ -140,7 +140,7 @@ const CSS = `
   }
   .header-logo { font-family: Calibri, Candara, sans-serif; font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
   .header-logo span { color: #F5A623; }
-  .header-tag { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.4); letter-spacing: 3px; text-transform: uppercase; }
+  .header-tag { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.8); letter-spacing: 3px; text-transform: uppercase; }
 
   /* ─── FOOTER ─────────────────────────────────────────────────── */
   .footer {
@@ -150,8 +150,8 @@ const CSS = `
     flex-shrink: 0;
     margin-top: auto;
   }
-  .footer-text { font-size: 9px; font-weight: 300; color: rgba(255,255,255,0.45); line-height: 1.5; }
-  .footer-numero { font-size: 9px; color: rgba(255,255,255,0.3); font-family: Calibri, Candara, monospace; }
+  .footer-text { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.85); line-height: 1.5; }
+  .footer-numero { font-size: 10px; color: rgba(255,255,255,0.7); font-family: Calibri, Candara, monospace; }
 
   /* ─── SEÇÃO CONTEÚDO ─────────────────────────────────────────── */
   .section { padding: 20px 36px; flex: 1; overflow: hidden; }
@@ -228,7 +228,7 @@ function headerInterno(numero: string, logoUrl?: string | null) {
   return `<div class="header-interno">
     <div class="header-logo">
       ${logoUrl ? `<img src="${logoUrl}" style="height:24px;max-width:130px;object-fit:contain;vertical-align:middle;" alt="Logo"/>` : `ATOM<span>TECH</span>`}
-      <small style="font-size:9px;font-weight:300;color:rgba(255,255,255,0.4);margin-left:8px">Energia Solar e Tecnologia</small>
+      <small style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.75);margin-left:8px">Energia Solar e Tecnologia</small>
     </div>
     <div class="header-tag">Proposta Comercial &middot; ${numero}</div>
   </div>`

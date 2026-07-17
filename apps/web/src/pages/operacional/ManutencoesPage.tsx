@@ -19,7 +19,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
 }
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 10, color: '#4A6080',
+  display: 'block', fontSize: 10, color: '#7488A8',
   fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
 }
 
@@ -99,7 +99,7 @@ function ModalPlano({ plano, onClose, onSucesso }: { plano: any | null; onClose:
           <h2 style={{ color: '#C8D8EC', fontSize: 15, fontWeight: 800, margin: 0 }}>
             {editando ? '✏ Editar Plano de Manutenção' : '🔁 Novo Plano de Manutenção'}
           </h2>
-          <button onClick={onClose} style={{ background: '#1E305040', border: 'none', color: '#4A6080', fontSize: 16, cursor: 'pointer', width: 30, height: 30, borderRadius: 8 }}>×</button>
+          <button onClick={onClose} style={{ background: '#1E305040', border: 'none', color: '#7488A8', fontSize: 16, cursor: 'pointer', width: 30, height: 30, borderRadius: 8 }}>×</button>
         </div>
 
         {erro && (
@@ -116,7 +116,7 @@ function ModalPlano({ plano, onClose, onSucesso }: { plano: any | null; onClose:
               {form.clienteId ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#39C5CF12', border: '1px solid #39C5CF40', borderRadius: 8, padding: '8px 12px' }}>
                   <span style={{ fontSize: 13, color: '#C8D8EC', fontWeight: 600 }}>{clienteSelecionado?.nome ?? clienteNomeLocal}</span>
-                  <button onClick={() => { setForm(f => ({ ...f, clienteId: '' })); setClienteNomeLocal('') }} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 15 }}>×</button>
+                  <button onClick={() => { setForm(f => ({ ...f, clienteId: '' })); setClienteNomeLocal('') }} style={{ background: 'none', border: 'none', color: '#7488A8', cursor: 'pointer', fontSize: 15 }}>×</button>
                 </div>
               ) : (
                 <>
@@ -194,7 +194,7 @@ function ModalPlano({ plano, onClose, onSucesso }: { plano: any | null; onClose:
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#4A6080', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#7488A8', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>Cancelar</button>
           <button onClick={salvar} disabled={salvando} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#39C5CF', color: '#0C1421', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
             {salvando ? 'Salvando...' : editando ? 'Salvar Alterações' : '✓ Criar Plano'}
           </button>
@@ -244,10 +244,10 @@ export function ManutencoesPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/ordens-servico')} style={{ background: '#1E305040', border: 'none', color: '#8A9BB5', fontSize: 16, cursor: 'pointer', width: 34, height: 34, borderRadius: 8 }}>←</button>
+          <button onClick={() => navigate('/ordens-servico')} style={{ background: '#1E305040', border: 'none', color: '#9FB0C9', fontSize: 16, cursor: 'pointer', width: 34, height: 34, borderRadius: 8 }}>←</button>
           <div>
             <h1 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: 0 }}>🔁 Manutenções Recorrentes</h1>
-            <p style={{ color: '#4A6080', fontSize: 11, margin: '2px 0 0' }}>
+            <p style={{ color: '#7488A8', fontSize: 11, margin: '2px 0 0' }}>
               Limpezas e revisões programadas — concluir a OS reagenda o plano automaticamente
             </p>
           </div>
@@ -267,7 +267,7 @@ export function ManutencoesPage() {
           { label: 'Planos ativos',     valor: ativos.length, cor: '#39C5CF' },
         ].map(k => (
           <div key={k.label} style={{ background: '#111D2E', border: `1px solid ${k.cor}30`, borderLeft: `3px solid ${k.cor}`, borderRadius: 10, padding: '12px 16px' }}>
-            <div style={{ fontSize: 10, color: '#4A6080', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: '#7488A8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k.label}</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: k.cor, marginTop: 2 }}>{k.valor}</div>
           </div>
         ))}
@@ -279,8 +279,8 @@ export function ManutencoesPage() {
       ) : planos.length === 0 ? (
         <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: 48, textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}>🔁</div>
-          <div style={{ color: '#8A9BB5', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Nenhum plano de manutenção ainda</div>
-          <div style={{ color: '#4A6080', fontSize: 12, marginBottom: 16 }}>Crie planos recorrentes (ex.: limpeza de painéis a cada 6 meses) e receba alertas quando estiver na hora.</div>
+          <div style={{ color: '#9FB0C9', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Nenhum plano de manutenção ainda</div>
+          <div style={{ color: '#7488A8', fontSize: 12, marginBottom: 16 }}>Crie planos recorrentes (ex.: limpeza de painéis a cada 6 meses) e receba alertas quando estiver na hora.</div>
           <button onClick={() => setShowModal(true)} style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#39C5CF', color: '#0C1421', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>+ Criar primeiro plano</button>
         </div>
       ) : (
@@ -291,7 +291,7 @@ export function ManutencoesPage() {
             return (
               <div key={p.id} style={{
                 background: '#111D2E', border: '1px solid #1E3050', borderRadius: 10,
-                borderLeft: `3px solid ${ativo ? sit.color : '#4A6080'}`,
+                borderLeft: `3px solid ${ativo ? sit.color : '#7488A8'}`,
                 padding: '14px 16px', opacity: ativo ? 1 : 0.55,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -303,16 +303,16 @@ export function ManutencoesPage() {
                           {sit.label}
                         </span>
                       ) : (
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#4A608020', color: '#4A6080' }}>PAUSADO</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#7488A820', color: '#7488A8' }}>PAUSADO</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: '#8A9BB5', marginBottom: 4 }}>👤 {p.clienteNome}</div>
-                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11, color: '#4A6080' }}>
+                    <div style={{ fontSize: 12, color: '#9FB0C9', marginBottom: 4 }}>👤 {p.clienteNome}</div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11, color: '#7488A8' }}>
                       <span>🔁 A cada {p.periodicidadeMeses} {Number(p.periodicidadeMeses) === 1 ? 'mês' : 'meses'}</span>
                       <span>📅 Próxima: <strong style={{ color: sit.color }}>{formatDate(String(p.proximaData).slice(0, 10))}</strong></span>
                       {p.ultimaExecucao && <span>✔ Última: {formatDate(String(p.ultimaExecucao).slice(0, 10))}</span>}
                     </div>
-                    {p.resumo && <div style={{ fontSize: 11, color: '#4A6080', marginTop: 5, fontStyle: 'italic' }}>{p.resumo}</div>}
+                    {p.resumo && <div style={{ fontSize: 11, color: '#7488A8', marginTop: 5, fontStyle: 'italic' }}>{p.resumo}</div>}
                   </div>
 
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -328,7 +328,7 @@ export function ManutencoesPage() {
                       </button>
                     ))}
                     <button onClick={() => { setEditandoPlano(p); setShowModal(true) }}
-                      style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>✏</button>
+                      style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#9FB0C9', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>✏</button>
                     <button onClick={() => toggleMut.mutate({ id: p.id, ativo: !ativo })}
                       title={ativo ? 'Pausar plano' : 'Reativar plano'}
                       style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: ativo ? '#F85149' : '#3EBB7A', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>

@@ -9,7 +9,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 type StatusFiltro = 'todos' | 'rascunho' | 'enviada' | 'aceita' | 'recusada' | 'expirada'
 
 const STATUS_FILTROS: { id: StatusFiltro; label: string; color: string }[] = [
-  { id: 'todos',    label: 'Todas',    color: '#8A9BB5' },
+  { id: 'todos',    label: 'Todas',    color: '#9FB0C9' },
   { id: 'rascunho', label: 'Rascunho', color: '#8B949E' },
   { id: 'enviada',  label: 'Enviada',  color: '#58A6FF' },
   { id: 'aceita',   label: 'Aceita',   color: '#3EBB7A' },
@@ -75,7 +75,7 @@ export function PropostasPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
-          <p style={{ color: '#4A6080', fontSize: 12, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
+          <p style={{ color: '#7488A8', fontSize: 12, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
         </div>
         <NovaPropostaDropdown />
       </div>
@@ -97,7 +97,7 @@ export function PropostasPage() {
               <div style={{ fontSize: 20, fontWeight: 800, color: filtro === s.id ? s.color : '#E2EAF5', lineHeight: 1 }}>
                 {contagem[s.id] ?? 0}
               </div>
-              <div style={{ fontSize: 10, color: filtro === s.id ? s.color : '#4A6080', marginTop: 4, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 10, color: filtro === s.id ? s.color : '#7488A8', marginTop: 4, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 {s.label}
               </div>
             </button>
@@ -129,9 +129,9 @@ export function PropostasPage() {
           <style>{'@keyframes spin { to { transform: rotate(360deg); } }'}</style>
         </div>
       ) : filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#4A6080' }}>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#7488A8' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
-          <p style={{ fontSize: 15, color: '#8A9BB5', margin: 0 }}>
+          <p style={{ fontSize: 15, color: '#9FB0C9', margin: 0 }}>
             {busca || filtro !== 'todos' ? 'Nenhuma proposta encontrada com este filtro.' : 'Nenhuma proposta criada ainda.'}
           </p>
           {!busca && filtro === 'todos' && (
@@ -150,7 +150,7 @@ export function PropostasPage() {
               padding: '6px 20px', gap: 12,
             }}>
               {['Nº Proposta', 'Cliente', 'Status', 'Data', ''].map(h => (
-                <span key={h} style={{ fontSize: 10, color: '#3A5070', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</span>
+                <span key={h} style={{ fontSize: 10, color: '#6A80A2', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{h}</span>
               ))}
             </div>
           )}
@@ -189,11 +189,11 @@ export function PropostasPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Badge status={p.status} />
-                        <span style={{ color: '#3A5070', fontSize: 18 }}>›</span>
+                        <span style={{ color: '#6A80A2', fontSize: 18 }}>›</span>
                       </div>
                     </div>
                     <div style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 600 }}>{p.clienteNome}</div>
-                    <div style={{ color: '#4A6080', fontSize: 11 }}>
+                    <div style={{ color: '#7488A8', fontSize: 11 }}>
                       {formatDate(p.dataEmissao)}
                       {p.tituloServico && ` · ${p.tituloServico}`}
                     </div>
@@ -211,11 +211,11 @@ export function PropostasPage() {
                     </div>
                     <div>
                       <div style={{ color: '#C8D8EC', fontSize: 13, fontWeight: 600 }}>{p.clienteNome}</div>
-                      {(p.tituloServico || p.clienteEstado) && <div style={{ color: '#3A5070', fontSize: 11, marginTop: 1 }}>{p.tituloServico || p.clienteEstado}</div>}
+                      {(p.tituloServico || p.clienteEstado) && <div style={{ color: '#6A80A2', fontSize: 11, marginTop: 1 }}>{p.tituloServico || p.clienteEstado}</div>}
                     </div>
                     <Badge status={p.status} />
-                    <span style={{ color: '#4A6080', fontSize: 12 }}>{formatDate(p.dataEmissao)}</span>
-                    <span style={{ color: '#3A5070', fontSize: 18 }}>›</span>
+                    <span style={{ color: '#7488A8', fontSize: 12 }}>{formatDate(p.dataEmissao)}</span>
+                    <span style={{ color: '#6A80A2', fontSize: 18 }}>›</span>
                   </>
                 )}
               </div>

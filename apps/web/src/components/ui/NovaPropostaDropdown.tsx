@@ -69,7 +69,7 @@ export function NovaPropostaDropdown({ label = '+ Nova Proposta', size = 'md' }:
             onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'none')}
           >
             <span style={{ color: '#E2EAF5', fontSize: 13, fontWeight: 700 }}>☀️ Sistema Fotovoltaico</span>
-            <span style={{ color: '#4A6080', fontSize: 11, marginTop: 2 }}>Proposta com dimensionamento e análise financeira</span>
+            <span style={{ color: '#7488A8', fontSize: 11, marginTop: 2 }}>Proposta com dimensionamento e análise financeira</span>
           </button>
           <button
             onClick={() => { setOpen(false); navigate('/propostas/nova-servico') }}
@@ -78,7 +78,7 @@ export function NovaPropostaDropdown({ label = '+ Nova Proposta', size = 'md' }:
             onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'none')}
           >
             <span style={{ color: '#E2EAF5', fontSize: 13, fontWeight: 700 }}>🔧 Serviço / Instalação</span>
-            <span style={{ color: '#4A6080', fontSize: 11, marginTop: 2 }}>CFTV, Carregadores, Elétrica, Manutenção...</span>
+            <span style={{ color: '#7488A8', fontSize: 11, marginTop: 2 }}>CFTV, Carregadores, Elétrica, Manutenção...</span>
           </button>
         </div>
       )}

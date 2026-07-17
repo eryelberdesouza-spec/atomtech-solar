@@ -15,7 +15,7 @@ const inputSt: React.CSSProperties = {
   fontSize: 13, outline: 'none', fontFamily: 'inherit',
 }
 const labelSt: React.CSSProperties = {
-  display: 'block', fontSize: 10, color: '#4A6080', fontWeight: 600,
+  display: 'block', fontSize: 10, color: '#7488A8', fontWeight: 600,
   textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
 }
 
@@ -92,7 +92,7 @@ export function CadastroRapidoCliente({ nomeInicial, onCriado, onCancelar }: {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <button onClick={onCancelar}
-          style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#4A6080', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+          style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#7488A8', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
           Cancelar
         </button>
         <button onClick={salvar} disabled={criarMut.isLoading}

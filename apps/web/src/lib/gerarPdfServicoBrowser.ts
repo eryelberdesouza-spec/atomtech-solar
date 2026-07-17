@@ -118,8 +118,8 @@ const CSS_SERVICO = `
   }
   .capa-topinfo {
     position: absolute; z-index: 3; top: 18mm; right: 17mm;
-    text-align: right; font-size: 7.5px; line-height: 1.35;
-    color: rgba(255,255,255,0.62); letter-spacing: 0.4px;
+    text-align: right; font-size: 9px; line-height: 1.4;
+    color: rgba(255,255,255,0.85); letter-spacing: 0.4px;
     font-family: 'Montserrat', Calibri, sans-serif;
   }
   .capa-content {
@@ -131,12 +131,12 @@ const CSS_SERVICO = `
   .capa-eyebrow { font-size: 9px; letter-spacing: 5px; text-transform: uppercase; color: #f2c23b; font-weight: 600; margin-bottom: 9mm; }
   .capa-title { font-size: 32px; line-height: 1.05; font-weight: 800; text-transform: uppercase; color: #fff; margin: 0 0 8mm 0; max-width: 96mm; }
   .capa-accent { width: 18mm; height: 1.5mm; background: #f2c23b !important; margin-bottom: 9mm; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .capa-prepared { font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.58); margin-bottom: 4mm; }
+  .capa-prepared { font-size: 9.5px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.8); margin-bottom: 4mm; }
   .capa-cliente { font-size: 19px; line-height: 1.14; font-weight: 800; text-transform: uppercase; max-width: 102mm; margin-bottom: 12mm; color: #fff; }
   .capa-meta { display: grid; grid-template-columns: repeat(3, auto); gap: 10mm; align-items: start; max-width: 105mm; }
-  .capa-meta-label { font-size: 7.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.48); margin-bottom: 2mm; }
-  .capa-meta-value { font-size: 10px; font-weight: 700; color: #fff; }
-  .capa-footer-row { display: flex; gap: 3mm; align-items: center; color: rgba(255,255,255,0.62); font-size: 7.5px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .capa-meta-label { font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.75); margin-bottom: 2mm; }
+  .capa-meta-value { font-size: 11.5px; font-weight: 700; color: #fff; }
+  .capa-footer-row { display: flex; gap: 3mm; align-items: center; color: rgba(255,255,255,0.85); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; }
   .capa-footer-bar { width: 1.2mm; height: 8mm; background: #f2c23b !important; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   /* ─── TABELA DE DOCUMENTO: thead/tfoot repetem em cada página impressa */
@@ -167,7 +167,7 @@ const CSS_SERVICO = `
     letter-spacing: 2px; text-transform: uppercase;
     padding-left: 10px; border-left: 1px solid rgba(255,255,255,0.2);
   }
-  .header-tag { font-size: 9px; font-weight: 400; color: rgba(255,255,255,0.6); letter-spacing: 2px; text-transform: uppercase; }
+  .header-tag { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.85); letter-spacing: 2px; text-transform: uppercase; }
 
   /* ─── SEÇÕES DE CONTEÚDO (fluem naturalmente no tbody) ──────────── */
   .doc-content { padding: 0 36px 16px; }
@@ -274,8 +274,8 @@ function footerServico(numero: string, empresa: any) {
     empresa?.telefone,
   ].filter(Boolean).join(' · ')
   return `<div style="width:100%;height:48px;background-color:#0E2040;padding:0 36px;display:flex;align-items:center;justify-content:space-between;">
-    <div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.7);font-family:inherit;">${partes}</div>
-    <div style="font-size:9px;color:rgba(255,255,255,0.5);font-family:inherit;">${numero}</div>
+    <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.92);font-family:inherit;">${partes}</div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.8);font-family:inherit;">${numero}</div>
   </div>`
 }
 
@@ -425,7 +425,7 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
         <tbody>
           ${itens.map((item: any, idx: number) => `
           <tr>
-            <td style="color:#8A9BB5;font-size:11px;text-align:center">${idx + 1}</td>
+            <td style="color:#5F708C;font-size:11px;text-align:center">${idx + 1}</td>
             <td class="descricao">${item.descricao}</td>
             <td class="num">${item.unidade ?? 'un'}</td>
             <td class="num">${fmtN(item.quantidade)}</td>
@@ -438,7 +438,7 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
         </tfoot>
       </table>
       ${prazoExecucao ? `<div class="info-box"><p><strong>⏱ Prazo de Execução:</strong> ${prazoExecucao}</p></div>` : ''}
-      <p style="font-size:11px;color:#8A9BB5;margin-top:4px">* Valores em Reais (BRL). Proposta válida até ${dataValidade ?? '—'}.</p>
+      <p style="font-size:11px;color:#5F708C;margin-top:4px">* Valores em Reais (BRL). Proposta válida até ${dataValidade ?? '—'}.</p>
     `)
   }
 
@@ -456,7 +456,7 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
           ${parcelas.map((p: any) => `<tr>
             <td style="color:#0E2040;font-weight:600;width:28px">${p.numeroParcela}.</td>
             <td>${p.descricaoEvento}</td>
-            <td style="color:#8A9BB5;font-size:11px">${p.prazoDias > 0 ? `${p.prazoDias} dias ${p.tipoPrazo ?? 'corridos'}` : 'Na assinatura'}</td>
+            <td style="color:#5F708C;font-size:11px">${p.prazoDias > 0 ? `${p.prazoDias} dias ${p.tipoPrazo ?? 'corridos'}` : 'Na assinatura'}</td>
             <td class="valor">${fmt(p.valor)}</td>
           </tr>`).join('')}
         </table>` : ''}
@@ -503,19 +503,19 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
     const contatoInline = temContato ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
         ${empresa?.telefone ? `<div>
-          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
+          <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
         </div>` : ''}
         ${empresa?.email ? `<div>
-          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">E-mail</p>
+          <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">E-mail</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
         </div>` : ''}
         ${empresa?.site ? `<div>
-          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Site</p>
+          <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Site</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
         </div>` : ''}
         ${empresa?.endereco ? `<div style="grid-column:1/-1;margin-top:2px">
-          <p style="color:#8A9BB5;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
+          <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>` : ''

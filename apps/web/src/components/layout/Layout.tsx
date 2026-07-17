@@ -163,7 +163,7 @@ function NavItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
         background: isActive ? item.color + '22' : 'transparent',
         border: '1px solid ' + (isActive ? item.color + '44' : 'transparent'),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: isActive ? item.color : '#4A6080',
+        color: isActive ? item.color : '#7488A8',
         transition: 'all 0.15s',
         boxShadow: isActive ? '0 0 12px ' + item.color + '30' : 'none',
       }}>
@@ -299,7 +299,7 @@ export function Layout() {
         <nav style={{ padding: '12px 8px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {!collapsed && (
             <div style={{
-              fontSize: 9, color: '#3A5070', fontWeight: 700,
+              fontSize: 9, color: '#6A80A2', fontWeight: 700,
               letterSpacing: '0.12em', textTransform: 'uppercase',
               padding: '4px 10px 10px',
             }}>Menu</div>
@@ -342,7 +342,7 @@ export function Layout() {
                   }}>
                     {usuario?.nome?.split(' ')[0] || 'Usuário'}
                   </div>
-                  <div style={{ fontSize: 10, color: '#3A5070' }}>Admin</div>
+                  <div style={{ fontSize: 10, color: '#6A80A2' }}>Admin</div>
                 </div>
 
                 {/* Botão Sair — expandido: ícone + texto */}
@@ -383,7 +383,7 @@ export function Layout() {
               style={{
                 width: '100%', padding: '7px 0', borderRadius: 8,
                 border: '1px solid #1E3050', background: 'transparent',
-                color: '#3A5070', cursor: 'pointer', marginBottom: 6,
+                color: '#6A80A2', cursor: 'pointer', marginBottom: 6,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.15s',
               }}
@@ -394,7 +394,7 @@ export function Layout() {
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-                ;(e.currentTarget as HTMLButtonElement).style.color = '#3A5070'
+                ;(e.currentTarget as HTMLButtonElement).style.color = '#6A80A2'
                 ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#1E3050'
               }}
             >
@@ -409,7 +409,7 @@ export function Layout() {
               style={{
                 width: '100%', padding: '8px', borderRadius: 8,
                 border: '1px solid #1E3050', background: 'transparent',
-                color: '#3A5070', cursor: 'pointer', fontSize: 12,
+                color: '#6A80A2', cursor: 'pointer', fontSize: 12,
                 transition: 'all 0.15s', fontFamily: 'inherit',
               }}
             >
@@ -441,7 +441,7 @@ export function Layout() {
                 style={{
                   width: 36, height: 36, borderRadius: 8,
                   background: 'transparent', border: '1px solid #1E3050',
-                  color: '#8A9BB5', cursor: 'pointer', flexShrink: 0,
+                  color: '#9FB0C9', cursor: 'pointer', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 18, lineHeight: 1,
                 }}
@@ -456,7 +456,7 @@ export function Layout() {
                 {pageTitle}
               </h1>
               {!isMobile && (
-                <div style={{ fontSize: 10, color: '#3A5070', marginTop: 1 }}>
+                <div style={{ fontSize: 10, color: '#6A80A2', marginTop: 1 }}>
                   AGO · Atom Gestão Operacional
                 </div>
               )}
@@ -480,7 +480,7 @@ export function Layout() {
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 12px', borderRadius: 7,
                     border: '1px solid ' + (isAdmin ? '#1E4033' : '#1E2D3A'),
-                    color: isAdmin ? '#10B981' : '#3A5070',
+                    color: isAdmin ? '#10B981' : '#6A80A2',
                     fontSize: 11, fontWeight: 600, textDecoration: 'none',
                     transition: 'all 0.15s', cursor: isAdmin ? 'pointer' : 'not-allowed',
                     opacity: isAdmin ? 1 : 0.5,
@@ -498,7 +498,7 @@ export function Layout() {
                   title={isAdmin ? 'Abrir AGF — Atom Gestão Financeira' : 'Acesso restrito a administradores'}
                 >
                   ◈ AGF Financeiro
-                  {!isAdmin && <span style={{ fontSize: 9, color: '#4A6080' }}>🔒</span>}
+                  {!isAdmin && <span style={{ fontSize: 9, color: '#7488A8' }}>🔒</span>}
                 </a>
               )
             })()}
@@ -536,7 +536,7 @@ export function Layout() {
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#C8D8EC' }}>
                       {usuario?.nome || 'Usuário'}
                     </div>
-                    <div style={{ fontSize: 10, color: '#3A5070', marginTop: 2 }}>
+                    <div style={{ fontSize: 10, color: '#6A80A2', marginTop: 2 }}>
                       {usuario?.email || 'Admin'}
                     </div>
                   </div>

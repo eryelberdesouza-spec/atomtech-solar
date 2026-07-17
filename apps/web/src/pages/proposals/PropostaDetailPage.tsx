@@ -1302,7 +1302,7 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
     fontSize: 13, outline: 'none', fontFamily: 'inherit',
   }
   const lblSt: React.CSSProperties = {
-    fontSize: 10, color: '#4A6080', fontWeight: 700,
+    fontSize: 10, color: '#7488A8', fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: '0.06em',
     display: 'block', marginBottom: 4,
   }
@@ -1331,14 +1331,14 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
           <div>
             <label style={lblSt}>Data de Validade</label>
             <input type="date" value={form.dataValidade} onChange={e => setForm(f => ({ ...f, dataValidade: e.target.value }))} style={inpSt} />
-            <div style={{ fontSize: 10, color: '#3A5070', marginTop: 3 }}>Deixe em branco para sem validade</div>
+            <div style={{ fontSize: 10, color: '#6A80A2', marginTop: 3 }}>Deixe em branco para sem validade</div>
           </div>
         </div>
 
         <div>
           <label style={lblSt}>{isServico ? 'Título do Serviço' : 'Título da Proposta'}</label>
           <input value={form.tituloServico} onChange={e => setForm(f => ({ ...f, tituloServico: e.target.value }))} placeholder={isServico ? 'Ex: Instalação de CFTV — Bloco A' : 'Ex: Sistema Fotovoltaico 12 kWp — Casa de Praia'} style={inpSt} />
-          <div style={{ fontSize: 10, color: '#3A5070', marginTop: 3 }}>Aparece na listagem de propostas — use para diferenciar propostas do mesmo cliente</div>
+          <div style={{ fontSize: 10, color: '#6A80A2', marginTop: 3 }}>Aparece na listagem de propostas — use para diferenciar propostas do mesmo cliente</div>
         </div>
 
         <div>
@@ -1349,7 +1349,7 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#4A6080', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#7488A8', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
             Cancelar
           </button>
           <button onClick={handleSalvar} disabled={isLoading} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>

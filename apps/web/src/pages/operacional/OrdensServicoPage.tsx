@@ -25,7 +25,7 @@ function ProgressBar({ feitos, total }: { feitos: number; total: number }) {
       <div style={{ flex: 1, height: 3, background: '#1E3050', borderRadius: 2, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.3s' }} />
       </div>
-      <span style={{ fontSize: 10, color: '#4A6080', fontFamily: 'monospace', flexShrink: 0 }}>{feitos}/{total}</span>
+      <span style={{ fontSize: 10, color: '#7488A8', fontFamily: 'monospace', flexShrink: 0 }}>{feitos}/{total}</span>
     </div>
   )
 }
@@ -78,7 +78,7 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
     fontSize: 13, outline: 'none', fontFamily: 'inherit',
   }
   const labelSt: React.CSSProperties = {
-    display: 'block', fontSize: 10, color: '#4A6080', fontWeight: 600,
+    display: 'block', fontSize: 10, color: '#7488A8', fontWeight: 600,
     textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
   }
 
@@ -87,9 +87,9 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
       <div style={{ background: '#111D2E', borderRadius: 14, border: '1px solid #1E3050', width: isMobile ? '96vw' : 560, maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? 18 : 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <h2 style={{ color: '#C8D8EC', fontSize: 15, fontWeight: 800, margin: 0 }}>🛠 Nova OS Avulsa</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4A6080', fontSize: 18, cursor: 'pointer' }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#7488A8', fontSize: 18, cursor: 'pointer' }}>×</button>
         </div>
-        <p style={{ color: '#4A6080', fontSize: 11, margin: '0 0 16px', lineHeight: 1.5 }}>
+        <p style={{ color: '#7488A8', fontSize: 11, margin: '0 0 16px', lineHeight: 1.5 }}>
           Para pós-venda, visita técnica, manutenção ou qualquer serviço sem contrato vinculado.
           OS de instalação continua sendo gerada pela proposta.
         </p>
@@ -107,7 +107,7 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
             {form.clienteId ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#3EBB7A12', border: '1px solid #3EBB7A40', borderRadius: 8, padding: '8px 12px' }}>
                 <span style={{ fontSize: 13, color: '#C8D8EC', fontWeight: 600 }}>{clienteSelecionado?.nome ?? clienteNomeLocal}</span>
-                <button onClick={() => { setForm(f => ({ ...f, clienteId: '' })); setClienteNomeLocal('') }} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 15 }}>×</button>
+                <button onClick={() => { setForm(f => ({ ...f, clienteId: '' })); setClienteNomeLocal('') }} style={{ background: 'none', border: 'none', color: '#7488A8', cursor: 'pointer', fontSize: 15 }}>×</button>
               </div>
             ) : (
               <>
@@ -186,7 +186,7 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#4A6080', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>Cancelar</button>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#7488A8', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>Cancelar</button>
           <button onClick={salvar} disabled={criarMut.isLoading}
             style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#F5A623', color: '#0C1421', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
             {criarMut.isLoading ? 'Criando...' : '✓ Criar OS'}
@@ -235,7 +235,7 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
     background: '#0C1828', color: '#C8D8EC', fontSize: 12, fontFamily: 'inherit',
     outline: 'none', width: '100%', boxSizing: 'border-box' as const,
   }
-  const labelStyle = { fontSize: 11, color: '#4A6080', fontWeight: 700, display: 'block' as const, marginBottom: 3 }
+  const labelStyle = { fontSize: 11, color: '#7488A8', fontWeight: 700, display: 'block' as const, marginBottom: 3 }
 
   const setLinha = (i: number, field: string, val: string) =>
     setLinhas(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: val } : l))
@@ -310,16 +310,16 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
         <div style={S.header}>
           <div>
             <h2 style={{ color: '#C8D8EC', fontSize: 15, fontWeight: 800, margin: 0 }}>📦 Registrar Contratos Históricos</h2>
-            <p style={{ color: '#4A6080', fontSize: 11, margin: '2px 0 0' }}>Contratos firmados antes da plataforma — serão geradas OS automaticamente</p>
+            <p style={{ color: '#7488A8', fontSize: 11, margin: '2px 0 0' }}>Contratos firmados antes da plataforma — serão geradas OS automaticamente</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4A6080', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#7488A8', fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
 
         {/* Abas */}
         <div style={{ display: 'flex', borderBottom: '1px solid #1E3050', padding: '0 24px' }}>
           {([['individual', '📝 Cadastro Individual'], ['lote', '📋 Importação em Lote']] as const).map(([id, label]) => (
             <button key={id} onClick={() => { setAba(id); setErro(''); setResultado(null) }}
-              style={{ padding: '10px 16px', border: 'none', borderBottom: `2px solid ${aba === id ? '#F5A623' : 'transparent'}`, background: 'none', color: aba === id ? '#F5A623' : '#4A6080', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '10px 16px', border: 'none', borderBottom: `2px solid ${aba === id ? '#F5A623' : 'transparent'}`, background: 'none', color: aba === id ? '#F5A623' : '#7488A8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               {label}
             </button>
           ))}
@@ -409,14 +409,14 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
                   <thead>
                     <tr style={{ borderBottom: '1px solid #1E3050' }}>
                       {['#', 'Cliente *', 'Nº Contrato', 'Valor R$ *', 'Data Início *', 'Data Conclusão', 'Status', 'Técnico', ''].map(h => (
-                        <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: '#4A6080', fontWeight: 700, whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
+                        <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: '#7488A8', fontWeight: 700, whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {linhas.map((l, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #1E305030' }}>
-                        <td style={{ padding: '4px 8px', color: '#4A6080', fontSize: 10 }}>{i + 1}</td>
+                        <td style={{ padding: '4px 8px', color: '#7488A8', fontSize: 10 }}>{i + 1}</td>
                         <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 150 }} placeholder="Nome" value={l.clienteNome} onChange={e => setLinha(i, 'clienteNome', e.target.value)} /></td>
                         <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 100 }} placeholder="CT-0001" value={l.numeroContratoExterno} onChange={e => setLinha(i, 'numeroContratoExterno', e.target.value)} /></td>
                         <td style={{ padding: '3px 4px' }}><input style={{ ...inputStyle, minWidth: 90 }} placeholder="25000" value={l.valorContrato} onChange={e => setLinha(i, 'valorContrato', e.target.value)} /></td>
@@ -440,13 +440,13 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button onClick={() => adicionarLinhas(5)} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                <button onClick={() => adicionarLinhas(5)} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#9FB0C9', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
                   + 5 linhas
                 </button>
-                <button onClick={() => adicionarLinhas(10)} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                <button onClick={() => adicionarLinhas(10)} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1E3050', background: 'transparent', color: '#9FB0C9', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
                   + 10 linhas
                 </button>
-                <span style={{ fontSize: 11, color: '#4A6080', alignSelf: 'center', marginLeft: 4 }}>
+                <span style={{ fontSize: 11, color: '#7488A8', alignSelf: 'center', marginLeft: 4 }}>
                   {linhas.filter(l => l.clienteNome.trim() && l.dataInicio && parseValor(l.valorContrato) > 0).length} linha(s) válida(s)
                 </span>
               </div>
@@ -456,7 +456,7 @@ function ModalHistorico({ onClose, onSucesso }: { onClose: () => void; onSucesso
 
         {/* Footer */}
         <div style={S.footer}>
-          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
+          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#9FB0C9', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
             Fechar
           </button>
           <button
@@ -534,13 +534,13 @@ function ModalEtiquetasOS({ os, onClose }: { os: any; onClose: () => void }) {
       <div style={{ background: '#0F1A29', border: '1px solid #1E3050', borderRadius: isMobile ? '16px 16px 0 0' : 14, width: '100%', maxWidth: isMobile ? '100%' : 420, maxHeight: isMobile ? '85vh' : '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: isMobile ? '14px 16px' : '16px 20px', borderBottom: '1px solid #1E3050', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 800, margin: 0 }}>🏷️ Etiquetas — {os.numero}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4A6080', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#7488A8', fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
 
         <div style={{ display: 'flex', borderBottom: '1px solid #1E3050', padding: '0 20px' }}>
           {([['aplicar', 'Aplicar'], ['gerenciar', 'Gerenciar']] as const).map(([id, label]) => (
             <button key={id} onClick={() => setAba(id)}
-              style={{ padding: '9px 14px', border: 'none', borderBottom: `2px solid ${aba === id ? '#F5A623' : 'transparent'}`, background: 'none', color: aba === id ? '#F5A623' : '#4A6080', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '9px 14px', border: 'none', borderBottom: `2px solid ${aba === id ? '#F5A623' : 'transparent'}`, background: 'none', color: aba === id ? '#F5A623' : '#7488A8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               {label}
             </button>
           ))}
@@ -550,7 +550,7 @@ function ModalEtiquetasOS({ os, onClose }: { os: any; onClose: () => void }) {
           {aba === 'aplicar' && (
             <div>
               {etiquetas.length === 0 && (
-                <div style={{ color: '#4A6080', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Nenhuma etiqueta criada. Vá em "Gerenciar" para criar uma.</div>
+                <div style={{ color: '#7488A8', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Nenhuma etiqueta criada. Vá em "Gerenciar" para criar uma.</div>
               )}
               {etiquetas.map((et: any) => {
                 const ativa = idsAtuais.includes(et.id)
@@ -567,7 +567,7 @@ function ModalEtiquetasOS({ os, onClose }: { os: any; onClose: () => void }) {
           {aba === 'gerenciar' && (
             <div>
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: '#4A6080', fontWeight: 700, marginBottom: 6 }}>Nova etiqueta</div>
+                <div style={{ fontSize: 11, color: '#7488A8', fontWeight: 700, marginBottom: 6 }}>Nova etiqueta</div>
                 <input style={{ ...inputStyle, marginBottom: 8 }} placeholder="Nome da etiqueta" value={novoNome} onChange={e => setNovoNome(e.target.value)} />
                 <div style={{ marginBottom: 8 }}><ColorPicker value={novaCor} onChange={setNovaCor} /></div>
                 <button onClick={criarEtiqueta} disabled={!novoNome.trim()}
@@ -585,13 +585,13 @@ function ModalEtiquetasOS({ os, onClose }: { os: any; onClose: () => void }) {
                         <div style={{ marginBottom: 8 }}><ColorPicker value={editCor} onChange={setEditCor} /></div>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={salvarEdicao} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: '#3EBB7A', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>Salvar</button>
-                          <button onClick={() => setEditandoId(null)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #1E3050', background: 'transparent', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>Cancelar</button>
+                          <button onClick={() => setEditandoId(null)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #1E3050', background: 'transparent', color: '#9FB0C9', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>Cancelar</button>
                         </div>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ flex: 1, padding: '5px 10px', borderRadius: 6, background: et.cor + '30', color: et.cor, fontSize: 12, fontWeight: 700, border: `1px solid ${et.cor}60` }}>{et.nome}</span>
-                        <button onClick={() => { setEditandoId(et.id); setEditNome(et.nome); setEditCor(et.cor) }} style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 13 }}>✏️</button>
+                        <button onClick={() => { setEditandoId(et.id); setEditNome(et.nome); setEditCor(et.cor) }} style={{ background: 'none', border: 'none', color: '#7488A8', cursor: 'pointer', fontSize: 13 }}>✏️</button>
                         <button onClick={() => excluir.mutate({ id: et.id })} style={{ background: 'none', border: 'none', color: '#F85149', cursor: 'pointer', fontSize: 13 }}>🗑️</button>
                       </div>
                     )}
@@ -646,7 +646,7 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <span style={{ fontSize: 11, fontFamily: 'monospace', color: status.color, fontWeight: 700 }}>{os.numero}</span>
           {isHistorico && (
-            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#8A9BB520', color: '#8A9BB5', border: '1px solid #8A9BB540' }}>HIST</span>
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#9FB0C920', color: '#9FB0C9', border: '1px solid #9FB0C940' }}>HIST</span>
           )}
           {isAvulsa && (
             <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#A371F720', color: '#A371F7', border: '1px solid #A371F740' }}>AVULSA</span>
@@ -658,7 +658,7 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
           )}
           {onAbrirEtiquetas && (
             <button onClick={e => { e.stopPropagation(); onAbrirEtiquetas() }}
-              style={{ background: 'none', border: 'none', color: '#4A6080', cursor: 'pointer', fontSize: 12, padding: 0 }}
+              style={{ background: 'none', border: 'none', color: '#7488A8', cursor: 'pointer', fontSize: 12, padding: 0 }}
               title="Gerenciar etiquetas">🏷️</button>
           )}
         </div>
@@ -667,11 +667,11 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
         {os.clienteNome ?? '—'}
       </div>
       {os.titulo && (
-        <div style={{ fontSize: 11, color: '#4A6080', marginBottom: 6 }}>{os.titulo}</div>
+        <div style={{ fontSize: 11, color: '#7488A8', marginBottom: 6 }}>{os.titulo}</div>
       )}
       {os.resumoServico && (
         <div style={{
-          fontSize: 11, color: '#8A9BB5', marginBottom: 6, lineHeight: 1.4,
+          fontSize: 11, color: '#9FB0C9', marginBottom: 6, lineHeight: 1.4,
           background: '#F5A62310', border: '1px solid #F5A62325', borderRadius: 6,
           padding: '5px 8px',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
@@ -698,10 +698,10 @@ function OSCard({ os, onClick, onAbrirEtiquetas, dragHandleProps, isDragging }: 
       {(os.dataPrevistaFim || os.tecnicoResponsavel) && (
         <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
           {os.tecnicoResponsavel && (
-            <span style={{ fontSize: 10, color: '#4A6080' }}>👤 {os.tecnicoResponsavel}</span>
+            <span style={{ fontSize: 10, color: '#7488A8' }}>👤 {os.tecnicoResponsavel}</span>
           )}
           {os.dataPrevistaFim && (
-            <span style={{ fontSize: 10, color: '#4A6080' }}>🗓 {formatDate(String(os.dataPrevistaFim).slice(0, 10))}</span>
+            <span style={{ fontSize: 10, color: '#7488A8' }}>🗓 {formatDate(String(os.dataPrevistaFim).slice(0, 10))}</span>
           )}
         </div>
       )}
@@ -793,7 +793,7 @@ export function OrdensServicoPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? 10 : 0 }}>
           <div>
             <h1 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: 0 }}>Operacional</h1>
-            <p style={{ color: '#4A6080', fontSize: 11, margin: '2px 0 0' }}>
+            <p style={{ color: '#7488A8', fontSize: 11, margin: '2px 0 0' }}>
               {total} ordem{total !== 1 ? 's' : ''} de serviço
             </p>
           </div>
@@ -807,13 +807,13 @@ export function OrdensServicoPage() {
                   <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{totalManut}</span>
                 )}
               </button>
-              <button onClick={() => setShowModalHistorico(true)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>📦 Contratos Históricos</button>
+              <button onClick={() => setShowModalHistorico(true)} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #9FB0C940', background: '#9FB0C910', color: '#9FB0C9', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>📦 Contratos Históricos</button>
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar OS, cliente..."
                 style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #1E3050', background: '#0C1828', color: '#C8D8EC', fontSize: 13, outline: 'none', width: 220, fontFamily: 'inherit' }} />
               <div style={{ display: 'flex', border: '1px solid #1E3050', borderRadius: 8, overflow: 'hidden' }}>
                 {[{ id: 'kanban', label: '⊞ Kanban' }, { id: 'lista', label: '☰ Lista' }].map(v => (
                   <button key={v.id} onClick={() => setView(v.id as any)}
-                    style={{ padding: '6px 12px', border: 'none', cursor: 'pointer', background: view === v.id ? '#F5A623' : 'transparent', color: view === v.id ? '#0C1421' : '#4A6080', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
+                    style={{ padding: '6px 12px', border: 'none', cursor: 'pointer', background: view === v.id ? '#F5A623' : 'transparent', color: view === v.id ? '#0C1421' : '#7488A8', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}
                   >{v.label}</button>
                 ))}
               </div>
@@ -829,7 +829,7 @@ export function OrdensServicoPage() {
                   <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, borderRadius: 8, background: '#F85149', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{totalManut}</span>
                 )}
               </button>
-              <button onClick={() => setShowModalHistorico(true)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #8A9BB540', background: '#8A9BB510', color: '#8A9BB5', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>📦</button>
+              <button onClick={() => setShowModalHistorico(true)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #9FB0C940', background: '#9FB0C910', color: '#9FB0C9', cursor: 'pointer', fontSize: 16, fontFamily: 'inherit' }}>📦</button>
             </div>
           )}
         </div>
@@ -842,7 +842,7 @@ export function OrdensServicoPage() {
             <div style={{ display: 'flex', border: '1px solid #1E3050', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
               {[{ id: 'kanban', label: '⊞' }, { id: 'lista', label: '☰' }].map(v => (
                 <button key={v.id} onClick={() => setView(v.id as any)}
-                  style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', background: view === v.id ? '#F5A623' : 'transparent', color: view === v.id ? '#0C1421' : '#4A6080', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}
+                  style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', background: view === v.id ? '#F5A623' : 'transparent', color: view === v.id ? '#0C1421' : '#7488A8', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}
                 >{v.label}</button>
               ))}
             </div>
@@ -854,7 +854,7 @@ export function OrdensServicoPage() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 10, marginBottom: isMobile ? 14 : 20 }}>
         {resumo.map(s => (
           <div key={s.id} style={{ background: '#111D2E', border: `1px solid ${s.color}30`, borderRadius: 10, padding: isMobile ? '8px 12px' : '10px 14px', borderTop: `2px solid ${s.color}` }}>
-            <div style={{ fontSize: isMobile ? 10 : 11, color: '#4A6080', fontWeight: 700, marginBottom: 2 }}>{s.icon} {s.label}</div>
+            <div style={{ fontSize: isMobile ? 10 : 11, color: '#7488A8', fontWeight: 700, marginBottom: 2 }}>{s.icon} {s.label}</div>
             <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: s.color }}>{s.count}</div>
           </div>
         ))}
@@ -895,7 +895,7 @@ export function OrdensServicoPage() {
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', paddingBottom: 4 }}>
             {colunas.map((col, i) => (
               <button key={col.id} onClick={() => setKanbanCol(i)}
-                style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${col.color}${kanbanCol === i ? 'AA' : '30'}`, background: kanbanCol === i ? col.color + '20' : 'transparent', color: kanbanCol === i ? col.color : '#4A6080', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${col.color}${kanbanCol === i ? 'AA' : '30'}`, background: kanbanCol === i ? col.color + '20' : 'transparent', color: kanbanCol === i ? col.color : '#7488A8', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
                 {col.icon} {col.label} <span style={{ background: col.color + '30', borderRadius: 10, padding: '0 6px', marginLeft: 3 }}>{col.itens.length}</span>
               </button>
             ))}
@@ -918,7 +918,7 @@ export function OrdensServicoPage() {
             <thead>
               <tr style={{ borderBottom: '1px solid #1E3050' }}>
                 {['Número', 'Cliente', 'Título', 'Técnico', 'Status', 'Progresso', 'Previsão'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: '#4A6080', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, color: '#7488A8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -932,11 +932,11 @@ export function OrdensServicoPage() {
                     onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
                     <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 12, color: status.color, fontWeight: 700 }}>{os.numero}</td>
                     <td style={{ padding: '10px 12px', fontSize: 13, color: '#C8D8EC' }}>{os.clienteNome ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>{os.titulo ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>{os.tecnicoResponsavel ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#7488A8' }}>{os.titulo ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#7488A8' }}>{os.tecnicoResponsavel ?? '—'}</td>
                     <td style={{ padding: '10px 12px' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: status.color + '18', color: status.color }}>{status.icon} {status.label}</span></td>
                     <td style={{ padding: '10px 12px', width: 120 }}><ProgressBar feitos={os.marcosFeitos ?? 0} total={os.totalMarcos ?? 0} /></td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#4A6080' }}>{os.dataPrevistaFim ? formatDate(String(os.dataPrevistaFim).slice(0, 10)) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#7488A8' }}>{os.dataPrevistaFim ? formatDate(String(os.dataPrevistaFim).slice(0, 10)) : '—'}</td>
                   </tr>
                 )
               })}
@@ -949,7 +949,7 @@ export function OrdensServicoPage() {
       {view === 'lista' && isMobile && (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filtradas.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#4A6080', padding: 40, fontSize: 13 }}>Nenhuma OS encontrada</div>
+            <div style={{ textAlign: 'center', color: '#7488A8', padding: 40, fontSize: 13 }}>Nenhuma OS encontrada</div>
           ) : (
             filtradas.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} onAbrirEtiquetas={() => setOsEtiquetas(os)} />)
           )}
