@@ -235,6 +235,7 @@ export const propostaRouter = router({
         templateOrigemId: z.number().optional(),
         observacoesInternas: z.string().optional(),
         tituloServico: z.string().optional(),
+        propostaRapida: z.boolean().optional(),
         sobredimensionamento: z.number().min(0).max(100).default(50),
         descontoAvista: z.number().optional(),
         marcoParcelas: z.array(z.object({
@@ -509,9 +510,16 @@ export const propostaRouter = router({
         }
       }
 
+      // Proposta rápida: mantém capa, técnico/financeiro essencial e comercial;
+      // desativa blocos institucionais (reativáveis em "Blocos da Proposta")
+      const BLOCOS_RAPIDA_SOLAR = new Set([
+        'capa', 'dimensionamento', 'equipamentos', 'analise_financeira', 'indicadores_financeiros',
+        'condicoes_comerciais', 'formas_pagamento', 'aceite', 'contato',
+      ])
       for (const bloco of BLOCOS_PADRAO) {
+        const ativo = input.propostaRapida ? BLOCOS_RAPIDA_SOLAR.has(bloco.tipo) : true
         await ctx.db.insert(blocoTable).values({
-          propostaId, tipoBloco: bloco.tipo, ativo: true, ordem: bloco.ordem,
+          propostaId, tipoBloco: bloco.tipo, ativo, ordem: bloco.ordem,
         }).execute()
       }
 
@@ -1162,6 +1170,7 @@ export const propostaRouter = router({
         dataEmissao: z.string(),
         dataValidade: z.string().optional(),
         observacoesInternas: z.string().optional(),
+        propostaRapida: z.boolean().optional(),
         itens: z.array(z.object({
           descricao: z.string().min(1),
           unidade: z.string().default('un'),
@@ -1250,9 +1259,15 @@ export const propostaRouter = router({
         }
       }
 
+      // Proposta rápida: só capa + escopo + condições + aceite/contato,
+      // sem os blocos institucionais (reativáveis depois em "Blocos da Proposta")
+      const BLOCOS_RAPIDA = new Set(['capa', 'escopo_servico', 'condicoes_comerciais', 'aceite', 'contato'])
       for (const bloco of BLOCOS_SERVICO_PADRAO) {
+        const ativo = input.propostaRapida
+          ? BLOCOS_RAPIDA.has(bloco.tipo)
+          : (bloco.ativo ?? true)
         await ctx.db.insert(blocoTable).values({
-          propostaId, tipoBloco: bloco.tipo, ativo: bloco.ativo ?? true, ordem: bloco.ordem,
+          propostaId, tipoBloco: bloco.tipo, ativo, ordem: bloco.ordem,
         }).execute()
       }
 

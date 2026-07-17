@@ -166,6 +166,7 @@ const FORM_INICIAL = {
   marcoParcelas: MARCOES_PADRAO,
   observacoes: '',
   titulo: '',
+  propostaRapida: false,
 }
 
 const STEPS = ['Cliente', 'Dados Técnicos', 'Precificação']
@@ -222,6 +223,7 @@ export function NovaPropostaPage() {
       overloadInversor: form.overloadInversor || 0, entradasPorMicro: form.entradasPorMicro || 1,
       quantidadeInversoresManual: form.quantidadeInversoresManual || undefined,
       observacoesInternas: form.observacoes || undefined, tituloServico: form.titulo || undefined,
+      propostaRapida: form.propostaRapida || undefined,
       descontoAvista: form.descontoAvista || undefined,
       marcoParcelas: form.marcoParcelas,
     } as any)
@@ -479,7 +481,14 @@ export function NovaPropostaPage() {
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Título da Proposta</label>
               <input value={form.titulo} onChange={(e: any) => set('titulo', e.target.value)} placeholder="Opcional — ex: Sistema 12 kWp — Casa de Praia (aparece na listagem)" style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Observações</label>
-              <textarea value={form.observacoes} onChange={(e: any) => set('observacoes', e.target.value)} rows={2} placeholder="Informações adicionais ou peculiaridades da instalação..." style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
+              <textarea value={form.observacoes} onChange={(e: any) => set('observacoes', e.target.value)} rows={2} placeholder="Informações adicionais ou peculiaridades da instalação..." style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
+              <label onClick={() => set('propostaRapida', !form.propostaRapida)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: form.propostaRapida ? '#F5A62312' : C.dark, border: `1px solid ${form.propostaRapida ? '#F5A62360' : C.darkBorder}` }}>
+                <input type="checkbox" checked={form.propostaRapida} readOnly style={{ marginTop: 2, accentColor: '#F5A623', cursor: 'pointer' }} />
+                <span>
+                  <span style={{ display: 'block', color: C.text, fontSize: 13, fontWeight: 700 }}>⚡ Proposta Rápida</span>
+                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 2 }}>PDF enxuto: capa, dimensionamento, equipamentos, análise financeira, condições de pagamento e aceite — sem os blocos institucionais. Reativáveis depois em "Blocos da Proposta".</span>
+                </span>
+              </label>
             </div>
 
             {createMutation.error && <div style={{ background: '#3A1A1A', border: `1px solid ${C.danger}`, borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}>{(createMutation.error as any).message}</div>}

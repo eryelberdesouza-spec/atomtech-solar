@@ -98,6 +98,7 @@ export function NovaPropostaServicoPage() {
   const [observacoes, setObservacoes]       = useState('')
   const [itens, setItens]                   = useState<ItemServico[]>([itemVazio()])
   const [erro, setErro]                     = useState('')
+  const [propostaRapida, setPropostaRapida] = useState(false)
 
   const { data: clientesData, isLoading: carregandoClientes } = trpc.cliente.list.useQuery({ porPagina: 500 })
   const clientes = (clientesData?.data ?? []).map(c => ({
@@ -145,6 +146,7 @@ export function NovaPropostaServicoPage() {
       dataEmissao,
       dataValidade: dataValidade || undefined,
       observacoesInternas: observacoes || undefined,
+      propostaRapida: propostaRapida || undefined,
       itens: itensValidos.map(i => ({
         descricao: i.descricao.trim(),
         unidade: i.unidade,
@@ -206,6 +208,14 @@ export function NovaPropostaServicoPage() {
               <textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} rows={2} placeholder="Notas internas (não aparecem na proposta)"
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
+
+            <label onClick={() => setPropostaRapida(v => !v)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: propostaRapida ? '#F5A62312' : C.dark, border: `1px solid ${propostaRapida ? '#F5A62360' : C.darkBorder}` }}>
+              <input type="checkbox" checked={propostaRapida} readOnly style={{ marginTop: 2, accentColor: '#F5A623', cursor: 'pointer' }} />
+              <span>
+                <span style={{ display: 'block', color: C.text, fontSize: 13, fontWeight: 700 }}>⚡ Proposta Rápida</span>
+                <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 2 }}>PDF enxuto: capa, escopo do serviço, condições de pagamento e aceite — sem os blocos institucionais (Quem Somos, Diferenciais, Garantias...). Ideal para clientes recorrentes. Você pode reativar blocos depois em "Blocos da Proposta".</span>
+              </span>
+            </label>
           </div>
         </Card>
 
