@@ -85,8 +85,6 @@ function renderListaLetras(txt: string): string {
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CSS_SERVICO = `
-  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap');
-
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body {
     font-family: 'Jost', 'Segoe UI', Candara, sans-serif;
@@ -551,6 +549,9 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Proposta ${numero} — ${nomeCliente}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=block">
   <style>${CSS_SERVICO.replace(/#F5A623/g, cor1).replace(/#2D9C4E/g, cor2)}</style>
 </head>
 <body>
@@ -565,6 +566,16 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
   </table>` : ''}
   <script>
     window.onload = function() {
+      // Espera a fonte Jost carregar de verdade antes de imprimir. Sem isso o
+      // Chrome imprime com glifos de pesos misturados (l/I saíam em negrito).
+      var esperarFontes = Promise.all([
+        document.fonts.load('300 13px Jost'),
+        document.fonts.load('400 13px Jost'),
+        document.fonts.load('600 13px Jost'),
+        document.fonts.load('700 13px Jost'),
+      ]).then(function() { return document.fonts.ready })
+      var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
+      Promise.race([esperarFontes, timeoutFontes]).then(function() {
       setTimeout(function() {
         // Empurra o tfoot ao pé da última página calculando o espaço restante
         try {
@@ -589,7 +600,8 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
           }
         } catch(e) {}
         window.print();
-      }, 800);
+      }, 300);
+      });
     };
   </script>
 </body>
