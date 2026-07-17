@@ -899,13 +899,16 @@ const dashboardRouter = router({
     const em7dias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
     const vencendo7Dias = parcelas.filter((p: any) => p.vencimento > hoje && p.vencimento <= em7dias).length
 
-    // Duplicatas suspeitas: títulos ativos com mesmo tipo+descrição+valor emitidos em até 7 dias de diferença
+    // Duplicatas suspeitas: mesmo tipo+descrição+valor+pessoa emitidos no mesmo dia
+    // (ou dia seguinte). Janela curta de propósito — janelas maiores marcam despesas
+    // recorrentes legítimas (abastecimento, tarifas) como suspeitas.
     const dupRows = await ctx.db.execute(sql`
       SELECT COUNT(*) AS n FROM fin_titulo a
       JOIN fin_titulo b ON b.empresa_id = a.empresa_id AND b.id > a.id
         AND b.tipo = a.tipo AND b.valor_original = a.valor_original
         AND UPPER(TRIM(b.descricao)) = UPPER(TRIM(a.descricao))
-        AND ABS(DATEDIFF(b.emissao, a.emissao)) <= 7
+        AND (b.pessoa_id <=> a.pessoa_id)
+        AND ABS(DATEDIFF(b.emissao, a.emissao)) <= 1
         AND b.ativo = 1
       WHERE a.empresa_id = ${empId} AND a.ativo = 1
     `) as any
