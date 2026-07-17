@@ -14,6 +14,7 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 > Rebranding 2026-07-10: SIGECO → AGO/AGF. Os nomes de pastas, URLs e tabelas NÃO mudaram — só a marca visível (janelas, PWA, PDFs, telas).
 
 - Deploy Vercel SEMPRE via CLI: `cmd /c "cd apps\financeiro && npx vercel --prod --yes"` (o botão Redeploy do dashboard reusa build antigo).
+- **CUIDADO (constatado 2026-07-17 no PC escritório)**: `apps/web/.vercel/project.json` aponta para o projeto Vercel errado ("web", alias web-seven-pi-60). O projeto de produção real é **"atomtech-solar-web"**, que faz auto-deploy do `git push origin main`. Para o AGO web, `git push` basta; conferir depois se o asset novo chegou em https://atomtech-solar-web.vercel.app.
 - API: `git push origin main` basta.
 - Migrations: endpoints GET `/run-migration-*` na API do Railway.
 
