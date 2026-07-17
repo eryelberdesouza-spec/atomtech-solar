@@ -46,17 +46,19 @@ function saudacao(): string {
   return 'Boa noite! 🌙'
 }
 
-function KpiCard({ label, value, valor, sub, icon, color }: {
-  label: string; value: string | number; valor?: number; sub?: string; icon: string; color: string
+function KpiCard({ label, value, valor, sub, icon, color, onClick }: {
+  label: string; value: string | number; valor?: number; sub?: string; icon: string; color: string; onClick?: () => void
 }) {
   return (
     <div
+      onClick={onClick}
+      title={onClick ? 'Ver propostas' : undefined}
       style={{
         background: 'linear-gradient(135deg, #111D2E 0%, #0E1A2A 100%)',
         borderRadius: 14, border: '1px solid #1E3050',
         borderTop: '3px solid ' + color,
         padding: '20px 22px', position: 'relative', overflow: 'hidden',
-        transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'default',
+        transition: 'transform 0.2s, box-shadow 0.2s', cursor: onClick ? 'pointer' : 'default',
       }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
@@ -88,10 +90,12 @@ function KpiCard({ label, value, valor, sub, icon, color }: {
   )
 }
 
-function FunilBar({ label, count, valor, total, color, icon }: { label: string; count: number; valor: number; total: number; color: string; icon: string }) {
+function FunilBar({ label, count, valor, total, color, icon, onClick }: { label: string; count: number; valor: number; total: number; color: string; icon: string; onClick?: () => void }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div onClick={onClick} title={onClick ? 'Ver propostas' : undefined} style={{ marginBottom: 14, cursor: onClick ? 'pointer' : 'default', borderRadius: 8, padding: '4px 6px', margin: '0 -6px 10px' }}
+      onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLDivElement).style.background = color + '10' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13 }}>{icon}</span>
@@ -207,10 +211,10 @@ export function DashboardPage() {
 
       {/* KPI Cards — 2 colunas no mobile */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 28 }}>
-        <KpiCard label="Volume Total Orçado"  value={stats.total}              valor={stats.valorTotal}     sub="todas as propostas"    icon="💰" color="#F5A623" />
-        <KpiCard label="Aguardando Resposta"  value={stats.aguardando}         valor={stats.valorAguardando} sub="propostas enviadas"    icon="📤" color="#58A6FF" />
-        <KpiCard label="Propostas Aceitas"    value={stats.aceitas}            valor={stats.valorAceitas}   sub="volume aprovado"       icon="✅" color="#3EBB7A" />
-        <KpiCard label="Taxa de Conversão"    value={stats.conversao + '%'}                                 sub={`${stats.aceitas} de ${stats.total} propostas`} icon="📊" color="#BC8CFF" />
+        <KpiCard label="Volume Total Orçado"  value={stats.total}              valor={stats.valorTotal}     sub="todas as propostas"    icon="💰" color="#F5A623" onClick={() => navigate('/propostas?status=todos')} />
+        <KpiCard label="Aguardando Resposta"  value={stats.aguardando}         valor={stats.valorAguardando} sub="propostas enviadas"    icon="📤" color="#58A6FF" onClick={() => navigate('/propostas?status=enviada')} />
+        <KpiCard label="Propostas Aceitas"    value={stats.aceitas}            valor={stats.valorAceitas}   sub="volume aprovado"       icon="✅" color="#3EBB7A" onClick={() => navigate('/propostas?status=aceita')} />
+        <KpiCard label="Taxa de Conversão"    value={stats.conversao + '%'}                                 sub={`${stats.aceitas} de ${stats.total} propostas`} icon="📊" color="#BC8CFF" onClick={() => navigate('/propostas?status=aceita')} />
       </div>
 
       {/* Main Row — coluna única no mobile */}
@@ -278,11 +282,11 @@ export function DashboardPage() {
           {/* Funil */}
           <div style={{ background: 'linear-gradient(135deg, #111D2E, #0E1A2A)', borderRadius: 14, border: '1px solid #1E3050', padding: '20px 22px' }}>
             <h3 style={{ color: '#E2EAF5', fontSize: 14, fontWeight: 700, margin: '0 0 18px' }}>Funil de Propostas</h3>
-            <FunilBar label="Rascunho" count={stats.funil.rascunho.count} valor={stats.funil.rascunho.valor} total={stats.total} color="#8B949E" icon="📝" />
-            <FunilBar label="Enviada"  count={stats.funil.enviada.count}  valor={stats.funil.enviada.valor}  total={stats.total} color="#58A6FF" icon="📤" />
-            <FunilBar label="Aceita"   count={stats.funil.aceita.count}   valor={stats.funil.aceita.valor}   total={stats.total} color="#3EBB7A" icon="✅" />
-            <FunilBar label="Recusada" count={stats.funil.recusada.count} valor={stats.funil.recusada.valor} total={stats.total} color="#F85149" icon="❌" />
-            <FunilBar label="Expirada" count={stats.funil.expirada.count} valor={stats.funil.expirada.valor} total={stats.total} color="#D29922" icon="⏰" />
+            <FunilBar label="Rascunho" count={stats.funil.rascunho.count} valor={stats.funil.rascunho.valor} total={stats.total} color="#8B949E" icon="📝" onClick={() => navigate('/propostas?status=rascunho')} />
+            <FunilBar label="Enviada"  count={stats.funil.enviada.count}  valor={stats.funil.enviada.valor}  total={stats.total} color="#58A6FF" icon="📤" onClick={() => navigate('/propostas?status=enviada')} />
+            <FunilBar label="Aceita"   count={stats.funil.aceita.count}   valor={stats.funil.aceita.valor}   total={stats.total} color="#3EBB7A" icon="✅" onClick={() => navigate('/propostas?status=aceita')} />
+            <FunilBar label="Recusada" count={stats.funil.recusada.count} valor={stats.funil.recusada.valor} total={stats.total} color="#F85149" icon="❌" onClick={() => navigate('/propostas?status=recusada')} />
+            <FunilBar label="Expirada" count={stats.funil.expirada.count} valor={stats.funil.expirada.valor} total={stats.total} color="#D29922" icon="⏰" onClick={() => navigate('/propostas?status=expirada')} />
           </div>
 
           {/* Ações Rápidas */}
