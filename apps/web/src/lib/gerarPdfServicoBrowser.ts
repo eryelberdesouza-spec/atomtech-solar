@@ -2,6 +2,8 @@
 // gerarPdfServicoBrowser.ts — PDF de Proposta de Serviço Geral
 // ═══════════════════════════════════════════════════════════════════
 
+import { JOST_FONT_FACE_CSS } from './jostFontEmbed'
+
 const fmt = (v: number | string | null | undefined): string => {
   const n = Number(v ?? 0)
   return `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -549,9 +551,7 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Proposta ${numero} — ${nomeCliente}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=block">
+  <style>${JOST_FONT_FACE_CSS}</style>
   <style>${CSS_SERVICO.replace(/#F5A623/g, cor1).replace(/#2D9C4E/g, cor2)}</style>
 </head>
 <body>
