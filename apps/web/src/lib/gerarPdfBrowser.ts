@@ -70,16 +70,30 @@ const CSS = `
   ul { padding-left: 20px; margin: 8px 0 12px; }
   li { font-size: 15px; font-weight: 300; color: #444; line-height: 1.9; }
 
-  /* ─── PÁGINA A4 ───────────────────────────────────────────────── */
-  .page {
+  /* ─── FOLHA A4 ────────────────────────────────────────────────── */
+  /* Cada folha é uma <table>: o Chrome repete thead no topo e tfoot no pé
+     de CADA página impressa quando o conteúdo transborda — é o que garante
+     cabeçalho/rodapé íntegros com conteúdo de tamanho variável (mesma
+     técnica do gerarPdfServicoBrowser.ts).
+     IMPORTANTE: a tabela NÃO pode ter height fixo (impede a fragmentação e
+     o thead deixa de repetir) e o break-after precisa ficar no div wrapper
+     (o Chrome ignora break-after em <table>). O rodapé é colado no pé da
+     última página via preenchimento medido em JS antes do print. */
+  .sheet-wrap { page-break-after: always; break-after: page; }
+  .sheet-wrap:last-of-type { page-break-after: auto; break-after: auto; }
+  table.sheet {
     width: 210mm;
-    min-height: 297mm;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    page-break-after: always;
-    break-after: page;
+    border-collapse: collapse;
+    border-spacing: 0;
   }
+  table.sheet > thead { display: table-header-group; }
+  table.sheet > tfoot { display: table-footer-group; }
+  table.sheet > thead > tr > td,
+  table.sheet > tfoot > tr > td,
+  table.sheet > tbody > tr > td {
+    padding: 0; border: none; background: transparent; text-align: left;
+  }
+  table.sheet > tbody > tr > td { vertical-align: top; }
 
   /* ─── CAPA ────────────────────────────────────────────────────── */
   .capa {
@@ -136,7 +150,6 @@ const CSS = `
     background: #0E2040;
     padding: 12px 36px;
     display: flex; justify-content: space-between; align-items: center;
-    flex-shrink: 0;
   }
   .header-logo { font-family: Calibri, Candara, sans-serif; font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
   .header-logo span { color: #F5A623; }
@@ -147,21 +160,20 @@ const CSS = `
     background: #0E2040;
     padding: 12px 36px;
     display: flex; justify-content: space-between; align-items: center;
-    flex-shrink: 0;
-    margin-top: auto;
   }
   .footer-text { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.85); line-height: 1.5; }
   .footer-numero { font-size: 10px; color: rgba(255,255,255,0.7); font-family: Calibri, Candara, monospace; }
 
   /* ─── SEÇÃO CONTEÚDO ─────────────────────────────────────────── */
-  .section { padding: 20px 36px; flex: 1; overflow: hidden; }
+  .section { padding: 20px 36px; }
   .section-title {
     font-family: Calibri, Candara, sans-serif;
     font-size: 22px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
     margin-bottom: 16px;
+    break-after: avoid; page-break-after: avoid;
   }
-  .section-sub { font-family: Calibri, Candara, sans-serif; font-size: 16px; font-weight: 600; color: #0E2040; margin: 28px 0 12px; padding-top: 16px; border-top: 1px solid #eee; }
+  .section-sub { font-family: Calibri, Candara, sans-serif; font-size: 16px; font-weight: 600; color: #0E2040; margin: 28px 0 12px; padding-top: 16px; border-top: 1px solid #eee; break-after: avoid; page-break-after: avoid; }
 
   /* ─── KPIs ────────────────────────────────────────────────────── */
   .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
@@ -171,12 +183,15 @@ const CSS = `
   .kpi-value { font-family: Calibri, Candara, sans-serif; font-size: 23px; font-weight: 700; color: #0E2040; margin-top: 4px; }
   .kpi-unit { font-family: Calibri, Candara, sans-serif; font-size: 12px; font-weight: 300; color: #888; }
 
-  /* ─── TABELAS ─────────────────────────────────────────────────── */
-  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-  th { background: #0E2040; color: #fff; padding: 8px 10px; font-family: Calibri, Candara, sans-serif; font-size: 10px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; text-align: left; }
-  th:last-child, td:last-child { text-align: right; }
-  td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; font-family: Calibri, Candara, sans-serif; font-size: 13px; font-weight: 300; color: #333; }
-  tr:nth-child(even) td { background: #fafafa; }
+  /* ─── TABELAS DE CONTEÚDO (escopadas em .section para não afetar a
+         tabela-folha .sheet) ─────────────────────────────────────── */
+  .section table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  .section table thead { display: table-header-group; } /* repete o cabeçalho da tabela se ela quebrar de página */
+  .section tr { break-inside: avoid; page-break-inside: avoid; }
+  .section th { background: #0E2040; color: #fff; padding: 8px 10px; font-family: Calibri, Candara, sans-serif; font-size: 10px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; text-align: left; }
+  .section th:last-child, .section td:last-child { text-align: right; }
+  .section td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; font-family: Calibri, Candara, sans-serif; font-size: 13px; font-weight: 300; color: #333; }
+  .section tr:nth-child(even) td { background: #fafafa; }
   .fluxo-positivo { color: #2D9C4E; font-weight: 600; }
   .fluxo-negativo { color: #d32f2f; }
 
@@ -215,11 +230,16 @@ const CSS = `
   .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; break-inside: avoid; page-break-inside: avoid; }
   .assinatura-linha { border-top: 1.5px solid #222; padding-top: 10px; text-align: center; font-size: 12px; font-weight: 300; color: #555; }
 
+  /* ─── CONTROLE DE QUEBRA DE PÁGINA ────────────────────────────── */
+  .kpi-card, .comp-card, .pagamento-box, .highlight-box, .aceite-box,
+  .reducao-grid, .assinatura-grid {
+    break-inside: avoid; page-break-inside: avoid;
+  }
+
   /* ─── PRINT ───────────────────────────────────────────────────── */
   @media print {
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { font-family: 'Calibri Light', Calibri, Candara, sans-serif; font-weight: 300; }
-    .page { page-break-after: always; break-after: page; }
     @page { size: A4; margin: 0; }
   }
 `
@@ -244,20 +264,24 @@ function footer(numero: string, emp?: any) {
   </div>`
 }
 
+// Uma folha A4: thead/tfoot da tabela repetem o cabeçalho/rodapé em cada
+// página impressa caso o conteúdo transborde para páginas seguintes.
+function sheet(inner: string, numero: string, logoUrl?: string | null, emp?: any): string {
+  return `<div class="sheet-wrap"><table class="sheet">
+    <thead><tr><td>${headerInterno(numero, logoUrl)}</td></tr></thead>
+    <tfoot><tr><td>${footer(numero, emp)}</td></tr></tfoot>
+    <tbody><tr><td><div class="section">${inner}</div></td></tr></tbody>
+  </table></div>`
+}
+
 function paginaTexto(titulo: string, chave: string, textos: any, numero: string, logoUrl?: string, emp?: any): string {
   const conteudo = textos?.[chave]?.conteudo
   if (!conteudo) return ''
-  return `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
-      <div class="section-title">${titulo}</div>
-      ${renderTexto(conteudo)}
-    </div>
-    ${footer(numero, emp)}
-  </div>`
+  return sheet(`<div class="section-title">${titulo}</div>
+      ${renderTexto(conteudo)}`, numero, logoUrl, emp)
 }
 
-function gerarHTML(data: any): string {
+export function gerarHTML(data: any): string {
   const { proposta: prop, empresa: emp, cliente: cli, fatura: fat,
     dimensionamento: dim, equipamentos: equips, precificacao: prec,
     analiseFinanceira: af, condicoesComerciais: condicoes, blocos, textos } = data
@@ -327,19 +351,14 @@ function gerarHTML(data: any): string {
   </div>` : ''
 
   // ── APRESENTAÇÃO ─────────────────────────────────────────────────────────
-  const apresentacao = tem('apresentacao_empresa') ? `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+  const apresentacao = tem('apresentacao_empresa') ? sheet(`
       <div class="section-title">Conhe&ccedil;a a Atom Tech</div>
       ${renderTexto(textos?.apresentacao_empresa?.conteudo) || '<p>A Atom Tech &eacute; especializada em sistemas fotovoltaicos.</p>'}
       ${tem('o_que_inclui') && textos?.o_que_inclui?.conteudo ? `
       <div style="margin-top:20px">
         <div class="section-sub">Sua Proposta Inclui</div>
         ${renderTexto(textos.o_que_inclui.conteudo)}
-      </div>` : ''}
-    </div>
-    ${footer(numero, emp)}
-  </div>` : ''
+      </div>` : ''}`, numero, logoUrl, emp) : ''
 
   // ── TEXTOS INSTITUCIONAIS ─────────────────────────────────────────────────
   const comoFunciona   = tem('como_funciona')   ? paginaTexto('Como Funciona a Energia Solar',    'como_funciona',   textos, numero, logoUrl, emp) : ''
@@ -349,9 +368,7 @@ function gerarHTML(data: any): string {
   const regulamentacao = tem('regulamentacao')  ? paginaTexto('Regulamenta&ccedil;&atilde;o no Brasil', 'regulamentacao', textos, numero, logoUrl, emp) : ''
 
   // ── DIMENSIONAMENTO ──────────────────────────────────────────────────────
-  const dimensionamentoBloco = tem('dimensionamento') ? `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+  const dimensionamentoBloco = tem('dimensionamento') ? sheet(`
       <div class="section-title">Dimensionamento do Sistema</div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Pot&ecirc;ncia Proposta</div><div class="kpi-value">${Number(dim?.potenciaFinalKwp ?? 0).toFixed(2)} <span class="kpi-unit">kWp</span></div></div>
@@ -376,15 +393,10 @@ function gerarHTML(data: any): string {
             </tr>`).join('')}
           </tbody>
         </table>
-      </div>` : ''}
-    </div>
-    ${footer(numero, emp)}
-  </div>` : ''
+      </div>` : ''}`, numero, logoUrl, emp) : ''
 
   // ── ANÁLISE FINANCEIRA ───────────────────────────────────────────────────
-  const analise = tem('analise_financeira') ? `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+  const analise = tem('analise_financeira') ? sheet(`
       <div class="section-title">An&aacute;lise Financeira do Investimento</div>
       <div class="highlight-box"><p>Investimento de <strong>${formatCurrency(precoFinal)}</strong> com infla&ccedil;&atilde;o energ&eacute;tica de 9,5% a.a. e 25 anos de vida &uacute;til.</p></div>
       <div class="kpi-grid">
@@ -406,10 +418,7 @@ function gerarHTML(data: any): string {
           <div><div class="reducao-header">Economia M&eacute;dia Mensal</div><div class="reducao-cell"><div class="reducao-label">Gera&ccedil;&atilde;o Solar</div><div class="reducao-value economia">${formatCurrency(af?.economiaMensalAno1)}</div></div></div>
           <div><div class="reducao-header">Depois da Instala&ccedil;&atilde;o</div><div class="reducao-cell"><div class="reducao-label">Custo Residual</div><div class="reducao-value">${formatCurrency(Math.max(0, Number(fat?.valorTotal || 0) - Number(af?.economiaMensalAno1 || 0)))}</div></div></div>
         </div>
-      </div>` : ''}
-    </div>
-    ${footer(numero, emp)}
-  </div>` : ''
+      </div>` : ''}`, numero, logoUrl, emp) : ''
 
   // ── FLUXO DE CAIXA ───────────────────────────────────────────────────────
   const fluxoCaixa = tem('fluxo_caixa') ? (() => {
@@ -447,33 +456,21 @@ function gerarHTML(data: any): string {
     const p1 = fluxo.slice(0, 13)   // Anos 0–12
     const p2 = fluxo.slice(13)       // Anos 13–25
 
-    return `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+    return sheet(`
       <div class="section-title">Fluxo de Caixa &mdash; 25 Anos</div>
       ${highlight}
       <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 0 a 12</p>
-      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p1)}</tbody></table>
-    </div>
-    ${footer(numero, emp)}
-  </div>
-  <div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p1)}</tbody></table>`, numero, logoUrl, emp)
+    + sheet(`
       <div class="section-title">Fluxo de Caixa &mdash; 25 Anos</div>
       ${highlight}
       <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 13 a 25</p>
-      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p2)}</tbody></table>
-    </div>
-    ${footer(numero, emp)}
-  </div>`
+      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p2)}</tbody></table>`, numero, logoUrl, emp)
   })() : ''
 
   // ── CONDIÇÕES COMERCIAIS ─────────────────────────────────────────────────
   const prazoExecucaoSolar = prop?.prazoExecucao ?? null
-  const condicoesBloco = tem('condicoes_comerciais') ? `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+  const condicoesBloco = tem('condicoes_comerciais') ? sheet(`
       <div class="section-title">Condi&ccedil;&otilde;es Comerciais</div>
       <div class="highlight-box"><p>Investimento Total: <strong>${formatCurrency(precoFinal)}</strong> &middot; Economia Estimada: <strong>${formatCurrency(af?.economiaMensalAno1)}/m&ecirc;s</strong></p></div>
       ${prazoExecucaoSolar ? `<div style="margin-top:12px;padding:12px 16px;background:#F5A62310;border-left:3px solid #F5A623;border-radius:4px"><span style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.05em">Prazo de Execu&ccedil;&atilde;o</span><p style="margin:4px 0 0;font-weight:600;color:#0E2040;font-size:14px">${prazoExecucaoSolar}</p></div>` : ''}
@@ -489,10 +486,7 @@ function gerarHTML(data: any): string {
                 <span style="font-weight:700">${c.tipo !== 'financiamento' ? formatCurrency(p.valor) : ''}</span>
               </div>`).join('')}
           </div>`).join('')}
-      </div>` : ''}
-    </div>
-    ${footer(numero, emp)}
-  </div>` : ''
+      </div>` : ''}`, numero, logoUrl, emp) : ''
 
   // ── CONTEÚDO DO ACEITE (bloco interno — sem header/footer/page próprios) ──
   // Embutido ao final da última seção ativa (consideracoes ou pagina propria)
@@ -549,7 +543,7 @@ function gerarHTML(data: any): string {
       if (ehItem) {
         itemIdx++
         const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        return `<div style="display:flex;gap:14px;margin-bottom:40px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #EEF2F7">
+        return `<div style="display:flex;gap:14px;margin-bottom:40px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #EEF2F7;break-inside:avoid;page-break-inside:avoid">
           <span style="min-width:24px;height:24px;background:#F5A62315;color:#0E2040;border:1px solid #F5A62340;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:Calibri,sans-serif;flex-shrink:0;margin-top:2px">${itemIdx}</span>
           <span style="font-size:14px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
         </div>`
@@ -565,24 +559,13 @@ function gerarHTML(data: any): string {
         }
       }
     }).join('')
-    return `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
+    return sheet(`
       <div class="section-title">LEIA COM ATEN&Ccedil;&Atilde;O &mdash; INFORMA&Ccedil;&Otilde;ES IMPORTANTES</div>
-      ${itensHtml}
-    </div>
-    ${footer(numero, emp)}
-  </div>`
+      ${itensHtml}`, numero, logoUrl, emp)
   })() : ''
 
   // Aceite sempre em página própria com header e footer — garante posicionamento correto
-  const aceite = tem('aceite') ? `<div class="page">
-    ${headerInterno(numero, logoUrl)}
-    <div class="section">
-      ${aceiteInner}
-    </div>
-    ${footer(numero, emp)}
-  </div>` : ''
+  const aceite = tem('aceite') ? sheet(aceiteInner, numero, logoUrl, emp) : ''
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -595,7 +578,38 @@ function gerarHTML(data: any): string {
 </head>
 <body>
   ${capa}${apresentacao}${comoFunciona}${diferenciais}${garantias}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${consideracoesBloco}${aceite}
-  <script>window.onload = function() { setTimeout(function() { window.print(); }, 800); };</script>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        // O tfoot naturalmente fica logo após o conteúdo na última página de
+        // cada folha. Preenche o espaço restante (medido) para empurrá-lo ao
+        // pé da página — técnica do gerarPdfServicoBrowser.ts, aqui por folha.
+        try {
+          var pageH = 297 * 96 / 25.4; // altura A4 em px CSS (~1122.5)
+          document.querySelectorAll('table.sheet').forEach(function(sh) {
+            var thead = sh.tHead, tfoot = sh.tFoot;
+            var cell = sh.querySelector('tbody > tr > td');
+            if (!thead || !tfoot || !cell) return;
+            var theadH = thead.getBoundingClientRect().height;
+            var tfootH = tfoot.getBoundingClientRect().height;
+            var availH = pageH - theadH - tfootH;
+            if (availH <= 0) return;
+            var contentH = cell.getBoundingClientRect().height;
+            // Cabe em uma página: preenchimento exato cola o rodapé no pé.
+            // Se transborda, NÃO preencher: estimar o vão da última página é
+            // impreciso (break-inside:avoid desloca conteúdo) e um erro para
+            // mais vaza o rodapé para uma página órfã. Nesse caso o tfoot
+            // fica logo após o conteúdo — e o Chrome já repete cabeçalho e
+            // rodapé no pé/topo de cada página intermediária.
+            if (contentH <= availH) {
+              cell.style.paddingBottom = (availH - contentH - 1) + 'px';
+            }
+          });
+        } catch (e) {}
+        setTimeout(function() { window.print(); }, 100);
+      }, 700);
+    };
+  </script>
 </body>
 </html>`
 }
