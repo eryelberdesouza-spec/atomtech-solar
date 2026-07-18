@@ -537,27 +537,29 @@ export function gerarHTML(data: any): string {
     const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
     let itemIdx = 0
     const itensHtml = linhas.map((linha: string) => {
+      const linhaStrip = linha.replace(/^[-*•]\s*/, '')
+      // Subtítulo: linha "**Título**" exata OU linha toda em MAIÚSCULAS —
+      // mesmo com asteriscos desbalanceados digitados (ex.: "*EXCLUSÕES**"),
+      // que o conversor de negrito não consome. Os asteriscos são limpos.
+      const soTexto = linhaStrip.replace(/\*+/g, '').trim()
+      const ehSubtitulo = soTexto.length >= 4 && soTexto.length <= 60 &&
+        (/^\*\*[^*]+\*\*\s*$/.test(linhaStrip.trim()) ||
+         (/^[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇÜ0-9\s.:—–-]+$/.test(soTexto) && /[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇÜ]/.test(soTexto)))
+      if (ehSubtitulo) {
+        return `<div style="font-family:Calibri,Candara,sans-serif;font-size:16px;font-weight:600;color:#0E2040;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #F5A62350;break-after:avoid;page-break-after:avoid">${soTexto}</div>`
+      }
       // "-" ou "*" SEM letra-ponto logo após → item numerado
       // "- a. texto", "- b. texto" etc. → texto corrido (preserva o "a.", "b.")
       const ehItem = /^[-*•]/.test(linha) && !/^[-*•]\s*[a-zA-Z]\.\s/.test(linha)
+      const texto = linhaStrip.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       if (ehItem) {
         itemIdx++
-        const texto = linha.replace(/^[-*•]\s*/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         return `<div style="display:flex;gap:14px;margin-bottom:40px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #EEF2F7;break-inside:avoid;page-break-inside:avoid">
           <span style="min-width:24px;height:24px;background:#F5A62315;color:#0E2040;border:1px solid #F5A62340;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:Calibri,sans-serif;flex-shrink:0;margin-top:2px">${itemIdx}</span>
           <span style="font-size:14px;font-weight:300;color:#333;line-height:1.8">${texto}</span>
         </div>`
-      } else {
-        // Linha sem "-" puro → subtítulo (se **bold** ou MAIÚSCULAS) ou texto corrido (a., b., c. etc.)
-        const linhaStrip = linha.replace(/^[-*•]\s*/, '') // strip opcional "-" de "- a. texto"
-        const texto = linhaStrip.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        const ehSubtitulo = /^\*\*[^*]+\*\*\s*$/.test(linhaStrip.trim()) || /^[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇÜ\s]{4,}$/.test(linhaStrip.trim())
-        if (ehSubtitulo) {
-          return `<div style="font-family:Calibri,Candara,sans-serif;font-size:16px;font-weight:600;color:#0E2040;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #F5A62350">${texto}</div>`
-        } else {
-          return `<p style="font-size:14px;font-weight:300;color:#333;line-height:1.8;margin:0 0 8px 4px">${texto}</p>`
-        }
       }
+      return `<p style="font-size:14px;font-weight:300;color:#333;line-height:1.8;margin:0 0 8px 4px">${texto}</p>`
     }).join('')
     return sheet(`
       <div class="section-title">LEIA COM ATEN&Ccedil;&Atilde;O &mdash; INFORMA&Ccedil;&Otilde;ES IMPORTANTES</div>

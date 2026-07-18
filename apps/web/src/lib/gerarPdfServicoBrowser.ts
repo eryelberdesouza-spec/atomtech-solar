@@ -42,26 +42,28 @@ function renderListaNumerada(txt: string, cor1: string): string {
   const linhas = txt.split('\n').map(l => l.trim()).filter(Boolean)
   let idx = 0
   return linhas.map(linha => {
+    const linhaStrip = linha.replace(/^[-•*]\s*/, '')
+    // Subtítulo: linha "**Título**" exata OU linha toda em MAIÚSCULAS — mesmo
+    // com asteriscos desbalanceados digitados (ex.: "*EXCLUSÕES**"), que o
+    // conversor de negrito não consome. Os asteriscos são limpos.
+    const soTexto = linhaStrip.replace(/\*+/g, '').trim()
+    const ehSubtitulo = soTexto.length >= 4 && soTexto.length <= 60 &&
+      (/^\*\*[^*]+\*\*\s*$/.test(linhaStrip.trim()) ||
+       (soTexto === soTexto.toUpperCase() && /[A-ZÁÉÍÓÚÃÕÇ]/.test(soTexto)))
+    if (ehSubtitulo) {
+      return `<div style="font-size:15px;font-weight:600;color:#0E2040;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid ${cor1}50;break-after:avoid;page-break-after:avoid">${soTexto}</div>`
+    }
     // "-" ou "•" puro → item numerado. "- a. texto" → texto corrido (preserva "a.")
     const ehItem = /^[-•]/.test(linha) && !/^[-•]\s*[a-zA-Z]\.\s/.test(linha)
+    const texto = bold(linhaStrip)
     if (ehItem) {
       idx++
-      const texto = bold(linha.replace(/^[-•]\s*/, ''))
       return `<div style="display:flex;gap:12px;margin-bottom:40px;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid #EEF2F7;page-break-inside:avoid;break-inside:avoid">
         <span style="min-width:24px;height:24px;background:${cor1}18;color:#0E2040;border:1px solid ${cor1}40;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:3px">${idx}</span>
         <div style="flex:1;font-size:13px;font-weight:300;color:#333;line-height:1.85">${texto}</div>
       </div>`
-    } else {
-      const linhaStrip = linha.replace(/^[-•]\s*/, '') // remove "-" de "- a. texto"
-      const texto = bold(linhaStrip)
-      const ehSubtitulo = /^\*\*[^*]+\*\*\s*$/.test(linhaStrip.trim()) ||
-        (linhaStrip === linhaStrip.toUpperCase() && linhaStrip.length > 3 && /[A-ZÁÉÍÓÚÃÕÇ]/.test(linhaStrip))
-      if (ehSubtitulo) {
-        return `<div style="font-size:15px;font-weight:600;color:#0E2040;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid ${cor1}50">${texto}</div>`
-      } else {
-        return `<p style="font-size:13px;font-weight:300;color:#333;line-height:1.85;margin:0 0 8px 4px">${texto}</p>`
-      }
     }
+    return `<p style="font-size:13px;font-weight:300;color:#333;line-height:1.85;margin:0 0 8px 4px">${texto}</p>`
   }).join('')
 }
 
