@@ -345,16 +345,24 @@ function ModalImportar({
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 
 export function PropostasPage() {
-  const [aba, setAba]               = useState<'pendentes' | 'importadas'>('pendentes')
+  const [aba, setAba]               = useState<'pendentes' | 'importadas' | 'arquivadas'>('pendentes')
   const [propostaModal, setPropostaModal] = useState<any | null>(null)
   const [sucesso, setSucesso]       = useState('')
 
-  const { data, isLoading, error } = (trpc as any).fin.proposta.listar.useQuery()
+  const { data, isLoading, error, refetch } = (trpc as any).fin.proposta.listar.useQuery()
   const propostas: any[] = data ?? []
 
-  const pendentes  = propostas.filter(p => !p.importada)
+  // Arquivar tira da lista de pendentes (duplicatas de formalização já tratadas
+  // no financeiro por outra via — proposta formalizada não pode ser excluída)
+  const arquivarMut = (trpc as any).fin.proposta.arquivarImportacao.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e: any) => alert('Erro: ' + e.message),
+  })
+
+  const pendentes  = propostas.filter(p => !p.importada && !p.arquivada)
   const importadas = propostas.filter(p => p.importada)
-  const lista      = aba === 'pendentes' ? pendentes : importadas
+  const arquivadas = propostas.filter(p => !p.importada && p.arquivada)
+  const lista      = aba === 'pendentes' ? pendentes : aba === 'importadas' ? importadas : arquivadas
 
   function handleSucesso() {
     setPropostaModal(null)
@@ -399,6 +407,15 @@ export function PropostasPage() {
             }}>{importadas.length}</span>
           )}
         </button>
+        <button style={tabStyle(aba === 'arquivadas')} onClick={() => setAba('arquivadas')}>
+          Arquivadas
+          {arquivadas.length > 0 && (
+            <span style={{
+              marginLeft: 8, padding: '1px 7px', borderRadius: 10, fontSize: 10,
+              background: '#6B728030', color: '#9CA3AF', fontWeight: 700,
+            }}>{arquivadas.length}</span>
+          )}
+        </button>
       </div>
 
       {sucesso && <Alert type="success">{sucesso}</Alert>}
@@ -414,7 +431,9 @@ export function PropostasPage() {
         }}>
           {aba === 'pendentes'
             ? 'Nenhuma proposta com contrato formalizado aguardando importação.'
-            : 'Nenhuma proposta importada ainda.'}
+            : aba === 'importadas'
+              ? 'Nenhuma proposta importada ainda.'
+              : 'Nenhuma proposta arquivada.'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -462,15 +481,37 @@ export function PropostasPage() {
               </div>
 
               {/* Ação */}
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ flexShrink: 0, display: 'flex', gap: 6, alignItems: 'center' }}>
                 {p.importada ? (
                   <span style={{ fontSize: 11, color: C.textMuted }}>
                     Título #{p.tituloFinId}
                   </span>
-                ) : (
-                  <Btn size="sm" onClick={() => setPropostaModal(p)}>
-                    ↯ Importar
+                ) : p.arquivada ? (
+                  <Btn size="sm" variant="ghost" onClick={() => arquivarMut.mutate({ propostaId: p.id, arquivar: false })} disabled={arquivarMut.isLoading}>
+                    ↩ Restaurar
                   </Btn>
+                ) : (
+                  <>
+                    <Btn size="sm" onClick={() => setPropostaModal(p)}>
+                      ↯ Importar
+                    </Btn>
+                    <button
+                      title="Arquivar — remove da lista de pendentes sem importar (reversível na aba Arquivadas)"
+                      onClick={() => {
+                        if (window.confirm(`Arquivar a proposta ${p.numero} da lista de importação?\n\nUse para duplicatas ou propostas já tratadas no financeiro por outra via. Ela NÃO será excluída — fica na aba "Arquivadas" e pode ser restaurada.`)) {
+                          arquivarMut.mutate({ propostaId: p.id, arquivar: true })
+                        }
+                      }}
+                      disabled={arquivarMut.isLoading}
+                      style={{
+                        padding: '5px 10px', borderRadius: 7, cursor: 'pointer',
+                        border: `1px solid ${C.border}`, background: 'transparent',
+                        color: C.textMuted, fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                      }}
+                    >
+                      🗄 Arquivar
+                    </button>
+                  </>
                 )}
               </div>
             </div>

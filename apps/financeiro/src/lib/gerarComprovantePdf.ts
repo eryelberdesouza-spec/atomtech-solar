@@ -516,7 +516,11 @@ export async function gerarComprovantePdf(params: {
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          font-family: 'Segoe UI', Arial, sans-serif;
+          /* Calibri tem faces reais de regular e negrito — evita o "negrito" falso
+             nas letras I/l causado por síntese de peso na impressão (mesmo fix do
+             PDF de proposta do AGO). Este documento usa muitos pesos inline, então
+             a família precisa cobrir todos com faces nativas. */
+          font-family: Calibri, Candara, 'Segoe UI', Arial, sans-serif;
           background: #fff;
           color: #1E293B;
           padding: 28px 32px;

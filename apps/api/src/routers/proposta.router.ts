@@ -834,16 +834,6 @@ export const propostaRouter = router({
         .limit(1)
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
 
-      if (input.parcelas && input.parcelas.length > 0) {
-        const totalPct = input.parcelas.reduce((s, p) => s + p.percentualDoTotal, 0)
-        if (Math.abs(totalPct - 100) > 0.01) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `A soma dos percentuais deve ser 100%. Atual: ${totalPct.toFixed(1)}%`,
-          })
-        }
-      }
-
       const updates: any = {}
       if (input.descricao) updates.descricao = input.descricao
       if (input.valorTotal) updates.valorTotal = String(input.valorTotal)
@@ -858,6 +848,19 @@ export const propostaRouter = router({
             .where(eq(condicaoComercialTable.id, condicaoId)).limit(1))[0]?.valorTotal ?? 0
         )
 
+        // Validação autoritativa pela SOMA DOS VALORES (tolerância de centavos por
+        // arredondamento). O valor enviado é persistido exatamente como digitado —
+        // recalculá-lo a partir do percentual arredondado distorcia valores exatos
+        // (ex.: R$ 10.000,00 virava R$ 9.999,68). O percentual acompanha como
+        // informação derivada.
+        const totalValor = input.parcelas.reduce((s, p) => s + p.valor, 0)
+        if (valorBase > 0 && Math.abs(totalValor - valorBase) > 0.05) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `A soma das parcelas (R$ ${totalValor.toFixed(2)}) deve ser igual ao valor total (R$ ${valorBase.toFixed(2)}).`,
+          })
+        }
+
         await ctx.db.delete(parcelaCondicaoTable)
           .where(eq(parcelaCondicaoTable.condicaoId, condicaoId)).execute()
 
@@ -866,7 +869,7 @@ export const propostaRouter = router({
             condicaoId,
             numeroParcela: p.numeroParcela,
             descricaoEvento: p.descricaoEvento,
-            valor: String((valorBase * p.percentualDoTotal) / 100),
+            valor: String(p.valor),
             percentualDoTotal: String(p.percentualDoTotal),
             prazoDias: p.prazoDias,
             tipoPrazo: p.tipoPrazo,

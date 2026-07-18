@@ -1013,6 +1013,32 @@ app.post('/extrato/parse-ofx', upload.single('ofx'), async (req, res) => {
   }
 })
 
+// ── Migração: arquivar proposta da lista de importação do AGF ─────────────────
+// Duplicatas de formalização já tratadas continuavam eternamente como
+// "pendentes de importação" — proposta formalizada não pode ser excluída,
+// então o caminho é arquivá-la da lista (reversível).
+app.get('/run-migration-proposta-arquivar-importacao', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'proposta' AND COLUMN_NAME = 'fin_importacao_arquivada'`
+    )
+    if (cols.length === 0) {
+      await conn.execute(`ALTER TABLE proposta ADD COLUMN fin_importacao_arquivada TINYINT(1) NOT NULL DEFAULT 0`)
+      await conn.end()
+      res.json({ ok: true, message: 'Coluna fin_importacao_arquivada criada' })
+    } else {
+      await conn.end()
+      res.json({ ok: true, message: 'Coluna já existia' })
+    }
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: planos de manutenção recorrente (limpeza de painéis etc.) ───────
 app.get('/run-migration-os-manutencao', async (_, res) => {
   try {

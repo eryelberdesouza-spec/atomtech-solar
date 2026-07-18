@@ -1969,6 +1969,7 @@ const propostaFinRouter = router({
         c.id AS clienteId, c.nome AS clienteNome, c.cpf_cnpj AS clienteCpfCnpj,
         c.email AS clienteEmail, c.telefone AS clienteTelefone,
         prec.preco_final AS valorTotal,
+        p.fin_importacao_arquivada AS arquivada,
         ft.id AS tituloFinId, ft.descricao AS tituloFinDescricao
       FROM proposta p
       INNER JOIN cliente c ON c.id = p.cliente_id
@@ -1999,10 +2000,29 @@ const propostaFinRouter = router({
       clienteTelefone:     r.clienteTelefone ? String(r.clienteTelefone) : null,
       valorTotal:          r.valorTotal ? Number(r.valorTotal) : null,
       importada:           !!r.tituloFinId,
+      arquivada:           Number(r.arquivada) === 1,
       tituloFinId:         r.tituloFinId ? Number(r.tituloFinId) : null,
       tituloFinDescricao:  r.tituloFinDescricao ? String(r.tituloFinDescricao) : null,
     }))
   }),
+
+  // Arquiva/restaura uma proposta da lista de importação — para duplicatas de
+  // formalização já tratadas no financeiro por outra via. Proposta formalizada
+  // não pode ser excluída (histórico comercial), então o caminho é arquivar.
+  arquivarImportacao: protectedProcedure
+    .input(z.object({ propostaId: z.number().int().positive(), arquivar: z.boolean().default(true) }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, empId))).limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      await ctx.db.execute(sql`
+        UPDATE proposta SET fin_importacao_arquivada = ${input.arquivar ? 1 : 0}
+        WHERE id = ${input.propostaId} AND empresa_id = ${empId}
+      `)
+      return { ok: true }
+    }),
 
   // Retorna condições comerciais + parcelas de uma proposta
   condicoes: protectedProcedure

@@ -483,6 +483,9 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
 
   const [editandoId, setEditandoId]     = useState<number | null>(null)
   const [formParcelas, setFormParcelas] = useState<any[]>([])
+  // Modo de edição das parcelas por marcos: percentual (comportamento original)
+  // ou valor em R$ (a soma precisa bater com o total, como o % precisa fechar 100)
+  const [modoParcela, setModoParcela]   = useState<'pct' | 'valor'>('pct')
   const [formAvista, setFormAvista]     = useState({ desconto: 0, prazoDias: 0, tipoPrazo: 'corridos' })
   const [showAddForm, setShowAddForm]   = useState(false)
   const [addForm, setAddForm]           = useState({ tipo: 'avista' as string, descricao: '', valorTotal: valorReferencia ?? 0, numParcelas: 1 })
@@ -500,9 +503,20 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
     if (c.tipo === 'avista') {
       setFormAvista({ desconto: 0, prazoDias: c.parcelas?.[0]?.prazoDias ?? 0, tipoPrazo: c.parcelas?.[0]?.tipoPrazo ?? 'corridos' })
     } else {
+      setModoParcela('pct')
       setFormParcelas((c.parcelas ?? []).map((p: any) => ({ id: p.id, numeroParcela: p.numeroParcela, descricaoEvento: p.descricaoEvento ?? '', percentualDoTotal: Number(p.percentualDoTotal) || 0, prazoDias: Number(p.prazoDias) || 0, tipoPrazo: p.tipoPrazo ?? 'corridos', valor: Number(p.valor) || 0 })))
     }
     setEditandoId(c.id)
+  }
+
+  // Troca %↔R$ convertendo os números já digitados, para o usuário continuar de onde estava
+  const trocarModoParcela = (novo: 'pct' | 'valor', valorTotal: number) => {
+    if (novo === modoParcela) return
+    setFormParcelas(f => f.map(p => novo === 'valor'
+      ? { ...p, valor: parseFloat(((Number(p.percentualDoTotal) / 100) * valorTotal).toFixed(2)) }
+      : { ...p, percentualDoTotal: valorTotal > 0 ? parseFloat(((Number(p.valor) / valorTotal) * 100).toFixed(2)) : 0 }
+    ))
+    setModoParcela(novo)
   }
 
   const handleAddCondicao = () => {
@@ -576,6 +590,10 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
         const isEditando = editandoId === c.id
         const podeEditar = c.tipo === 'avista' || c.tipo === 'parcelado_marcos'
         const totalPct   = formParcelas.reduce((s, p) => s + Number(p.percentualDoTotal), 0)
+        const totalValor = formParcelas.reduce((s, p) => s + Number(p.valor), 0)
+        const somaFecha  = modoParcela === 'pct'
+          ? Math.abs(totalPct - 100) < 0.01
+          : Math.abs(totalValor - Number(c.valorTotal)) < 0.01
         const barColor   = barColors[i % barColors.length]
 
         return (
@@ -647,18 +665,36 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
 
             {isEditando && c.tipo === 'parcelado_marcos' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '10px 1fr 65px 65px 90px', gap: 8, marginBottom: 4, padding: '0 2px' }}>
-                  {['', 'Descrição', '%', 'Dias', 'Tipo'].map(h => (
+                {/* Seletor % / R$ */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                  <span style={{ color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Definir parcelas por:</span>
+                  <div style={{ display: 'flex', border: `1px solid ${C.darkBorder}`, borderRadius: 7, overflow: 'hidden' }}>
+                    {([['pct', '% Percentual'], ['valor', 'R$ Valor']] as const).map(([m, label]) => (
+                      <button key={m} onClick={() => trocarModoParcela(m, Number(c.valorTotal))}
+                        style={{ padding: '5px 12px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit', background: modoParcela === m ? C.solar : 'transparent', color: modoParcela === m ? '#0C1421' : C.textDim }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: modoParcela === 'pct' ? '10px 1fr 65px 65px 90px' : '10px 1fr 110px 65px 90px', gap: 8, marginBottom: 4, padding: '0 2px' }}>
+                  {['', 'Descrição', modoParcela === 'pct' ? '%' : 'Valor (R$)', 'Dias', 'Tipo'].map(h => (
                     <span key={h} style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>{h}</span>
                   ))}
                 </div>
                 {formParcelas.map((p, j) => (
-                  <div key={j} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 65px 65px 90px', gap: 8, alignItems: 'center' }}>
+                  <div key={j} style={{ display: 'grid', gridTemplateColumns: modoParcela === 'pct' ? '10px 1fr 65px 65px 90px' : '10px 1fr 110px 65px 90px', gap: 8, alignItems: 'center' }}>
                     <span style={{ color: C.textDim, fontSize: 11, fontWeight: 700 }}>{j + 1}</span>
                     <input value={p.descricaoEvento} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], descricaoEvento: e.target.value }; setFormParcelas(n) }}
                       style={{ padding: '7px 10px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
-                    <input type="number" min={0} max={100} value={p.percentualDoTotal} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], percentualDoTotal: Number(e.target.value) }; setFormParcelas(n) }}
-                      style={{ width: '100%', padding: '7px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} />
+                    {modoParcela === 'pct' ? (
+                      <input type="number" min={0} max={100} step={0.01} value={p.percentualDoTotal} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], percentualDoTotal: Number(e.target.value) }; setFormParcelas(n) }}
+                        style={{ width: '100%', padding: '7px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} />
+                    ) : (
+                      <input type="number" min={0} step={0.01} value={p.valor} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], valor: Number(e.target.value) }; setFormParcelas(n) }}
+                        style={{ width: '100%', padding: '7px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} />
+                    )}
                     <input type="number" min={0} value={p.prazoDias} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], prazoDias: Number(e.target.value) }; setFormParcelas(n) }}
                       style={{ width: '100%', padding: '7px 6px', borderRadius: 7, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
                     <select value={p.tipoPrazo} onChange={e => { const n = [...formParcelas]; n[j] = { ...n[j], tipoPrazo: e.target.value }; setFormParcelas(n) }}
@@ -672,18 +708,31 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
                   <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => [...f, { numeroParcela: f.length + 1, descricaoEvento: `Parcela ${f.length + 1}`, percentualDoTotal: 0, valor: 0, prazoDias: 0, tipoPrazo: 'corridos' }])}>+ Parcela</Btn>
                   {formParcelas.length > 1 && <Btn size="sm" variant="ghost" onClick={() => setFormParcelas(f => f.slice(0, -1))}>- Remover</Btn>}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: `1px solid ${C.darkBorder}` }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: Math.abs(totalPct - 100) < 0.01 ? C.green : C.danger }}>Total: {totalPct.toFixed(0)}% {Math.abs(totalPct - 100) < 0.01 ? '✔' : '⚠ deve ser 100%'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: `1px solid ${C.darkBorder}`, flexWrap: 'wrap', gap: 8 }}>
+                  {modoParcela === 'pct' ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: somaFecha ? C.green : C.danger }}>
+                      Total: {totalPct.toFixed(2).replace(/\.?0+$/, '')}% {somaFecha ? '✔' : '⚠ deve ser 100%'}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: somaFecha ? C.green : C.danger }}>
+                      Soma: {formatCurrency(totalValor)} {somaFecha ? '✔' : `⚠ deve ser ${formatCurrency(Number(c.valorTotal))} (falta ${formatCurrency(Number(c.valorTotal) - totalValor)})`}
+                    </span>
+                  )}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <Btn variant="ghost" onClick={() => setEditandoId(null)}>Cancelar</Btn>
-                    <Btn disabled={Math.abs(totalPct - 100) > 0.01 || updateCond.isLoading} onClick={() => updateCond.mutate({
+                    <Btn disabled={!somaFecha || updateCond.isLoading} onClick={() => updateCond.mutate({
                       propostaId,
                       condicaoId: c.id,
                       parcelas: formParcelas.map((p, idx) => ({
                         ...p,
                         numeroParcela: idx + 1,
-                        valor: parseFloat(((p.percentualDoTotal / 100) * Number(c.valorTotal)).toFixed(2)),
-                        percentualDoTotal: Number(p.percentualDoTotal) || 0,
+                        // No modo % o valor deriva do percentual; no modo R$ é o inverso
+                        valor: modoParcela === 'pct'
+                          ? parseFloat(((p.percentualDoTotal / 100) * Number(c.valorTotal)).toFixed(2))
+                          : Number(p.valor) || 0,
+                        percentualDoTotal: modoParcela === 'pct'
+                          ? Number(p.percentualDoTotal) || 0
+                          : (Number(c.valorTotal) > 0 ? parseFloat(((Number(p.valor) / Number(c.valorTotal)) * 100).toFixed(2)) : 0),
                         prazoDias: Number(p.prazoDias) || 0,
                       })),
                     })}>

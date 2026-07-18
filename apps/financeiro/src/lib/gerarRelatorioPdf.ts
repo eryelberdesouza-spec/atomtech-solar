@@ -18,9 +18,18 @@ const BASE_STYLE = `
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: Arial, Helvetica, sans-serif;
+    /* Mesma tipografia do PDF de proposta (AGO): família Light nativa com peso 300.
+       Pedir negrito/peso sintetizado em cima da face errada é o que "engorda" o
+       I maiúsculo e o l minúsculo na impressão — por isso os elementos em negrito
+       abaixo trocam para a família Calibri normal. */
+    font-family: 'Calibri Light', Calibri, Candara, 'Segoe UI', 'Trebuchet MS', sans-serif;
+    font-weight: 300;
     font-size: 11px; color: #1a1a2e; background: #fff;
     padding: 20px 24px;
+  }
+  h1, h2, h3, th, strong, b,
+  .titulo-relatorio, .kpi-value, .faixa-value, .badge, td.right {
+    font-family: Calibri, Candara, 'Segoe UI', sans-serif;
   }
   @media print {
     body { padding: 0; }
