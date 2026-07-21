@@ -31,6 +31,13 @@ function getUsuario() {
   } catch { return {} }
 }
 
+function limparSessao() {
+  localStorage.removeItem('atomfin_token')
+  localStorage.removeItem('atomfin_usuario')
+  localStorage.removeItem('atomtech_token')
+  localStorage.removeItem('atomtech_usuario')
+}
+
 function AcessoBloqueado() {
   const usuario = getUsuario()
   const roleLabel: Record<string, string> = {
@@ -72,19 +79,34 @@ function AcessoBloqueado() {
             {roleLabel[usuario?.role] ?? usuario?.role ?? 'desconhecido'}
           </strong>
         </div>
-        <a
-          href={PROPOSTAS_URL}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '10px 22px', borderRadius: 8,
-            background: 'linear-gradient(135deg, #10B981, #059669)',
-            color: '#022C22', fontWeight: 700, fontSize: 13,
-            textDecoration: 'none',
-            boxShadow: '0 4px 16px rgba(16,185,129,0.3)',
-          }}
-        >
-          ☀ Voltar para o AGO
-        </a>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'stretch' }}>
+          <a
+            href={PROPOSTAS_URL}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '10px 22px', borderRadius: 8,
+              background: 'linear-gradient(135deg, #10B981, #059669)',
+              color: '#022C22', fontWeight: 700, fontSize: 13,
+              textDecoration: 'none',
+              boxShadow: '0 4px 16px rgba(16,185,129,0.3)',
+            }}
+          >
+            ☀ Voltar para o AGO
+          </a>
+          <button
+            type="button"
+            onClick={() => { limparSessao(); window.location.href = '/login' }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '10px 22px', borderRadius: 8,
+              background: 'transparent', border: '1px solid #1E4033',
+              color: '#94A3B8', fontWeight: 600, fontSize: 13,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Sair e entrar com outra conta
+          </button>
+        </div>
       </div>
     </div>
   )
