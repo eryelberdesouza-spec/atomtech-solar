@@ -180,7 +180,9 @@ export function ModalEditarLancamento({
   onClose:   () => void
   onSuccess: () => void
 }) {
-  const { data: byId, isLoading } = (trpc as any).fin.titulo.byId.useQuery({ tituloId }, { staleTime: 0 })
+  // cacheTime: 0 — nunca reaproveita cache de outra sessão de edição deste mesmo
+  // título; sem isso o formulário podia ficar preso num snapshot antigo (ver abaixo).
+  const { data: byId, isLoading } = (trpc as any).fin.titulo.byId.useQuery({ tituloId }, { staleTime: 0, cacheTime: 0 })
   const { data: pessoas      = [] } = (trpc as any).fin.pessoa.list.useQuery()
   const { data: planosContas = [] } = (trpc as any).fin.planoContas.list.useQuery()
   const { data: centrosCusto = [] } = (trpc as any).fin.centroCusto.list.useQuery()
@@ -216,7 +218,9 @@ export function ModalEditarLancamento({
   }, [byId])
 
   const update = (trpc as any).fin.titulo.update.useMutation({
-    onSuccess: () => { onSuccess(); onClose() },
+    // Invalida o cache deste título — sem isso, reabrir a edição ou imprimir o
+    // comprovante logo em seguida podia mostrar os dados de ANTES de salvar.
+    onSuccess: () => { utils.fin.titulo.byId.invalidate({ tituloId }); onSuccess(); onClose() },
     onError:   (e: any) => setErro(e.message ?? 'Erro ao salvar'),
   })
 
@@ -586,7 +590,9 @@ function ModalComprovante({
   const [comAgendamento, setComAgendamento] = useState(!!(agSalvo && Object.values(agSalvo).some(v => v)))
   const [salvou, setSalvou] = useState(false)
 
-  const { data: byId,    isLoading: l1 } = (trpc as any).fin.titulo.byId.useQuery({ tituloId })
+  // staleTime: 0 — comprovante precisa sempre do valor mais recente; o cache
+  // padrão de 60s podia imprimir dados de antes de uma edição/pagamento recente.
+  const { data: byId,    isLoading: l1 } = (trpc as any).fin.titulo.byId.useQuery({ tituloId }, { staleTime: 0 })
   const { data: empresa, isLoading: l2 } = (trpc as any).fin.empresa.minha.useQuery()
 
   const isLoading = l1 || l2
@@ -1376,7 +1382,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
           tituloId={editandoTituloId}
           tipo={tipo}
           onClose={() => setEditandoTituloId(null)}
-          onSuccess={() => { setEditandoTituloId(null); refetch() }}
+          onSuccess={() => { setEditandoTituloId(null); refetch(); alert('✓ Alterações salvas com sucesso.') }}
         />
       )}
 
