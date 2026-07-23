@@ -1315,10 +1315,11 @@ const tituloRouter = router({
       tituloId:      z.number(),
       descricao:     z.string().min(1),
       documento:     z.string().nullish(),
-      pessoaId:      z.number().nullish(),
-      planoContasId: z.number().nullish(),
-      centroCustoId: z.number().nullish(),
-      categoriaCustoId: z.number().nullish(),
+      // undefined = não mexer (preserva valor atual); null = desvincular de propósito
+      pessoaId:      z.number().nullable().optional(),
+      planoContasId: z.number().nullable().optional(),
+      centroCustoId: z.number().nullable().optional(),
+      categoriaCustoId: z.number().nullable().optional(),
       observacoes:   z.string().nullish(),
       emissao:       z.string(),
       // parcelaId presente = atualiza existente; ausente = nova parcela
@@ -1361,15 +1362,17 @@ const tituloRouter = router({
       const novoTotal = somaExistentes + somaNovas
 
       // Atualiza cabeçalho do título
+      // pessoaId/planoContasId/centroCustoId/categoriaCustoId: só entram no SET se vierem
+      // explicitamente no payload (undefined = preserva vínculo atual, não apaga)
       await ctx.db
         .update(finTitulo)
         .set({
           descricao:     input.descricao,
           documento:     input.documento ?? null,
-          pessoaId:      input.pessoaId ?? null,
-          planoContasId: input.planoContasId ?? null,
-          centroCustoId: input.centroCustoId ?? null,
-          categoriaCustoId: input.categoriaCustoId ?? null,
+          ...(input.pessoaId !== undefined ? { pessoaId: input.pessoaId } : {}),
+          ...(input.planoContasId !== undefined ? { planoContasId: input.planoContasId } : {}),
+          ...(input.centroCustoId !== undefined ? { centroCustoId: input.centroCustoId } : {}),
+          ...(input.categoriaCustoId !== undefined ? { categoriaCustoId: input.categoriaCustoId } : {}),
           observacoes:   input.observacoes ?? null,
           emissao:       input.emissao as any,
           valorOriginal: novoTotal.toFixed(2),
@@ -3021,10 +3024,17 @@ const extratoRouter = router({
       const resultado: Record<string, any[]> = {}
 
       for (const item of input.itens) {
-        // Janela de ±3 dias ao redor da data da transação
+        // Janela ampla: a data do extrato é a data do PAGAMENTO real, que pode
+        // divergir bastante do vencimento cadastrado (pagamento antecipado, em
+        // atraso, ou parcela com vencimento em outro mês). Comparar só contra o
+        // vencimento com ±3 dias (janela antiga) deixava passar duplicatas reais
+        // — o sistema simplesmente não achava o lançamento manual correspondente
+        // e importava como novo. Agora casa por vencimento OU emissão, ±20 dias.
         const base  = new Date(item.data + 'T12:00:00Z')
-        const dFrom = new Date(base); dFrom.setDate(dFrom.getDate() - 3)
-        const dTo   = new Date(base); dTo.setDate(dTo.getDate() + 3)
+        const dFrom = new Date(base); dFrom.setDate(dFrom.getDate() - 20)
+        const dTo   = new Date(base); dTo.setDate(dTo.getDate() + 20)
+        const dFromStr = dFrom.toISOString().slice(0, 10)
+        const dToStr   = dTo.toISOString().slice(0, 10)
 
         const matches = await ctx.db
           .select({
@@ -3033,6 +3043,7 @@ const extratoRouter = router({
             descricao:  finTitulo.descricao,
             valor:      finParcela.valor,
             vencimento: finParcela.vencimento,
+            emissao:    finTitulo.emissao,
             status:     finParcela.status,
             tipo:       finTitulo.tipo,
           })
@@ -3043,11 +3054,16 @@ const extratoRouter = router({
               eq(finTitulo.empresaId, empId),
               isNull(finParcela.extratoFingerprint),           // apenas lançamentos manuais
               sql`ABS(CAST(${finParcela.valor} AS DECIMAL(10,2)) - ${item.valor}) < 0.02`,
-              gte(finParcela.vencimento, dFrom.toISOString().slice(0, 10) as any),
-              lte(finParcela.vencimento, dTo.toISOString().slice(0, 10) as any),
+              sql`(
+                (${finParcela.vencimento} BETWEEN ${dFromStr} AND ${dToStr})
+                OR (${finTitulo.emissao} BETWEEN ${dFromStr} AND ${dToStr})
+              )`,
             )
           )
-          .orderBy(sql`(${finTitulo.tipo} = ${item.tipo}) DESC`) // matches do mesmo tipo primeiro
+          .orderBy(sql`
+            (${finTitulo.tipo} = ${item.tipo}) DESC,
+            LEAST(ABS(DATEDIFF(${finParcela.vencimento}, ${item.data})), ABS(DATEDIFF(${finTitulo.emissao}, ${item.data})))
+          `) // mesmo tipo primeiro, depois o mais próximo da data do extrato
           .limit(5)
 
         if (matches.length > 0) resultado[item.fingerprint] = matches
