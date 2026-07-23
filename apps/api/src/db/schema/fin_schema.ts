@@ -188,6 +188,23 @@ export const finAuditoria = mysqlTable('fin_auditoria', {
   idxCreatedAt: index('idx_fin_audit_created').on(t.createdAt),
 }))
 
+// ─── DUPLICATAS IGNORADAS ─────────────────────────────────────────────────────
+// Marca um par de títulos como "revisado, não é duplicata" para não reaparecer
+// no relatório de auditoria (ex.: duas ARTs emitidas no mesmo dia para projetos
+// diferentes, com descrição genérica idêntica).
+export const finDuplicataIgnorada = mysqlTable('fin_duplicata_ignorada', {
+  id:          int('id').primaryKey().autoincrement(),
+  empresaId:   int('empresa_id').notNull(),
+  tituloIdA:   int('titulo_id_a').notNull(),  // sempre o menor dos dois ids
+  tituloIdB:   int('titulo_id_b').notNull(),  // sempre o maior dos dois ids
+  usuarioId:   int('usuario_id'),
+  usuarioNome: varchar('usuario_nome', { length: 150 }),
+  createdAt:   timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (t) => ({
+  idxPar:     index('idx_fin_dupign_par').on(t.tituloIdA, t.tituloIdB),
+  idxEmpresa: index('idx_fin_dupign_empresa').on(t.empresaId),
+}))
+
 // ─── PERÍODO FECHADO ──────────────────────────────────────────────────────────
 export const finPeriodoFechado = mysqlTable('fin_periodo_fechado', {
   id:          int('id').primaryKey().autoincrement(),

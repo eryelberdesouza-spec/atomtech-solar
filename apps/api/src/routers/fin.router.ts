@@ -20,6 +20,7 @@ import {
   finParcela,
   finTransferencia,
   finAuditoria,
+  finDuplicataIgnorada,
   finPeriodoFechado,
   empresa,
   usuario,
@@ -3286,6 +3287,60 @@ const auditoriaRouter = router({
         .where(and(...filtros))
 
       return { itens, total: Number(total), pagina: input.pagina, porPagina: input.porPagina }
+    }),
+
+  // Possíveis duplicatas: mesmo tipo + pessoa + valor + descrição (normalizada) +
+  // data de emissão, entre títulos ativos. Sinal forte de lançamento duplicado —
+  // usado como checagem de rotina (não substitui o alerta em tempo real do
+  // titulo.create, que cobre o momento da digitação).
+  duplicatas: protectedProcedure.query(async ({ ctx }) => {
+    const empId = ctx.usuario.empresaId
+
+    const rows = await ctx.db.execute(sql`
+      SELECT
+        a.id AS idA, b.id AS idB,
+        a.tipo AS tipo, a.descricao AS descricaoA, b.descricao AS descricaoB,
+        a.valor_original AS valor, a.emissao AS emissaoA, b.emissao AS emissaoB,
+        pa.nome AS pessoaNome,
+        ig.id AS ignoradoId
+      FROM fin_titulo a
+      JOIN fin_titulo b
+        ON b.empresa_id = a.empresa_id AND b.id > a.id
+        AND b.tipo = a.tipo
+        AND b.valor_original = a.valor_original
+        AND b.emissao = a.emissao
+        AND UPPER(TRIM(b.descricao)) = UPPER(TRIM(a.descricao))
+        AND (b.pessoa_id <=> a.pessoa_id)
+        AND b.ativo = 1
+      LEFT JOIN fin_pessoa pa ON pa.id = a.pessoa_id
+      LEFT JOIN fin_duplicata_ignorada ig
+        ON ig.empresa_id = a.empresa_id AND ig.titulo_id_a = a.id AND ig.titulo_id_b = b.id
+      WHERE a.empresa_id = ${empId} AND a.ativo = 1
+      ORDER BY a.emissao DESC
+    `) as any
+    const arr: any[] = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : (Array.isArray(rows) ? rows : [])
+
+    return arr.map(r => ({
+      idA: r.idA, idB: r.idB, tipo: r.tipo,
+      descricao: r.descricaoA, valor: r.valor,
+      data: String(r.emissaoA).slice(0, 10),
+      pessoaNome: r.pessoaNome ?? null,
+      ignorado: r.ignoradoId != null,
+    }))
+  }),
+
+  // Marca um par como revisado — não é duplicata. Não deleta nada, só some da lista.
+  ignorarDuplicata: protectedProcedure
+    .input(z.object({ tituloIdA: z.number().int().positive(), tituloIdB: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const a = Math.min(input.tituloIdA, input.tituloIdB)
+      const b = Math.max(input.tituloIdA, input.tituloIdB)
+      await ctx.db.insert(finDuplicataIgnorada).values({
+        empresaId: empId, tituloIdA: a, tituloIdB: b,
+        usuarioId: ctx.usuario.id, usuarioNome: ctx.usuario.nome ?? null,
+      })
+      return { ok: true }
     }),
 })
 

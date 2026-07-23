@@ -728,6 +728,35 @@ app.get('/run-migration-fin-alerta', async (_, res) => {
   }
 })
 
+// ── Migração: tabela de duplicatas ignoradas (auditoria semanal) ──────────────
+app.get('/run-migration-fin-duplicata-ignorada', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_duplicata_ignorada (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id    INT NOT NULL,
+        titulo_id_a   INT NOT NULL,
+        titulo_id_b   INT NOT NULL,
+        usuario_id    INT,
+        usuario_nome  VARCHAR(150),
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fin_dupign_par (titulo_id_a, titulo_id_b),
+        INDEX idx_fin_dupign_emp (empresa_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela fin_duplicata_ignorada criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 // ── Migração: liga fin_pessoa ao cadastro de cliente da Plataforma de Propostas ──
 // Cadastro único (Onda 2 / pedido do usuário 2026-07-02) — evita cadastrar o mesmo
 // cliente duas vezes. Faz backfill: liga fin_pessoa já existentes ao cliente
