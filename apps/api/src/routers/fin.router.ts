@@ -20,6 +20,7 @@ import {
   finParcela,
   finTransferencia,
   finAuditoria,
+  finDuplicataIgnorada,
   finPeriodoFechado,
   empresa,
   usuario,
@@ -1315,10 +1316,11 @@ const tituloRouter = router({
       tituloId:      z.number(),
       descricao:     z.string().min(1),
       documento:     z.string().nullish(),
-      pessoaId:      z.number().nullish(),
-      planoContasId: z.number().nullish(),
-      centroCustoId: z.number().nullish(),
-      categoriaCustoId: z.number().nullish(),
+      // undefined = não mexer (preserva valor atual); null = desvincular de propósito
+      pessoaId:      z.number().nullable().optional(),
+      planoContasId: z.number().nullable().optional(),
+      centroCustoId: z.number().nullable().optional(),
+      categoriaCustoId: z.number().nullable().optional(),
       observacoes:   z.string().nullish(),
       emissao:       z.string(),
       // parcelaId presente = atualiza existente; ausente = nova parcela
@@ -1361,15 +1363,17 @@ const tituloRouter = router({
       const novoTotal = somaExistentes + somaNovas
 
       // Atualiza cabeçalho do título
+      // pessoaId/planoContasId/centroCustoId/categoriaCustoId: só entram no SET se vierem
+      // explicitamente no payload (undefined = preserva vínculo atual, não apaga)
       await ctx.db
         .update(finTitulo)
         .set({
           descricao:     input.descricao,
           documento:     input.documento ?? null,
-          pessoaId:      input.pessoaId ?? null,
-          planoContasId: input.planoContasId ?? null,
-          centroCustoId: input.centroCustoId ?? null,
-          categoriaCustoId: input.categoriaCustoId ?? null,
+          ...(input.pessoaId !== undefined ? { pessoaId: input.pessoaId } : {}),
+          ...(input.planoContasId !== undefined ? { planoContasId: input.planoContasId } : {}),
+          ...(input.centroCustoId !== undefined ? { centroCustoId: input.centroCustoId } : {}),
+          ...(input.categoriaCustoId !== undefined ? { categoriaCustoId: input.categoriaCustoId } : {}),
           observacoes:   input.observacoes ?? null,
           emissao:       input.emissao as any,
           valorOriginal: novoTotal.toFixed(2),
@@ -3021,10 +3025,17 @@ const extratoRouter = router({
       const resultado: Record<string, any[]> = {}
 
       for (const item of input.itens) {
-        // Janela de ±3 dias ao redor da data da transação
+        // Janela ampla: a data do extrato é a data do PAGAMENTO real, que pode
+        // divergir bastante do vencimento cadastrado (pagamento antecipado, em
+        // atraso, ou parcela com vencimento em outro mês). Comparar só contra o
+        // vencimento com ±3 dias (janela antiga) deixava passar duplicatas reais
+        // — o sistema simplesmente não achava o lançamento manual correspondente
+        // e importava como novo. Agora casa por vencimento OU emissão, ±20 dias.
         const base  = new Date(item.data + 'T12:00:00Z')
-        const dFrom = new Date(base); dFrom.setDate(dFrom.getDate() - 3)
-        const dTo   = new Date(base); dTo.setDate(dTo.getDate() + 3)
+        const dFrom = new Date(base); dFrom.setDate(dFrom.getDate() - 20)
+        const dTo   = new Date(base); dTo.setDate(dTo.getDate() + 20)
+        const dFromStr = dFrom.toISOString().slice(0, 10)
+        const dToStr   = dTo.toISOString().slice(0, 10)
 
         const matches = await ctx.db
           .select({
@@ -3033,6 +3044,7 @@ const extratoRouter = router({
             descricao:  finTitulo.descricao,
             valor:      finParcela.valor,
             vencimento: finParcela.vencimento,
+            emissao:    finTitulo.emissao,
             status:     finParcela.status,
             tipo:       finTitulo.tipo,
           })
@@ -3043,11 +3055,16 @@ const extratoRouter = router({
               eq(finTitulo.empresaId, empId),
               isNull(finParcela.extratoFingerprint),           // apenas lançamentos manuais
               sql`ABS(CAST(${finParcela.valor} AS DECIMAL(10,2)) - ${item.valor}) < 0.02`,
-              gte(finParcela.vencimento, dFrom.toISOString().slice(0, 10) as any),
-              lte(finParcela.vencimento, dTo.toISOString().slice(0, 10) as any),
+              sql`(
+                (${finParcela.vencimento} BETWEEN ${dFromStr} AND ${dToStr})
+                OR (${finTitulo.emissao} BETWEEN ${dFromStr} AND ${dToStr})
+              )`,
             )
           )
-          .orderBy(sql`(${finTitulo.tipo} = ${item.tipo}) DESC`) // matches do mesmo tipo primeiro
+          .orderBy(sql`
+            (${finTitulo.tipo} = ${item.tipo}) DESC,
+            LEAST(ABS(DATEDIFF(${finParcela.vencimento}, ${item.data})), ABS(DATEDIFF(${finTitulo.emissao}, ${item.data})))
+          `) // mesmo tipo primeiro, depois o mais próximo da data do extrato
           .limit(5)
 
         if (matches.length > 0) resultado[item.fingerprint] = matches
@@ -3270,6 +3287,60 @@ const auditoriaRouter = router({
         .where(and(...filtros))
 
       return { itens, total: Number(total), pagina: input.pagina, porPagina: input.porPagina }
+    }),
+
+  // Possíveis duplicatas: mesmo tipo + pessoa + valor + descrição (normalizada) +
+  // data de emissão, entre títulos ativos. Sinal forte de lançamento duplicado —
+  // usado como checagem de rotina (não substitui o alerta em tempo real do
+  // titulo.create, que cobre o momento da digitação).
+  duplicatas: protectedProcedure.query(async ({ ctx }) => {
+    const empId = ctx.usuario.empresaId
+
+    const rows = await ctx.db.execute(sql`
+      SELECT
+        a.id AS idA, b.id AS idB,
+        a.tipo AS tipo, a.descricao AS descricaoA, b.descricao AS descricaoB,
+        a.valor_original AS valor, a.emissao AS emissaoA, b.emissao AS emissaoB,
+        pa.nome AS pessoaNome,
+        ig.id AS ignoradoId
+      FROM fin_titulo a
+      JOIN fin_titulo b
+        ON b.empresa_id = a.empresa_id AND b.id > a.id
+        AND b.tipo = a.tipo
+        AND b.valor_original = a.valor_original
+        AND b.emissao = a.emissao
+        AND UPPER(TRIM(b.descricao)) = UPPER(TRIM(a.descricao))
+        AND (b.pessoa_id <=> a.pessoa_id)
+        AND b.ativo = 1
+      LEFT JOIN fin_pessoa pa ON pa.id = a.pessoa_id
+      LEFT JOIN fin_duplicata_ignorada ig
+        ON ig.empresa_id = a.empresa_id AND ig.titulo_id_a = a.id AND ig.titulo_id_b = b.id
+      WHERE a.empresa_id = ${empId} AND a.ativo = 1
+      ORDER BY a.emissao DESC
+    `) as any
+    const arr: any[] = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : (Array.isArray(rows) ? rows : [])
+
+    return arr.map(r => ({
+      idA: r.idA, idB: r.idB, tipo: r.tipo,
+      descricao: r.descricaoA, valor: r.valor,
+      data: String(r.emissaoA).slice(0, 10),
+      pessoaNome: r.pessoaNome ?? null,
+      ignorado: r.ignoradoId != null,
+    }))
+  }),
+
+  // Marca um par como revisado — não é duplicata. Não deleta nada, só some da lista.
+  ignorarDuplicata: protectedProcedure
+    .input(z.object({ tituloIdA: z.number().int().positive(), tituloIdB: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+      const a = Math.min(input.tituloIdA, input.tituloIdB)
+      const b = Math.max(input.tituloIdA, input.tituloIdB)
+      await ctx.db.insert(finDuplicataIgnorada).values({
+        empresaId: empId, tituloIdA: a, tituloIdB: b,
+        usuarioId: ctx.usuario.id, usuarioNome: ctx.usuario.nome ?? null,
+      })
+      return { ok: true }
     }),
 })
 

@@ -32,7 +32,93 @@ function fmtDataHora(iso: string) {
   return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function fmtBRL(v: any) {
+  return Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function fmtDataBR(iso: string) {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+// ─── Duplicidades — checagem de rotina (auditoria semanal) ────────────────────
+function DuplicatasSection() {
+  const utils = (trpc as any).useUtils()
+  const { data = [], isLoading } = (trpc as any).fin.auditoria.duplicatas.useQuery(undefined, { staleTime: 0 })
+  const ignorarMut = (trpc as any).fin.auditoria.ignorarDuplicata.useMutation({
+    onSuccess: () => utils.fin.auditoria.duplicatas.invalidate(),
+  })
+  const [mostrarIgnoradas, setMostrarIgnoradas] = useState(false)
+
+  const pares = (data as any[]).filter(p => mostrarIgnoradas || !p.ignorado)
+  const pendentes = (data as any[]).filter(p => !p.ignorado).length
+
+  return (
+    <>
+      <Alert type={pendentes > 0 ? 'warning' : 'info'}>
+        {pendentes > 0
+          ? `⚠ ${pendentes} par(es) com mesma pessoa, valor, descrição e data — confira se não é lançamento duplicado.`
+          : 'Nenhuma possível duplicata encontrada no momento. ✓'}
+        {' '}Sugestão: revise esta lista uma vez por semana.
+      </Alert>
+
+      {(data as any[]).some(p => p.ignorado) && (
+        <div style={{ marginTop: 10 }}>
+          <Btn size="sm" variant="ghost" onClick={() => setMostrarIgnoradas(v => !v)}>
+            {mostrarIgnoradas ? '− Ocultar já revisadas' : `+ Mostrar já revisadas (${(data as any[]).filter(p => p.ignorado).length})`}
+          </Btn>
+        </div>
+      )}
+
+      <Card style={{ marginTop: 16, padding: 0, overflow: 'hidden' }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner /></div>
+        ) : pares.length === 0 ? (
+          <EmptyState icon="✓" title="Nada para revisar" />
+        ) : (
+          <div>
+            {pares.map(p => (
+              <div key={`${p.idA}-${p.idB}`} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '14px 18px', borderBottom: `1px solid ${C.border}`,
+                opacity: p.ignorado ? 0.5 : 1,
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                      background: p.tipo === 'RECEBER' ? C.credit + '18' : C.debit + '18',
+                      color: p.tipo === 'RECEBER' ? C.credit : C.debit,
+                    }}>
+                      {p.tipo === 'RECEBER' ? '↓ Receber' : '↑ Pagar'}
+                    </span>
+                    <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{p.descricao}</span>
+                    {p.ignorado && <span style={{ fontSize: 10, color: C.textMuted }}>· revisado, não é duplicata</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textMuted }}>
+                    Títulos <strong>#{p.idA}</strong> e <strong>#{p.idB}</strong> · {p.pessoaNome ?? 'sem pessoa vinculada'} · {fmtDataBR(p.data)}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <span style={{ fontSize: 15, fontWeight: 800, color: C.text }}>{fmtBRL(p.valor)}</span>
+                  {!p.ignorado && (
+                    <Btn size="sm" variant="ghost" disabled={ignorarMut.isLoading}
+                      onClick={() => ignorarMut.mutate({ tituloIdA: p.idA, tituloIdB: p.idB })}>
+                      Não é duplicata
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </>
+  )
+}
+
 export function AuditoriaPage() {
+  const [aba, setAba] = useState<'trilha' | 'duplicatas'>('duplicatas')
   const [entidade, setEntidade] = useState('')
   const [acao, setAcao] = useState('')
   const [dataIni, setDataIni] = useState('')
@@ -65,6 +151,21 @@ export function AuditoriaPage() {
     <PageWrapper>
       <SectionHeader title="Auditoria" />
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {([['duplicatas', '👯 Duplicidades'], ['trilha', '🕵️ Trilha de Alterações']] as const).map(([v, l]) => (
+          <button key={v} onClick={() => setAba(v)} style={{
+            padding: '7px 16px', borderRadius: 20, cursor: 'pointer',
+            fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+            border: `1px solid ${aba === v ? C.emerald : C.border}`,
+            background: aba === v ? C.emerald + '18' : 'transparent',
+            color: aba === v ? C.emerald : C.textMuted, transition: 'all 0.12s',
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {aba === 'duplicatas' && <DuplicatasSection />}
+
+      {aba === 'trilha' && <>
       <Alert type="info">
         Registro de quem excluiu, deu baixa ou estornou lançamentos financeiros — quem, quando e o que mudou.
       </Alert>
@@ -126,6 +227,7 @@ export function AuditoriaPage() {
           </>
         )}
       </Card>
+      </>}
 
       <Modal
         open={!!detalhe}
