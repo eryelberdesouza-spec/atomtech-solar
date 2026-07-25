@@ -570,11 +570,16 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
     window.onload = function() {
       // Espera a fonte Jost carregar de verdade antes de imprimir. Sem isso o
       // Chrome imprime com glifos de pesos misturados (l/I saíam em negrito).
+      // Todos os pesos usados no documento (ver jostFontEmbed.ts — cada um é
+      // uma instância @font-face estática, não uma faixa de peso variável).
       var esperarFontes = Promise.all([
         document.fonts.load('300 13px Jost'),
         document.fonts.load('400 13px Jost'),
+        document.fonts.load('500 13px Jost'),
         document.fonts.load('600 13px Jost'),
         document.fonts.load('700 13px Jost'),
+        document.fonts.load('800 13px Jost'),
+        document.fonts.load('900 13px Jost'),
       ]).then(function() { return document.fonts.ready })
       var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
       Promise.race([esperarFontes, timeoutFontes]).then(function() {
