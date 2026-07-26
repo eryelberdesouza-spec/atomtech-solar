@@ -287,7 +287,11 @@ function sec(titulo: string, conteudo: string): string {
 
 // ─── GERADOR PRINCIPAL ───────────────────────────────────────────────────────
 
-export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null): void {
+// Monta o HTML completo da proposta de serviço.
+// `autoPrint: false` é usado na geração server-side (Chrome headless), onde o
+// PDF sai do page.pdf() e não do diálogo de impressão.
+export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}): string {
+  const autoPrint = opts.autoPrint !== false
   const { proposta, itensServico, condicoesComerciais, blocos, empresa, textos, cliente } = data
 
   const cor1 = empresa?.corPrimaria ?? '#F5A623'
@@ -568,10 +572,7 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
   </table>` : ''}
   <script>
     window.onload = function() {
-      // Espera a fonte Jost carregar de verdade antes de imprimir. Sem isso o
-      // Chrome imprime com glifos de pesos misturados (l/I saíam em negrito).
-      // Todos os pesos usados no documento (ver jostFontEmbed.ts — cada um é
-      // uma instância @font-face estática, não uma faixa de peso variável).
+      // Espera a fonte Jost carregar de verdade antes de imprimir/renderizar.
       var esperarFontes = Promise.all([
         document.fonts.load('300 13px Jost'),
         document.fonts.load('400 13px Jost'),
@@ -606,7 +607,9 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
             }
           }
         } catch(e) {}
-        window.print();
+        // Sinaliza ao Chrome headless que o layout terminou (geração no servidor)
+        window.__PDF_READY__ = true;
+        ${autoPrint ? 'window.print();' : ''}
       }, 300);
       });
     };
@@ -614,6 +617,11 @@ export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null):
 </body>
 </html>`
 
+  return fullHtml
+}
+
+export function abrirPdfServicoNoNavegador(data: any, winParam?: Window | null): void {
+  const fullHtml = gerarHtmlServico(data, { autoPrint: true })
   const win = winParam ?? window.open('', '_blank')
   if (!win) { alert('Permita popups para este site e tente novamente.'); return }
   win.document.write(fullHtml)

@@ -8,6 +8,7 @@ import { appRouter } from './routers'
 import { createContext, testConnection } from './routers/trpc'
 import { parseInter, parseSicoob } from './lib/extratoParser'
 import { parseOFX } from './lib/ofxParser'
+import { renderPdf, acharChromium } from './lib/pdfRenderer'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -48,6 +49,55 @@ app.use('/trpc', createExpressMiddleware({
 }))
 
 app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
+// ── Geração de PDF vetorial (Chrome headless) ────────────────────────────────
+// O cliente monta o HTML da proposta e envia aqui; devolvemos o PDF pronto.
+// Assim o arquivo nunca depende do destino escolhido no diálogo de impressão
+// (o "Microsoft Print to PDF" rasterizava tudo em JPEG e degradava o texto).
+app.get('/pdf/health', (_, res) => {
+  const caminho = acharChromium()
+  res.json({ chromium: caminho ?? null, ok: Boolean(caminho) })
+})
+
+app.post('/pdf/render', async (req, res) => {
+  // Mesma checagem de token usada no createContext do tRPC
+  const authHeader = req.headers.authorization
+  let autenticado = false
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(authHeader.slice(7).split('.')[1], 'base64').toString('utf-8'),
+      )
+      autenticado = Boolean(payload.userId && payload.empresaId)
+    } catch { /* token inválido */ }
+  }
+  if (!autenticado) return res.status(401).json({ error: 'Não autenticado' })
+
+  const { html, filename } = req.body ?? {}
+  if (typeof html !== 'string' || !html.includes('<html')) {
+    return res.status(400).json({ error: 'Campo "html" ausente ou inválido' })
+  }
+
+  // Só a origem do próprio front e a da API podem ser buscadas pelo Chrome
+  // (imagem de capa e logo). Qualquer outra URL no HTML é bloqueada.
+  const origensPermitidas = [
+    ...ALLOWED_ORIGINS,
+    ...(req.headers.origin ? [req.headers.origin] : []),
+    `${req.protocol}://${req.get('host')}`,
+  ]
+
+  try {
+    const pdf = await renderPdf(html, { origensPermitidas })
+    const nome = String(filename ?? 'proposta.pdf').replace(/[^\w.\-]/g, '_')
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Length', String(pdf.length))
+    res.setHeader('Content-Disposition', `attachment; filename="${nome}"`)
+    res.send(pdf)
+  } catch (e: any) {
+    console.error('Erro ao gerar PDF:', e)
+    res.status(500).json({ error: e?.message ?? 'Falha ao gerar PDF' })
+  }
+})
 
 
 
