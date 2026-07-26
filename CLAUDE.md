@@ -9,6 +9,7 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 | apps/api | Backend tRPC + Drizzle ORM + MySQL | Railway — auto-deploy no push (https://atomtech-solar-production.up.railway.app) |
 | apps/web | **AGO — Atom Gestão Operacional** (propostas, clientes, OS; ex-"SIGECO Propostas") | Vercel — https://atomtech-solar-web.vercel.app |
 | apps/financeiro | **AGF — Atom Gestão Financeira** (ex-"SIGECO Gestão") | Vercel — https://financeiro-two-mu.vercel.app |
+| apps/eletropostos | **API — Atom Projetos e Implantação** (implantação de eletropostos: padrões de entrada p/ estações de recarga VE, DIS-NOR-030 R07 Neoenergia BSB; ex-"AGE") | Vercel — https://api-atomtech.vercel.app (projeto Vercel `api-atomtech`) · Backend Supabase próprio (ref `slabpszvuabkwzmqrmkp`, sa-east-1), independente do apps/api. Deploy via CLI: `cd apps\eletropostos && npx vercel --prod --yes` |
 | n8n/ | Bot WhatsApp (docs/prompt; o workflow vive no n8n do Railway) | — |
 
 > Rebranding 2026-07-10: SIGECO → AGO/AGF. Os nomes de pastas, URLs e tabelas NÃO mudaram — só a marca visível (janelas, PWA, PDFs, telas).
@@ -22,6 +23,24 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 - Rules of Hooks: NUNCA chamar hook React depois de early return.
 - Verificar online (browser) antes de reportar como pronto.
 - Drizzle/React Query/tRPC: seguir os padrões já existentes nos routers.
+- **Ao verificar uma saída (PDF, export, arquivo), reproduzir o pipeline DO USUÁRIO** — não um equivalente conveniente. Ver a lição abaixo, que custou 3 rodadas de correção errada.
+
+## PDFs de proposta (AGO) — geração no servidor desde 2026-07-26
+
+**Como funciona hoje**: o AGO monta o HTML da proposta no cliente e envia para `POST /pdf/render` na API; o Chrome headless (puppeteer-core) renderiza e devolve o PDF **vetorial** pronto, que o navegador só baixa (`PROP-<numero>.pdf`). Não passa mais pelo diálogo de impressão. Se a API falhar, o front cai sozinho no fluxo antigo de `window.print()`.
+
+- `GET /pdf/health` → mostra o Chromium detectado no container (diagnóstico rápido).
+- Chromium instalado no **`apps/api/Dockerfile` E no `apps/api/nixpacks.toml`** (não ficou claro qual builder o Railway usa; em produção resolveu para `/usr/bin/chromium-browser`).
+- `apps/web/src/lib/gerarPdfBrowser.ts` (solar) e `gerarPdfServicoBrowser.ts` (serviço) exportam o builder de HTML com opção `{ autoPrint: false }` e sinalizam `window.__PDF_READY__` quando o cálculo de rodapé termina — é o que o servidor espera antes de chamar `page.pdf()`.
+- `page.pdf()` precisa de `preferCSSPageSize: true` para respeitar o `@page { size: A4; margin: 0 }`.
+- **Ressalva de segurança**: o endpoint exige Bearer token, mas usa a mesma validação do resto da API — que só decodifica o payload do JWT **sem verificar assinatura** (o código marca como stub de dev). Como agora existe um endpoint que renderiza HTML no servidor, vale endurecer isso. Mitigação atual: toda requisição de rede do Chrome é bloqueada fora das origens do próprio AGO/API.
+
+**LIÇÃO (2026-07-26) — antes de investigar QUALQUER queixa de formatação de PDF, checar o `Producer` do arquivo:**
+- `Producer: "Skia/PDF ..."` + operadores `showText` = PDF vetorial do Chrome, saudável.
+- `Producer: "Microsoft: Print To PDF"` + `paintImageXObject` = **rasterizado**. O driver do Windows converte a página em tiles JPEG (um por glifo), sem fontes embutidas. As hastes finas de `l`/`I` viram pixels sólidos e parecem negrito. **Nenhuma mudança de CSS/`@font-face` afeta isso** — a fonte nunca chega ao arquivo. Foram 3 rodadas "corrigindo" fonte à toa porque eu validava com Chrome headless enquanto o usuário salvava pelo driver do Windows.
+- Diagnóstico: `pdfjs-dist` → `getDocument().getMetadata()` (Producer) + `getOperatorList()` (imagem vs texto).
+
+**Armadilhas de paginação do Chrome** (custaram várias iterações em 2026-07-18): cabeçalho/rodapé que repetem por página exigem `<table>` com `thead`/`tfoot` e a tabela **não pode ter height fixo** (mata a fragmentação); `break-after: page` é **ignorado em `<table>`** — tem que ficar num `<div>` wrapper.
 
 ## Bot WhatsApp (Fases 1 e 2 COMPLETAS — em produção desde 06-07/07/2026)
 
