@@ -1323,6 +1323,29 @@ app.post('/os/:osId/anexo', uploadAnexo.single('arquivo'), async (req, res) => {
     } catch { /* token inválido */ }
     if (!empresaId) { res.status(401).json({ ok: false, error: 'Token inválido' }); return }
 
+    // Fotos de campo chegam em resolução original do celular (facilmente 3-5MB cada)
+    // e o volume de disco do MySQL é fixo — sem compressão, poucas dezenas de fotos
+    // enchem o banco e travam gravações em TODAS as tabelas (não só anexos). Redimensiona
+    // para no máximo 1600px no lado maior e recomprime em JPEG — resolução suficiente para
+    // conferência/zoom, ~85% menor que o arquivo original. PDF passa direto (não é imagem).
+    let dados = req.file.buffer
+    let tipoMime = req.file.mimetype
+    let nomeFinal = req.file.originalname
+    if (tipoMime.startsWith('image/') && tipoMime !== 'image/gif') {
+      try {
+        const sharp = (await import('sharp')).default
+        dados = await sharp(req.file.buffer)
+          .rotate() // aplica orientação EXIF antes de descartar os metadados
+          .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 78, mozjpeg: true })
+          .toBuffer()
+        tipoMime = 'image/jpeg'
+        nomeFinal = nomeFinal.replace(/\.[^.]+$/, '') + '.jpg'
+      } catch (compressErr) {
+        console.error('Falha ao comprimir imagem, salvando original:', compressErr)
+      }
+    }
+
     const mysql2 = await import('mysql2/promise')
     const conn   = await mysql2.createConnection(process.env.DATABASE_URL!)
 
@@ -1340,13 +1363,13 @@ app.post('/os/:osId/anexo', uploadAnexo.single('arquivo'), async (req, res) => {
     await conn.execute(
       `INSERT INTO os_anexo (ordem_servico_id, empresa_id, nome, tipo_mime, tamanho, dados)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [osId, empresaId, req.file.originalname, req.file.mimetype, req.file.size, req.file.buffer],
+      [osId, empresaId, nomeFinal, tipoMime, dados.length, dados],
     )
     const [idRow]: any = await conn.execute('SELECT LAST_INSERT_ID() AS id')
     const id = (idRow as any[])[0]?.id
     await conn.end()
 
-    res.json({ ok: true, id, nome: req.file.originalname, tipoMime: req.file.mimetype, tamanho: req.file.size })
+    res.json({ ok: true, id, nome: nomeFinal, tipoMime, tamanho: dados.length })
   } catch (e: any) {
     console.error('Erro upload anexo OS:', e)
     res.status(500).json({ ok: false, error: e.message })
