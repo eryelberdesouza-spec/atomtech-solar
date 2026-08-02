@@ -10,6 +10,7 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 | apps/web | **AGO — Atom Gestão Operacional** (propostas, clientes, OS; ex-"SIGECO Propostas") | Vercel — https://atomtech-solar-web.vercel.app |
 | apps/financeiro | **AGF — Atom Gestão Financeira** (ex-"SIGECO Gestão") | Vercel — https://financeiro-two-mu.vercel.app |
 | apps/eletropostos | **API — Atom Projetos e Implantação** (implantação de eletropostos: padrões de entrada p/ estações de recarga VE, DIS-NOR-030 R07 Neoenergia BSB; ex-"AGE") | Vercel — https://api-atomtech.vercel.app (projeto Vercel `api-atomtech`) · Backend Supabase próprio (ref `slabpszvuabkwzmqrmkp`, sa-east-1), independente do apps/api. Deploy via CLI: `cd apps\eletropostos && npx vercel --prod --yes` |
+| apps/relatorio-energia | Serviço interno (FastAPI/Python) que gera o relatório mensal de gestão de energia solar em `.pptx` — extração de fatura + GDASH (visão IA) + textos analíticos (IA). Usado só via tela "Relatório Energia" do AGO (`apps/web`), nunca exposto direto ao usuário. | Railway, mesmo projeto do apps/api (`satisfied-love`) — https://relatorio-energia-production.up.railway.app. Deploy via CLI (sem GitHub auto-deploy): `cd apps\relatorio-energia && railway up . --path-as-root --service relatorio-energia --detach` a partir da raiz do monorepo, ou `railway up apps\relatorio-energia --path-as-root --service relatorio-energia --detach` |
 | n8n/ | Bot WhatsApp (docs/prompt; o workflow vive no n8n do Railway) | — |
 
 > Rebranding 2026-07-10: SIGECO → AGO/AGF. Os nomes de pastas, URLs e tabelas NÃO mudaram — só a marca visível (janelas, PWA, PDFs, telas).
@@ -24,6 +25,35 @@ Monorepo da Atom Tech (engenharia: energia solar, mobilidade elétrica, infraest
 - Verificar online (browser) antes de reportar como pronto.
 - Drizzle/React Query/tRPC: seguir os padrões já existentes nos routers.
 - **Ao verificar uma saída (PDF, export, arquivo), reproduzir o pipeline DO USUÁRIO** — não um equivalente conveniente. Ver a lição abaixo, que custou 3 rodadas de correção errada.
+
+## Relatório de Energia (AGO) — serviço Python interno desde 2026-08-02
+
+Gera o relatório mensal de gestão de energia solar (`.pptx`) a partir da fatura de energia
+(Neoenergia) + export do GDASH. Migrado nesta data do repositório separado
+`atomtech-relatorio-energia` (agora histórico/arquivado) para dentro do monorepo, já
+validado com dados reais da Margran antes da migração.
+
+**Fluxo**: AGO (`apps/web/src/pages/relatorios/RelatorioEnergiaPage.tsx`) → proxy
+autenticado em `apps/api` (`POST /relatorio-energia/gerar`, `GET /relatorio-energia/clientes`,
+mesmo padrão de autenticação manual do `/pdf/render`) → serviço Python
+`apps/relatorio-energia` (FastAPI), protegido por header `X-Internal-Secret` (env var
+`INTERNAL_SHARED_SECRET`, igual nos dois serviços Railway). O serviço Python nunca é
+chamado direto do browser.
+
+- `extract_conta.py`: regex sobre o texto da fatura (`pdftotext -layout`). Testado só com
+  Neoenergia; outra distribuidora exige ajustar o parser.
+- `extract_gdash.py`: visão computacional (Claude) sobre o PDF do GDASH (é imagem, sem texto).
+- `generate_narrative.py`: textos analíticos por IA — os campos têm limite de caracteres
+  explícito no prompt porque preenchem caixas de tamanho fixo no template `.pptx` (achado
+  real: sem limite, o texto vaza da caixa no PowerPoint; ver histórico do repo).
+- **Fatura sempre atrasa um ciclo em relação ao GDASH mais recente** (GDASH fecha o mês
+  corrente rápido; a fatura do mesmo mês sai ~2-4 semanas depois). Ao gerar relatório de um
+  mês fechado, use o export do GDASH mais novo disponível (traz os 3 meses anteriores no
+  histórico) em vez de esperar um export exatamente daquele mês.
+- Cadastro de clientes em `apps/relatorio-energia/clientes.json` (arquivo simples, não é
+  tabela do banco — só a Margran cadastrada até 2026-08-02).
+- Variáveis de ambiente do serviço Python: `ANTHROPIC_API_KEY`, `INTERNAL_SHARED_SECRET`.
+  Variáveis do `apps/api`: `RELATORIO_ENERGIA_URL`, `INTERNAL_SHARED_SECRET` (mesmo valor).
 
 ## PDFs de proposta (AGO) — geração no servidor desde 2026-07-26
 
