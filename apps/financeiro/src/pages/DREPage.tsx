@@ -255,10 +255,15 @@ export function DREPage() {
     { value: 'T2',    label: '2º Trimestre' },
     { value: 'T3',    label: '3º Trimestre' },
     { value: 'T4',    label: '4º Trimestre' },
-    ...Array.from({ length: 12 }, (_, i) => ({
-      value: String(i + 1).padStart(2, '0'),
-      label: Object.values(MESES_LABEL)[i],
-    })),
+    // Acesso direto pela chave (não Object.values/entries): chaves com zero à
+    // esquerda ('01'..'09') não são "índice de array" para o JS, mas '10'..'12'
+    // são — o motor reordena essas 3 para o início da enumeração, embaralhando
+    // o rótulo com o mês errado (Jan/26 exibia dados de Abril). Achado em
+    // 2026-08-01 ao investigar "relatório mês a mês não faz sentido".
+    ...Array.from({ length: 12 }, (_, i) => {
+      const mm = String(i + 1).padStart(2, '0')
+      return { value: mm, label: MESES_LABEL[mm] }
+    }),
   ]
 
   const receitas   = data?.receitas   ?? { total: 0, contas: [] }
