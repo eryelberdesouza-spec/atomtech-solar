@@ -101,64 +101,94 @@ app.post('/pdf/render', async (req, res) => {
 
 // ── Relatório de Energia — proxy para o serviço Python (apps/relatorio-energia) ──
 // apps/api nunca fala com a Anthropic nem manipula o .pptx: só autentica o usuário
-// do AGO e repassa para o serviço interno, que exige o header X-Internal-Secret.
-function autenticarBearer(req: express.Request): boolean {
+// do AGO, busca o cadastro do cliente no banco, repassa pro serviço interno
+// (X-Internal-Secret) e arquiva o resultado em relatorio_energia_gerado.
+function payloadBearer(req: express.Request): { userId?: number; empresaId?: number } | null {
   const authHeader = req.headers.authorization
-  if (!authHeader?.startsWith('Bearer ')) return false
+  if (!authHeader?.startsWith('Bearer ')) return null
   try {
     const payload = JSON.parse(
       Buffer.from(authHeader.slice(7).split('.')[1], 'base64').toString('utf-8'),
     )
-    return Boolean(payload.userId && payload.empresaId)
+    return payload?.empresaId ? payload : null
   } catch {
-    return false
+    return null
   }
 }
 
-app.get('/relatorio-energia/clientes', async (req, res) => {
-  if (!autenticarBearer(req)) return res.status(401).json({ error: 'Não autenticado' })
+const MESES_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
-  const baseUrl = process.env.RELATORIO_ENERGIA_URL
-  const segredo = process.env.INTERNAL_SHARED_SECRET
-  if (!baseUrl || !segredo) {
-    return res.status(500).json({ error: 'Serviço de relatório de energia não configurado' })
-  }
-
-  try {
-    const resp = await fetch(`${baseUrl}/clientes`, {
-      headers: { 'X-Internal-Secret': segredo },
-    })
-    if (!resp.ok) return res.status(resp.status).json({ error: 'Falha ao listar clientes' })
-    res.json(await resp.json())
-  } catch (e: any) {
-    console.error('Erro ao listar clientes de relatório de energia:', e)
-    res.status(500).json({ error: e?.message ?? 'Falha ao listar clientes' })
-  }
-})
+// "Julho/2026" -> "2026-07-01" (referencia_mes é sempre o primeiro dia do mês)
+function mesAnoParaData(mesAno: string): string | null {
+  const [mesNome, ano] = mesAno.split('/')
+  const idx = MESES_PT.findIndex(m => m.toLowerCase() === mesNome?.trim().toLowerCase())
+  if (idx === -1 || !ano) return null
+  return `${ano}-${String(idx + 1).padStart(2, '0')}-01`
+}
 
 app.post(
   '/relatorio-energia/gerar',
   upload.fields([{ name: 'fatura', maxCount: 1 }, { name: 'gdash', maxCount: 1 }]),
   async (req, res) => {
-    if (!autenticarBearer(req)) return res.status(401).json({ error: 'Não autenticado' })
+    const payload = payloadBearer(req)
+    if (!payload?.empresaId) return res.status(401).json({ error: 'Não autenticado' })
+    const { empresaId, userId } = payload
 
     const baseUrl = process.env.RELATORIO_ENERGIA_URL
     const segredo = process.env.INTERNAL_SHARED_SECRET
-    if (!baseUrl || !segredo) {
+    const responsavelTecnico = process.env.RELATORIO_ENERGIA_RESPONSAVEL_TECNICO
+    const localEmissao = process.env.RELATORIO_ENERGIA_LOCAL_EMISSAO
+    if (!baseUrl || !segredo || !responsavelTecnico || !localEmissao) {
       return res.status(500).json({ error: 'Serviço de relatório de energia não configurado' })
     }
 
     const arquivos = req.files as { [campo: string]: Express.Multer.File[] } | undefined
-    const cliente = (req.body as any)?.cliente
+    const clienteId = parseInt((req.body as any)?.clienteId)
     const fatura = arquivos?.fatura?.[0]
     const gdash = arquivos?.gdash?.[0]
-    if (!cliente || !fatura || !gdash) {
-      return res.status(400).json({ error: 'Envie "cliente", "fatura" e "gdash"' })
+    if (!clienteId || !fatura || !gdash) {
+      return res.status(400).json({ error: 'Envie "clienteId", "fatura" e "gdash"' })
     }
 
     try {
+      const mysql2 = await import('mysql2/promise')
+      const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+      const [clienteRows]: any = await conn.execute(
+        `SELECT nome, distribuidora FROM cliente WHERE id = ? AND empresa_id = ? LIMIT 1`,
+        [clienteId, empresaId],
+      )
+      const clienteRow = (clienteRows as any[])[0]
+      if (!clienteRow) {
+        await conn.end()
+        return res.status(404).json({ error: 'Cliente não encontrado' })
+      }
+
+      const [configRows]: any = await conn.execute(
+        `SELECT potencia_kwp, nome_l1, nome_l2, nome_l3, nome_l4
+         FROM cliente_energia_solar WHERE cliente_id = ? AND empresa_id = ? LIMIT 1`,
+        [clienteId, empresaId],
+      )
+      const config = (configRows as any[])[0]
+      if (!config) {
+        await conn.end()
+        return res.status(400).json({ error: 'Configure os dados técnicos deste cliente antes de gerar o relatório' })
+      }
+
+      const clienteDados = {
+        CLIENTE_NOME: clienteRow.nome,
+        CLIENTE_NOME_L1: config.nome_l1 || clienteRow.nome,
+        CLIENTE_NOME_L2: config.nome_l2 || '',
+        CLIENTE_NOME_L3: config.nome_l3 || '',
+        CLIENTE_NOME_L4: config.nome_l4 || '',
+        POTENCIA_KWP: config.potencia_kwp,
+        DISTRIBUIDORA: clienteRow.distribuidora || '',
+        RESPONSAVEL_TECNICO: responsavelTecnico,
+        LOCAL_EMISSAO: localEmissao,
+      }
+
       const form = new FormData()
-      form.append('cliente', cliente)
+      form.append('cliente_dados', JSON.stringify(clienteDados))
       form.append('fatura', new Blob([new Uint8Array(fatura.buffer)]), fatura.originalname)
       form.append('gdash', new Blob([new Uint8Array(gdash.buffer)]), gdash.originalname)
 
@@ -169,6 +199,7 @@ app.post(
       })
 
       if (!resp.ok) {
+        await conn.end()
         let detalhe = `HTTP ${resp.status}`
         try { detalhe = (await resp.json())?.detail ?? detalhe } catch { /* corpo não-JSON */ }
         return res.status(resp.status).json({ error: detalhe })
@@ -177,6 +208,24 @@ app.post(
       const pptx = Buffer.from(await resp.arrayBuffer())
       const contentDisposition = resp.headers.get('content-disposition')
       const nome = contentDisposition?.match(/filename="(.+)"/)?.[1] ?? 'relatorio.pptx'
+      const mesAno = resp.headers.get('x-relatorio-mes-ano')
+      const referenciaMes = mesAno ? mesAnoParaData(mesAno) : null
+
+      if (referenciaMes) {
+        await conn.execute(
+          `INSERT INTO relatorio_energia_gerado
+             (cliente_id, empresa_id, referencia_mes, arquivo_nome, arquivo_tamanho, arquivo_dados, gerado_por)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             arquivo_nome = VALUES(arquivo_nome), arquivo_tamanho = VALUES(arquivo_tamanho),
+             arquivo_dados = VALUES(arquivo_dados), gerado_por = VALUES(gerado_por), created_at = CURRENT_TIMESTAMP`,
+          [clienteId, empresaId, referenciaMes, nome, pptx.length, pptx, userId ?? null],
+        )
+      } else {
+        console.error('Relatório de energia gerado sem X-Relatorio-Mes-Ano — não arquivado no histórico')
+      }
+      await conn.end()
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
       res.setHeader('Content-Length', String(pptx.length))
       res.setHeader('Content-Disposition', `attachment; filename="${nome}"`)
@@ -187,6 +236,40 @@ app.post(
     }
   },
 )
+
+// ── Baixar um relatório de energia já gerado (histórico) ─────────────────────
+app.get('/relatorio-energia/historico/:id/download', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const rawToken = (req.headers.authorization ?? '').replace('Bearer ', '').trim()
+                  || (req.query.token as string ?? '')
+
+    let empresaId: number | undefined
+    try {
+      const payload = JSON.parse(Buffer.from(rawToken.split('.')[1], 'base64').toString('utf-8'))
+      empresaId = payload.empresaId
+    } catch { /* token inválido */ }
+    if (!empresaId) { res.status(401).send('Não autorizado'); return }
+
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [rows]: any = await conn.execute(
+      `SELECT arquivo_nome, arquivo_dados FROM relatorio_energia_gerado
+       WHERE id = ? AND empresa_id = ? LIMIT 1`,
+      [id, empresaId],
+    )
+    await conn.end()
+
+    const arquivo = (rows as any[])[0]
+    if (!arquivo) { res.status(404).send('Relatório não encontrado'); return }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(arquivo.arquivo_nome)}"`)
+    res.send(arquivo.arquivo_dados)
+  } catch (e: any) {
+    res.status(500).send('Erro: ' + e.message)
+  }
+})
 
 app.get('/run-migration-modelo-bloco', async (_, res) => {
   try {
@@ -1336,6 +1419,54 @@ app.get('/run-migration-os-anexo', async (_, res) => {
   } catch (e: any) {
     if (e.code === 'ER_TABLE_EXISTS_ERROR') {
       res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
+// ── Migração: cliente_energia_solar (config técnica) + relatorio_energia_gerado
+//    (histórico mensal, com o .pptx em MEDIUMBLOB — fora do schema Drizzle, mesmo
+//    padrão de os_anexo) ─────────────────────────────────────────────────────
+app.get('/run-migration-relatorio-energia-config', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS cliente_energia_solar (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        cliente_id    INT NOT NULL UNIQUE,
+        empresa_id    INT NOT NULL,
+        potencia_kwp  VARCHAR(20) NOT NULL,
+        nome_l1       VARCHAR(100),
+        nome_l2       VARCHAR(100),
+        nome_l3       VARCHAR(100),
+        nome_l4       VARCHAR(100),
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMP NULL,
+        INDEX idx_ces_empresa (empresa_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS relatorio_energia_gerado (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        cliente_id       INT NOT NULL,
+        empresa_id       INT NOT NULL,
+        referencia_mes   DATE NOT NULL,
+        arquivo_nome     VARCHAR(255) NOT NULL,
+        arquivo_tamanho  INT NOT NULL,
+        arquivo_dados    MEDIUMBLOB NOT NULL,
+        gerado_por       INT,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_cliente_mes (cliente_id, referencia_mes),
+        INDEX idx_reg_empresa (empresa_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabelas cliente_energia_solar e relatorio_energia_gerado criadas com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabelas já existiam' })
     } else {
       res.status(500).json({ ok: false, error: e.message })
     }

@@ -7,9 +7,11 @@ Sai:    .pptx pronto para virar PDF e enviar ao cliente
 
 Requer: ANTHROPIC_API_KEY no ambiente (extração do GDASH e textos analíticos usam IA).
 
-Uso:
+Uso (o cadastro de cliente vem do banco do AGO em produção; para rodar via CLI local,
+passe um JSON com os campos CLIENTE_NOME, CLIENTE_NOME_L1, POTENCIA_KWP, DISTRIBUIDORA,
+RESPONSAVEL_TECNICO, LOCAL_EMISSAO):
     python3 src/gerar_relatorio.py \
-        --cliente margran \
+        --cliente-dados caminho/cliente.json \
         --conta caminho/conta.pdf \
         --gdash caminho/gdash.pdf \
         --saida relatorios_gerados/margran_mai2026.pptx
@@ -52,17 +54,6 @@ def pdf_para_texto(caminho_pdf: str) -> str:
         capture_output=True, text=True, check=True,
     )
     return saida.stdout
-
-
-def carregar_cliente(cliente_id: str) -> dict:
-    with open(ROOT / "clientes.json", encoding="utf-8") as f:
-        clientes = json.load(f)
-    if cliente_id not in clientes:
-        raise SystemExit(
-            f"Cliente '{cliente_id}' não encontrado em clientes.json. "
-            f"Cadastrados: {list(clientes)}"
-        )
-    return clientes[cliente_id]
 
 
 def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
@@ -114,7 +105,7 @@ def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--cliente", required=True, help="id do cliente em clientes.json (ex.: margran)")
+    ap.add_argument("--cliente-dados", required=True, help="JSON com os dados do cliente")
     ap.add_argument("--conta", required=True, help="PDF da conta de energia")
     ap.add_argument("--gdash", required=True, help="PDF exportado do GDASH")
     ap.add_argument("--data-emissao", default=None, help="dd/mm/aaaa (default: hoje)")
@@ -125,7 +116,8 @@ def main():
     data_emissao = args.data_emissao or date.today().strftime("%d/%m/%Y")
 
     print("[1/5] Carregando cadastro do cliente...")
-    cliente = carregar_cliente(args.cliente)
+    with open(args.cliente_dados, encoding="utf-8") as f:
+        cliente = json.load(f)
 
     print("[2/5] Extraindo dados da conta de energia...")
     texto_conta = pdf_para_texto(args.conta)

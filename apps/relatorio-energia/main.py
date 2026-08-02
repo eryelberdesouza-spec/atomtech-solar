@@ -24,7 +24,7 @@ from extract_conta import extrair_conta_neoenergia  # noqa: E402
 from extract_gdash import extrair_gdash  # noqa: E402
 from generate_narrative import gerar_narrativa  # noqa: E402
 from fill_template import fill, TEMPLATE_PATH  # noqa: E402
-from gerar_relatorio import carregar_cliente, montar_dados, pdf_para_texto  # noqa: E402
+from gerar_relatorio import montar_dados, pdf_para_texto  # noqa: E402
 
 INTERNAL_SHARED_SECRET = os.environ.get("INTERNAL_SHARED_SECRET")
 
@@ -43,17 +43,9 @@ def health():
     return {"ok": True}
 
 
-@app.get("/clientes")
-def listar_clientes(x_internal_secret: str | None = Header(default=None)):
-    checar_segredo(x_internal_secret)
-    with open(ROOT / "clientes.json", encoding="utf-8") as f:
-        clientes = json.load(f)
-    return [{"id": cid, "nome": c["CLIENTE_NOME"]} for cid, c in clientes.items()]
-
-
 @app.post("/gerar")
 async def gerar(
-    cliente: str = Form(...),
+    cliente_dados: str = Form(...),
     fatura: UploadFile = File(...),
     gdash: UploadFile = File(...),
     x_internal_secret: str | None = Header(default=None),
@@ -61,9 +53,17 @@ async def gerar(
     checar_segredo(x_internal_secret)
 
     try:
-        cliente_dados = carregar_cliente(cliente)
-    except SystemExit as e:
-        raise HTTPException(400, str(e))
+        cliente_dados = json.loads(cliente_dados)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, f"cliente_dados inválido: {e}")
+
+    campos_obrigatorios = [
+        "CLIENTE_NOME", "CLIENTE_NOME_L1", "POTENCIA_KWP",
+        "DISTRIBUIDORA", "RESPONSAVEL_TECNICO", "LOCAL_EMISSAO",
+    ]
+    faltando = [c for c in campos_obrigatorios if not cliente_dados.get(c)]
+    if faltando:
+        raise HTTPException(400, f"cliente_dados sem os campos: {', '.join(faltando)}")
 
     with tempfile.TemporaryDirectory() as tmp:
         caminho_fatura = Path(tmp) / "fatura.pdf"
@@ -105,9 +105,13 @@ async def gerar(
         except Exception as e:
             raise HTTPException(500, f"Falha ao gerar relatório: {e}")
 
-    nome_arquivo = f"{cliente}_{dados['MES_ANO'].replace('/', '-')}.pptx".replace(" ", "_")
+    nome_cliente = cliente_dados["CLIENTE_NOME"].replace(" ", "_")
+    nome_arquivo = f"{nome_cliente}_{dados['MES_ANO'].replace('/', '-')}.pptx"
     return Response(
         content=conteudo,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{nome_arquivo}"',
+            "X-Relatorio-Mes-Ano": dados["MES_ANO"],
+        },
     )
