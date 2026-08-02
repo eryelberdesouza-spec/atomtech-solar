@@ -99,7 +99,94 @@ app.post('/pdf/render', async (req, res) => {
   }
 })
 
+// ── Relatório de Energia — proxy para o serviço Python (apps/relatorio-energia) ──
+// apps/api nunca fala com a Anthropic nem manipula o .pptx: só autentica o usuário
+// do AGO e repassa para o serviço interno, que exige o header X-Internal-Secret.
+function autenticarBearer(req: express.Request): boolean {
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) return false
+  try {
+    const payload = JSON.parse(
+      Buffer.from(authHeader.slice(7).split('.')[1], 'base64').toString('utf-8'),
+    )
+    return Boolean(payload.userId && payload.empresaId)
+  } catch {
+    return false
+  }
+}
 
+app.get('/relatorio-energia/clientes', async (req, res) => {
+  if (!autenticarBearer(req)) return res.status(401).json({ error: 'Não autenticado' })
+
+  const baseUrl = process.env.RELATORIO_ENERGIA_URL
+  const segredo = process.env.INTERNAL_SHARED_SECRET
+  if (!baseUrl || !segredo) {
+    return res.status(500).json({ error: 'Serviço de relatório de energia não configurado' })
+  }
+
+  try {
+    const resp = await fetch(`${baseUrl}/clientes`, {
+      headers: { 'X-Internal-Secret': segredo },
+    })
+    if (!resp.ok) return res.status(resp.status).json({ error: 'Falha ao listar clientes' })
+    res.json(await resp.json())
+  } catch (e: any) {
+    console.error('Erro ao listar clientes de relatório de energia:', e)
+    res.status(500).json({ error: e?.message ?? 'Falha ao listar clientes' })
+  }
+})
+
+app.post(
+  '/relatorio-energia/gerar',
+  upload.fields([{ name: 'fatura', maxCount: 1 }, { name: 'gdash', maxCount: 1 }]),
+  async (req, res) => {
+    if (!autenticarBearer(req)) return res.status(401).json({ error: 'Não autenticado' })
+
+    const baseUrl = process.env.RELATORIO_ENERGIA_URL
+    const segredo = process.env.INTERNAL_SHARED_SECRET
+    if (!baseUrl || !segredo) {
+      return res.status(500).json({ error: 'Serviço de relatório de energia não configurado' })
+    }
+
+    const arquivos = req.files as { [campo: string]: Express.Multer.File[] } | undefined
+    const cliente = (req.body as any)?.cliente
+    const fatura = arquivos?.fatura?.[0]
+    const gdash = arquivos?.gdash?.[0]
+    if (!cliente || !fatura || !gdash) {
+      return res.status(400).json({ error: 'Envie "cliente", "fatura" e "gdash"' })
+    }
+
+    try {
+      const form = new FormData()
+      form.append('cliente', cliente)
+      form.append('fatura', new Blob([new Uint8Array(fatura.buffer)]), fatura.originalname)
+      form.append('gdash', new Blob([new Uint8Array(gdash.buffer)]), gdash.originalname)
+
+      const resp = await fetch(`${baseUrl}/gerar`, {
+        method: 'POST',
+        headers: { 'X-Internal-Secret': segredo },
+        body: form,
+      })
+
+      if (!resp.ok) {
+        let detalhe = `HTTP ${resp.status}`
+        try { detalhe = (await resp.json())?.detail ?? detalhe } catch { /* corpo não-JSON */ }
+        return res.status(resp.status).json({ error: detalhe })
+      }
+
+      const pptx = Buffer.from(await resp.arrayBuffer())
+      const contentDisposition = resp.headers.get('content-disposition')
+      const nome = contentDisposition?.match(/filename="(.+)"/)?.[1] ?? 'relatorio.pptx'
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+      res.setHeader('Content-Length', String(pptx.length))
+      res.setHeader('Content-Disposition', `attachment; filename="${nome}"`)
+      res.send(pptx)
+    } catch (e: any) {
+      console.error('Erro ao gerar relatório de energia:', e)
+      res.status(500).json({ error: e?.message ?? 'Falha ao gerar relatório' })
+    }
+  },
+)
 
 app.get('/run-migration-modelo-bloco', async (_, res) => {
   try {
