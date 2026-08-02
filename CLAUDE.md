@@ -34,11 +34,11 @@ Gera o relatório mensal de gestão de energia solar (`.pptx`) a partir da fatur
 validado com dados reais da Margran antes da migração.
 
 **Fluxo**: AGO (`apps/web/src/pages/relatorios/RelatorioEnergiaPage.tsx`) → proxy
-autenticado em `apps/api` (`POST /relatorio-energia/gerar`, `GET /relatorio-energia/clientes`,
-mesmo padrão de autenticação manual do `/pdf/render`) → serviço Python
-`apps/relatorio-energia` (FastAPI), protegido por header `X-Internal-Secret` (env var
-`INTERNAL_SHARED_SECRET`, igual nos dois serviços Railway). O serviço Python nunca é
-chamado direto do browser.
+autenticado em `apps/api` (`POST /relatorio-energia/gerar`, mesmo padrão de autenticação
+manual do `/pdf/render`) → serviço Python `apps/relatorio-energia` (FastAPI), protegido por
+header `X-Internal-Secret` (env var `INTERNAL_SHARED_SECRET`, igual nos dois serviços
+Railway). O serviço Python nunca é chamado direto do browser e não guarda nada — é
+stateless, só gera o `.pptx` e devolve.
 
 - `extract_conta.py`: regex sobre o texto da fatura (`pdftotext -layout`). Testado só com
   Neoenergia; outra distribuidora exige ajustar o parser.
@@ -50,10 +50,23 @@ chamado direto do browser.
   corrente rápido; a fatura do mesmo mês sai ~2-4 semanas depois). Ao gerar relatório de um
   mês fechado, use o export do GDASH mais novo disponível (traz os 3 meses anteriores no
   histórico) em vez de esperar um export exatamente daquele mês.
-- Cadastro de clientes em `apps/relatorio-energia/clientes.json` (arquivo simples, não é
-  tabela do banco — só a Margran cadastrada até 2026-08-02).
 - Variáveis de ambiente do serviço Python: `ANTHROPIC_API_KEY`, `INTERNAL_SHARED_SECRET`.
-  Variáveis do `apps/api`: `RELATORIO_ENERGIA_URL`, `INTERNAL_SHARED_SECRET` (mesmo valor).
+  Variáveis do `apps/api`: `RELATORIO_ENERGIA_URL`, `INTERNAL_SHARED_SECRET` (mesmo valor),
+  `RELATORIO_ENERGIA_RESPONSAVEL_TECNICO`, `RELATORIO_ENERGIA_LOCAL_EMISSAO`.
+
+**Cadastro do cliente e histórico (desde 2026-08-02)**: não existe mais `clientes.json`.
+O seletor de cliente na tela usa o cadastro real do AGO (`trpc.cliente.list`); dados
+técnicos específicos do relatório (potência kWp, quebra do nome na capa) ficam na tabela
+`cliente_energia_solar` (1:1 com `cliente`, via router `relatorioEnergia.config`) — se um
+cliente ainda não tem essa config, a tela mostra um formulário inline antes de liberar a
+geração. Responsável técnico e local de emissão **não** ficam por cliente — são as env vars
+acima, porque na prática são sempre os mesmos.
+
+Cada `.pptx` gerado fica salvo em `relatorio_energia_gerado` (BLOB no MySQL, mesmo padrão de
+`os_anexo`) com `UNIQUE(cliente_id, referencia_mes)` — **regenerar o mesmo cliente/mês
+substitui** a linha anterior, não duplica. A tela mostra os últimos 12 meses por cliente,
+com link de download direto (`GET /relatorio-energia/historico/:id/download`) pros meses já
+gerados, sem precisar rodar o pipeline de novo.
 
 ## PDFs de proposta (AGO) — geração no servidor desde 2026-07-26
 
