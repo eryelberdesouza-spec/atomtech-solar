@@ -17,6 +17,11 @@ const MESES_LABEL: Record<string, string> = {
 
 function anoAtual() { return new Date().getFullYear() }
 
+// Último dia real do mês (28/29/30/31) — mês 1-indexado (1=janeiro)
+function ultimoDiaDoMes(ano: number, mes: number): number {
+  return new Date(ano, mes, 0).getDate()
+}
+
 function periodoParaDatas(ano: number, periodo: string): { de: string; ate: string } {
   if (periodo === 'anual') {
     return { de: `${ano}-01-01`, ate: `${ano}-12-31` }
@@ -27,13 +32,17 @@ function periodoParaDatas(ano: number, periodo: string): { de: string; ate: stri
     const mFim = t * 3
     return {
       de:  `${ano}-${String(mIni).padStart(2, '0')}-01`,
-      ate: `${ano}-${String(mFim).padStart(2, '0')}-31`,
+      ate: `${ano}-${String(mFim).padStart(2, '0')}-${String(ultimoDiaDoMes(ano, mFim)).padStart(2, '0')}`,
     }
   }
-  // mês MM
+  // mês MM — "31" fixo aqui gerava data inválida (ex.: 2026-02-31) e o MySQL
+  // devolvia ZERO linhas no BETWEEN para qualquer mês com menos de 31 dias
+  // (achado em 2026-08-01: relatório "vazio" em fev/abr/jun/set/nov e nos
+  // trimestres que terminam nesses meses)
+  const mes = Number(periodo)
   return {
     de:  `${ano}-${periodo}-01`,
-    ate: `${ano}-${periodo}-31`,
+    ate: `${ano}-${periodo}-${String(ultimoDiaDoMes(ano, mes)).padStart(2, '0')}`,
   }
 }
 
