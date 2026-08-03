@@ -8,6 +8,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 const STATUS_COLOR: Record<string, string> = {
   aberta:      '#58A6FF',
   em_execucao: '#F5A623',
+  pendencia:   '#D97706',
   concluida:   '#3EBB7A',
   cancelada:   '#F85149',
 }
@@ -15,6 +16,7 @@ const STATUS_COLOR: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   aberta:      'Aberta',
   em_execucao: 'Em Execução',
+  pendencia:   'Pendência',
   concluida:   'Concluída',
   cancelada:   'Cancelada',
 }

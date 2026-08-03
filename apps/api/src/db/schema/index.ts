@@ -553,7 +553,7 @@ export const ordemServico = mysqlTable('ordem_servico', {
   // recalcula automaticamente a próxima data do plano
   manutencaoPlanoId:   int('manutencao_plano_id'),
   numero:              varchar('numero', { length: 20 }).notNull().unique(),
-  status:              mysqlEnum('status', ['aberta', 'em_execucao', 'concluida', 'cancelada']).default('aberta').notNull(),
+  status:              mysqlEnum('status', ['aberta', 'em_execucao', 'pendencia', 'concluida', 'cancelada']).default('aberta').notNull(),
   titulo:              varchar('titulo', { length: 200 }),
   descricao:           text('descricao'),
   tecnicoResponsavel:  varchar('tecnico_responsavel', { length: 100 }),

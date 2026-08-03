@@ -419,7 +419,7 @@ export const osRouter = router({
   updateStatus: protectedProcedure
     .input(z.object({
       id:     z.number().int().positive(),
-      status: z.enum(['aberta','em_execucao','concluida','cancelada']),
+      status: z.enum(['aberta','em_execucao','pendencia','concluida','cancelada']),
     }))
     .mutation(async ({ ctx, input }) => {
       if (input.status === 'cancelada' && ctx.usuario.role !== 'admin') {

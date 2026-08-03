@@ -11,6 +11,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 const STATUS_OS = [
   { id: 'aberta',       label: 'Aberta',       color: '#58A6FF', icon: '📋' },
   { id: 'em_execucao',  label: 'Em Execução',  color: '#F5A623', icon: '🔧' },
+  { id: 'pendencia',    label: 'Pendência',    color: '#D97706', icon: '⚠️' },
   { id: 'concluida',    label: 'Concluída',    color: '#3EBB7A', icon: '✅' },
   { id: 'cancelada',    label: 'Cancelada',    color: '#F85149', icon: '✕' },
 ]
@@ -862,7 +863,7 @@ export function OrdensServicoPage() {
       </div>
 
       {/* ── Resumo KPIs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 10, marginBottom: isMobile ? 14 : 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: isMobile ? 8 : 10, marginBottom: isMobile ? 14 : 20 }}>
         {resumo.map(s => (
           <div key={s.id} style={{ background: '#111D2E', border: `1px solid ${s.color}30`, borderRadius: 10, padding: isMobile ? '8px 12px' : '10px 14px', borderTop: `2px solid ${s.color}` }}>
             <div style={{ fontSize: isMobile ? 10 : 11, color: '#7488A8', fontWeight: 700, marginBottom: 2 }}>{s.icon} {s.label}</div>
@@ -874,7 +875,7 @@ export function OrdensServicoPage() {
       {/* ── KANBAN ── */}
       {view === 'kanban' && !isMobile && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, flex: 1, overflowY: 'auto', alignItems: 'flex-start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, flex: 1, overflowY: 'auto', alignItems: 'flex-start' }}>
             {colunas.map(col => (
               <div key={col.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: col.color + '12', border: `1px solid ${col.color}30` }}>

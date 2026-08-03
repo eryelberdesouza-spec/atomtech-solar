@@ -542,6 +542,23 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
 })
 
 // ── Migração: Módulo Operacional (Ordens de Serviço) ─────────────────────────
+// ── Migração: adiciona status 'pendencia' ao ENUM de ordem_servico ────────────
+app.get('/run-migration-os-pendencia', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      ALTER TABLE ordem_servico
+      MODIFY COLUMN status ENUM('aberta','em_execucao','pendencia','concluida','cancelada')
+        NOT NULL DEFAULT 'aberta'
+    `)
+    await conn.end()
+    res.json({ ok: true, message: "Status 'pendencia' adicionado ao ENUM de ordem_servico" })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/run-migration-os', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
