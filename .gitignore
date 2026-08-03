@@ -5,5 +5,8 @@ dist
 uploads/ 
 apps/api/cd 
 apps/api/n 
-apps/api/npx 
+apps/api/npx
 .vercel
+__pycache__/
+*.pyc
+.venv/

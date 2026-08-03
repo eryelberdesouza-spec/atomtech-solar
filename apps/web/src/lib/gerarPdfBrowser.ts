@@ -281,7 +281,10 @@ function paginaTexto(titulo: string, chave: string, textos: any, numero: string,
       ${renderTexto(conteudo)}`, numero, logoUrl, emp)
 }
 
-export function gerarHTML(data: any): string {
+// `autoPrint: false` é usado na geração server-side (Chrome headless), onde o
+// PDF sai do page.pdf() e não do diálogo de impressão.
+export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string {
+  const autoPrint = opts.autoPrint !== false
   const { proposta: prop, empresa: emp, cliente: cli, fatura: fat,
     dimensionamento: dim, equipamentos: equips, precificacao: prec,
     analiseFinanceira: af, condicoesComerciais: condicoes, blocos, textos } = data
@@ -608,7 +611,9 @@ export function gerarHTML(data: any): string {
             }
           });
         } catch (e) {}
-        setTimeout(function() { window.print(); }, 100);
+        // Sinaliza ao Chrome headless que o layout terminou (geração no servidor)
+        window.__PDF_READY__ = true;
+        ${autoPrint ? 'setTimeout(function() { window.print(); }, 100);' : ''}
       }, 700);
     };
   </script>

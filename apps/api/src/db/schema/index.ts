@@ -479,11 +479,54 @@ export const clienteRelations = relations(cliente, ({ one, many }) => ({
   empresa: one(empresa, { fields: [cliente.empresaId], references: [empresa.id] }),
   faturas: many(fatura),
   propostas: many(proposta),
+  energiaSolar: one(clienteEnergiaSolar, { fields: [cliente.id], references: [clienteEnergiaSolar.clienteId] }),
+  relatoriosEnergia: many(relatorioEnergiaGerado),
 }))
 
 export const faturaRelations = relations(fatura, ({ one, many }) => ({
   cliente: one(cliente, { fields: [fatura.clienteId], references: [cliente.id] }),
   historicoConsumo: many(historicoConsumo),
+}))
+
+// ─── CLIENTE ENERGIA SOLAR (config técnica p/ o relatório mensal de energia) ──
+
+export const clienteEnergiaSolar = mysqlTable('cliente_energia_solar', {
+  id: int('id').primaryKey().autoincrement(),
+  clienteId: int('cliente_id').notNull().unique().references(() => cliente.id),
+  empresaId: int('empresa_id').notNull().references(() => empresa.id),
+  potenciaKwp: varchar('potencia_kwp', { length: 20 }).notNull(), // ex.: "32,49 kWp"
+  nomeL1: varchar('nome_l1', { length: 100 }), // quebra do nome na capa do .pptx
+  nomeL2: varchar('nome_l2', { length: 100 }),
+  nomeL3: varchar('nome_l3', { length: 100 }),
+  nomeL4: varchar('nome_l4', { length: 100 }),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at'),
+})
+
+export const clienteEnergiaSolarRelations = relations(clienteEnergiaSolar, ({ one }) => ({
+  cliente: one(cliente, { fields: [clienteEnergiaSolar.clienteId], references: [cliente.id] }),
+}))
+
+// ─── RELATÓRIO DE ENERGIA GERADO (histórico mensal) ───────────────────────────
+// O binário do .pptx (coluna `arquivo_dados`, MEDIUMBLOB) fica fora do schema
+// Drizzle de propósito — mesmo padrão de os_anexo: lido/gravado via mysql2 cru
+// nas rotas de apps/api/src/index.ts, nunca via query builder.
+
+export const relatorioEnergiaGerado = mysqlTable('relatorio_energia_gerado', {
+  id: int('id').primaryKey().autoincrement(),
+  clienteId: int('cliente_id').notNull().references(() => cliente.id),
+  empresaId: int('empresa_id').notNull().references(() => empresa.id),
+  referenciaMes: date('referencia_mes').notNull(), // primeiro dia do mês, ex. 2026-06-01
+  arquivoNome: varchar('arquivo_nome', { length: 255 }).notNull(),
+  arquivoTamanho: int('arquivo_tamanho').notNull(),
+  geradoPor: int('gerado_por').references(() => usuario.id),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+}, (t) => ({
+  uqClienteMes: uniqueIndex('uq_cliente_mes').on(t.clienteId, t.referenciaMes),
+}))
+
+export const relatorioEnergiaGeradoRelations = relations(relatorioEnergiaGerado, ({ one }) => ({
+  cliente: one(cliente, { fields: [relatorioEnergiaGerado.clienteId], references: [cliente.id] }),
 }))
 
 export const itemServicoProposta = mysqlTable('item_servico_proposta', {

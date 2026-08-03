@@ -10,8 +10,9 @@ import {
   Btn, Badge, Card, Tabs, Spinner, Toggle,
   EmptyState, PageWrapper, C, Input,
 } from '../../components/ui'
-import { abrirPdfNoNavegador } from '../../lib/gerarPdfBrowser'
-import { abrirPdfServicoNoNavegador } from '../../lib/gerarPdfServicoBrowser'
+import { abrirPdfNoNavegador, gerarHTML } from '../../lib/gerarPdfBrowser'
+import { abrirPdfServicoNoNavegador, gerarHtmlServico } from '../../lib/gerarPdfServicoBrowser'
+import { baixarPdfDoServidor } from '../../lib/baixarPdfServidor'
 import { abrirContratoNoNavegador } from '../../lib/gerarContratoBrowser'
 import { abrirContratoServicoNoNavegador } from '../../lib/gerarContratoServicoBrowser'
 
@@ -1528,29 +1529,45 @@ export function PropostaDetailPage() {
     setShowCapaModal(true)
   }
 
-  const handleGerarPdfComCapa = (capaImg: string) => {
+  const handleGerarPdfComCapa = async (capaImg: string) => {
     setShowCapaModal(false)
-    // Abre a janela SINCRONAMENTE dentro do gesto de clique. Se for adiada para
-    // dentro do setTimeout, o navegador bloqueia o popup (sem ícone de desbloqueio).
-    const win = window.open('', '_blank')
-    if (!win) { alert('Popups bloqueados. Permita popups para este site e gere o PDF novamente.'); return }
     setGerandoPdf(true)
-    setTimeout(() => {
-      try {
-        const textos: Record<string, any> = {}
-        if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
-        const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData, capaImg }
-        if ((data as any).proposta?.tipoProposta === 'servico_geral') {
-          abrirPdfServicoNoNavegador(dadosPdf, win)
-        } else {
-          abrirPdfNoNavegador(dadosPdf, win)
+
+    const textos: Record<string, any> = {}
+    if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
+    const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData, capaImg }
+    const ehServico = (data as any).proposta?.tipoProposta === 'servico_geral'
+    const numero = (data as any).proposta?.numero ?? 'proposta'
+
+    try {
+      // Caminho principal: a API renderiza com Chrome headless e devolve o PDF
+      // vetorial pronto. Não passa pelo diálogo de impressão, então não há como
+      // o arquivo sair rasterizado (era o que o "Microsoft Print to PDF" fazia).
+      const html = ehServico
+        ? gerarHtmlServico(dadosPdf, { autoPrint: false })
+        : gerarHTML(dadosPdf, { autoPrint: false })
+      await baixarPdfDoServidor(html, `PROP-${numero}.pdf`)
+    } catch (e: any) {
+      // Fallback: se a API estiver fora do ar, volta ao fluxo de impressão.
+      console.error('Geração no servidor falhou, caindo para a impressão:', e)
+      const win = window.open('', '_blank')
+      if (!win) {
+        alert(
+          'Não foi possível gerar o PDF no servidor (' + (e?.message ?? e) + ') ' +
+          'e o popup da impressão foi bloqueado. Permita popups e tente novamente.',
+        )
+      } else {
+        try {
+          if (ehServico) abrirPdfServicoNoNavegador(dadosPdf, win)
+          else abrirPdfNoNavegador(dadosPdf, win)
+        } catch (e2: any) {
+          try { win.close() } catch {}
+          alert('Erro ao gerar PDF: ' + (e2?.message ?? String(e2)))
         }
-      } catch (e: any) {
-        try { win.close() } catch {}
-        alert('Erro ao gerar PDF: ' + (e?.message ?? String(e)))
-        console.error(e)
-      } finally { setGerandoPdf(false) }
-    }, 100)
+      }
+    } finally {
+      setGerandoPdf(false)
+    }
   }
 
   const handleGerarContrato = () => {

@@ -119,6 +119,14 @@ const IcoOperacional = () => (
   </svg>
 )
 
+// Relatório de Energia — sol
+const IcoRelatorioEnergia = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="4"/>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+  </svg>
+)
+
 // Configurações — engrenagem
 const IcoConfiguracoes = () => (
   <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -134,6 +142,7 @@ const NAV: NavItem[] = [
   { path: '/clientes',       label: 'Clientes',      Icon: IcoClientes,      color: '#3EBB7A', desc: 'Base de clientes'  },
   { path: '/faturas',        label: 'Faturas',       Icon: IcoFaturas,       color: '#BC8CFF', desc: 'Contas de energia' },
   { path: '/ordens-servico', label: 'Operacional',   Icon: IcoOperacional,   color: '#FB923C', desc: 'Ordens de serviço' },
+  { path: '/relatorios-energia', label: 'Relatório Energia', Icon: IcoRelatorioEnergia, color: '#F5A623', desc: 'Gestão de energia solar' },
   { path: '/configuracoes',  label: 'Configurações', Icon: IcoConfiguracoes, color: '#8B949E', desc: 'Sistema'           },
 ]
 

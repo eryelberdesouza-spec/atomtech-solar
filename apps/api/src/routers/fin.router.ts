@@ -2243,12 +2243,23 @@ const dreRouter = router({
       // ── Agregação por conta do plano de contas ─────────────────────────────
       // Regime caixa: usa dataPagamento + status=PAGA
       // Regime competência: usa vencimento + status PAGA ou ABERTA
+      //
+      // IMPORTANTE — lançado em 2026-08-01 após achado de auditoria: uma conta do
+      // plano de contas pode ter parcelas tanto PAGAR quanto RECEBER (ex.: uma
+      // despesa com estorno/devolução vira um título RECEBER na mesma conta; contas
+      // FINANCEIRO como "Investimentos" têm aplicação=PAGAR e resgate=RECEBER). Somar
+      // tudo com o mesmo sinal, como o código fazia antes, inflava artificialmente o
+      // resultado — um estorno de despesa contava como MAIS despesa em vez de menos,
+      // e um lançamento PAGAR dentro de FINANCEIRO (ex.: tarifa bancária, pagamento
+      // de empréstimo) somava como se fosse entrada de caixa. Por isso agora
+      // separamos RECEBER e PAGAR por conta e líquidamos em código (ver abaixo).
       const rows = await ctx.db.execute(sql`
         SELECT
           pc.tipo          AS tipo,
           pc.id            AS conta_id,
           pc.codigo        AS conta_codigo,
           pc.nome          AS conta_nome,
+          t.tipo           AS titulo_tipo,
           SUM(
             CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
               THEN COALESCE(p.valor_pago, p.valor)
@@ -2271,14 +2282,17 @@ const dreRouter = router({
                 AND p.vencimento BETWEEN ${input.de} AND ${input.ate}
             END
           )
-        GROUP BY pc.tipo, pc.id, pc.codigo, pc.nome
+        GROUP BY pc.tipo, pc.id, pc.codigo, pc.nome, t.tipo
         ORDER BY pc.tipo, pc.codigo
       `) as any[]
 
-      // ── Evolução mensal (mesmo período, agrupado por mês) ─────────────────
+      // ── Evolução mensal (mesmo período, agrupado por mês) ──────────────────
+      // Inclui FINANCEIRO (antes ficava de fora) para o "Resultado" do gráfico
+      // bater com o Lucro Líquido/Prejuízo dos cards — mesma lógica de netting.
       const mesesRaw = await ctx.db.execute(sql`
         SELECT
           pc.tipo AS tipo,
+          t.tipo  AS titulo_tipo,
           DATE_FORMAT(
             CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
               THEN p.data_pagamento
@@ -2298,7 +2312,7 @@ const dreRouter = router({
           t.empresa_id = ${empId}
           AND t.ativo = 1
           AND pc.ativo = 1
-          AND pc.tipo IN ('RECEITA','DESPESA')
+          AND pc.tipo IN ('RECEITA','DESPESA','FINANCEIRO')
           AND (
             CASE WHEN ${sql.raw(`'${input.regime}'`)} = 'CAIXA'
               THEN p.status = 'PAGA'
@@ -2307,7 +2321,7 @@ const dreRouter = router({
                 AND p.vencimento BETWEEN ${input.de} AND ${input.ate}
             END
           )
-        GROUP BY pc.tipo, mes
+        GROUP BY pc.tipo, t.tipo, mes
         ORDER BY mes
       `) as any[]
 
@@ -2321,21 +2335,41 @@ const dreRouter = router({
         : Array.isArray(mesesRaw) ? mesesRaw : (mesesRaw as any).rows ?? []
 
       type Conta = { id: number; codigo: string; nome: string; total: number; qtd: number }
+
+      // Agrupa por conta primeiro (uma conta pode ter linhas PAGAR e RECEBER
+      // separadas vindas do GROUP BY), depois líquida conforme a natureza da conta:
+      //   RECEITA/DESPESA: líquido na direção esperada (RECEBER−PAGAR / PAGAR−RECEBER),
+      //     mantendo magnitude positiva — um estorno reduz a despesa, não vira receita
+      //   FINANCEIRO: líquido assinado (RECEBER−PAGAR) — pode dar resultado negativo
+      //     (ex.: tarifas e pagamento de empréstimo pesando mais que juros recebidos)
+      const porConta = new Map<string, { tipo: string; id: number; codigo: string; nome: string; receber: number; pagar: number; qtd: number }>()
+      for (const r of data) {
+        const key = `${r.tipo}:${r.conta_id}`
+        if (!porConta.has(key)) {
+          porConta.set(key, {
+            tipo: String(r.tipo), id: Number(r.conta_id),
+            codigo: String(r.conta_codigo ?? ''), nome: String(r.conta_nome ?? ''),
+            receber: 0, pagar: 0, qtd: 0,
+          })
+        }
+        const acc = porConta.get(key)!
+        const valor = Number(r.total ?? 0)
+        if (r.titulo_tipo === 'RECEBER') acc.receber += valor
+        else acc.pagar += valor
+        acc.qtd += Number(r.qtd ?? 0)
+      }
+
       const receitas:   Conta[] = []
       const despesas:   Conta[] = []
       const financeiro: Conta[] = []
-
-      for (const r of data) {
-        const conta: Conta = {
-          id:     Number(r.conta_id),
-          codigo: String(r.conta_codigo ?? ''),
-          nome:   String(r.conta_nome ?? ''),
-          total:  Number(r.total ?? 0),
-          qtd:    Number(r.qtd ?? 0),
+      for (const c of porConta.values()) {
+        if (c.tipo === 'RECEITA') {
+          receitas.push({ id: c.id, codigo: c.codigo, nome: c.nome, qtd: c.qtd, total: c.receber - c.pagar })
+        } else if (c.tipo === 'DESPESA') {
+          despesas.push({ id: c.id, codigo: c.codigo, nome: c.nome, qtd: c.qtd, total: c.pagar - c.receber })
+        } else if (c.tipo === 'FINANCEIRO') {
+          financeiro.push({ id: c.id, codigo: c.codigo, nome: c.nome, qtd: c.qtd, total: c.receber - c.pagar })
         }
-        if (r.tipo === 'RECEITA')    receitas.push(conta)
-        else if (r.tipo === 'DESPESA')   despesas.push(conta)
-        else if (r.tipo === 'FINANCEIRO') financeiro.push(conta)
       }
 
       const totalReceitas   = receitas.reduce((s, c) => s + c.total, 0)
@@ -2344,17 +2378,21 @@ const dreRouter = router({
       const resultado       = totalReceitas - totalDespesas + totalFinanceiro
       const margem          = totalReceitas > 0 ? (resultado / totalReceitas) * 100 : 0
 
-      // Consolidar meses: { mes, receitas, despesas, resultado }
-      const mesMap: Record<string, { mes: string; receitas: number; despesas: number }> = {}
+      // Consolidar meses: { mes, receitas, despesas, resultado } — mesma lógica de
+      // netting, e o "resultado" já inclui FINANCEIRO para bater com os cards acima
+      const mesMap: Record<string, { mes: string; receitas: number; despesas: number; financeiro: number }> = {}
       for (const m of meses) {
         const k = String(m.mes)
-        if (!mesMap[k]) mesMap[k] = { mes: k, receitas: 0, despesas: 0 }
-        if (m.tipo === 'RECEITA')  mesMap[k].receitas  += Number(m.total ?? 0)
-        if (m.tipo === 'DESPESA')  mesMap[k].despesas  += Number(m.total ?? 0)
+        if (!mesMap[k]) mesMap[k] = { mes: k, receitas: 0, despesas: 0, financeiro: 0 }
+        const valor = Number(m.total ?? 0)
+        const sinalReceber = m.titulo_tipo === 'RECEBER' ? 1 : -1
+        if (m.tipo === 'RECEITA')    mesMap[k].receitas   += valor * sinalReceber
+        else if (m.tipo === 'DESPESA')   mesMap[k].despesas   += valor * -sinalReceber
+        else if (m.tipo === 'FINANCEIRO') mesMap[k].financeiro += valor * sinalReceber
       }
       const evolucao = Object.values(mesMap)
         .sort((a, b) => a.mes.localeCompare(b.mes))
-        .map(m => ({ ...m, resultado: m.receitas - m.despesas }))
+        .map(m => ({ mes: m.mes, receitas: m.receitas, despesas: m.despesas, resultado: m.receitas - m.despesas + m.financeiro }))
 
       return {
         receitas:   { total: totalReceitas,   contas: receitas },

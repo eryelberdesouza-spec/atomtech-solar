@@ -1,5 +1,7 @@
-﻿[phases.setup]
-nixPkgs = ["nodejs_20", "npm-9_x"]
+[phases.setup]
+# chromium: necessário para o endpoint /pdf/render (Chrome headless gera os
+# PDFs vetoriais das propostas). O binário fica no PATH como "chromium".
+nixPkgs = ["nodejs_20", "npm-9_x", "chromium"]
 
 [phases.install]
 cmds = ["npm install"]
@@ -10,3 +12,5 @@ cmds = []
 [start]
 cmd = "npx tsx src/index.ts"
 
+[variables]
+PUPPETEER_SKIP_DOWNLOAD = "true"
