@@ -1012,6 +1012,11 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
     onError:   (e: any) => setDeleteErro(e.message ?? 'Erro ao excluir'),
   })
 
+  const cancelarTitulo = (trpc as any).fin.titulo.cancelar.useMutation({
+    onSuccess: () => refetch(),
+    onError:   (e: any) => alert('Erro ao cancelar: ' + (e.message ?? 'Tente novamente')),
+  })
+
   const deleteLote = (trpc as any).fin.titulo.deleteLote.useMutation({
     onSuccess: (r: any) => {
       setSelecionados(new Set())
@@ -1309,6 +1314,20 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
                     disabled={estornar.isLoading}
                     title="Estornar pagamento"
                   >↩</Btn>
+                )}
+
+                {/* Cancelar — some do saldo em aberto, mas fica registrado (diferente de excluir) */}
+                {r.status !== 'PAGA' && (
+                  <Btn
+                    size="sm" variant="ghost"
+                    disabled={cancelarTitulo.isLoading}
+                    onClick={() => {
+                      if (window.confirm(`Cancelar o título "${r.descricao}" (${fmtBRLFull(Number(r.valor))})?\n\nEle sai do saldo em aberto, mas fica registrado no sistema (diferente de excluir).`)) {
+                        cancelarTitulo.mutate({ tituloId: r.tituloId })
+                      }
+                    }}
+                    title="Cancelar título (mantém registro)"
+                  >🚫</Btn>
                 )}
 
                 {/* Excluir */}

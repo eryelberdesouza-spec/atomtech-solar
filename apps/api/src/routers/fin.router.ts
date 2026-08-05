@@ -1411,6 +1411,45 @@ const tituloRouter = router({
       return { ok: true }
     }),
 
+  // Cancela um título sem excluí-lo — diferente de delete: fica no banco para
+  // rastreabilidade (auditoria, histórico), só some das listas e do saldo em
+  // aberto (ativo=false, mesmo filtro que dashboard/lançamentos já usam).
+  // Bloqueado se já existe parcela paga (nesse caso a movimentação já aconteceu
+  // de verdade — estornar a baixa antes de cancelar, não o contrário).
+  cancelar: protectedProcedure
+    .input(z.object({ tituloId: z.number().int().positive(), motivo: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const empId = ctx.usuario.empresaId
+
+      const [titulo] = await ctx.db
+        .select()
+        .from(finTitulo)
+        .where(and(eq(finTitulo.id, input.tituloId), eq(finTitulo.empresaId, empId)))
+        .limit(1)
+      if (!titulo) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (!titulo.ativo) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Título já está cancelado' })
+
+      const [pagaExistente] = await ctx.db
+        .select({ id: finParcela.id })
+        .from(finParcela)
+        .where(and(eq(finParcela.tituloId, input.tituloId), eq(finParcela.status, 'PAGA')))
+        .limit(1)
+      if (pagaExistente) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Título possui parcela(s) paga(s). Estorne o(s) pagamento(s) antes de cancelar.' })
+
+      await ctx.db.update(finTitulo).set({
+        ativo: false,
+        observacoes: [titulo.observacoes, input.motivo ? `[Cancelado] ${input.motivo}` : '[Cancelado]'].filter(Boolean).join(' — '),
+        updatedAt: new Date(),
+      }).where(eq(finTitulo.id, input.tituloId))
+
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'UPDATE', entidade: 'fin_titulo', entidadeId: input.tituloId,
+        dadosAntes: titulo, dadosDepois: { ...titulo, ativo: false, observacoes: input.motivo ?? null },
+      })
+
+      return { ok: true }
+    }),
+
   // Exclui título (e cascata parcelas) — requer senha de administrador
   delete: protectedProcedure
     .input(z.object({ tituloId: z.number(), senhaAdmin: z.string() }))
