@@ -957,7 +957,12 @@ function ModalDeleteLote({
 
 function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [statusFilter, setStatusFilter] = useState('')
-  const [dataIni, setDataIni]           = useState(mesAtualIni())
+  // Sem filtro de data por padrão — um título vencido há muito tempo (ex.: um
+  // contrato antigo de 2024 nunca baixado) não pode sumir silenciosamente da
+  // tela só porque o vencimento é anterior ao mês atual. O Dashboard soma TUDO
+  // que está em aberto; esta tela precisa mostrar a mesma verdade por padrão.
+  // Quem quiser um recorte por período ainda pode aplicar o filtro de data.
+  const [dataIni, setDataIni]           = useState('')
   const [dataFim, setDataFim]           = useState('')
   const [buscaTexto, setBuscaTexto]     = useState('')
   const [pessoaFiltro, setPessoaFiltro] = useState('')
