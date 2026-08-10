@@ -28,7 +28,7 @@ import {
   empresa,
   historicoConsumo,
 } from '../db/schema'
-import { calcularDimensionamento } from '../engines/sizing.engine'
+import { calcularDimensionamento, calcularIrradiacaoMensal, getTaxaDesempenho, getAreaFatorTelhado } from '../engines/sizing.engine'
 import { calcularFinanceiro } from '../engines/financial.engine'
 import { calcularPrecificacao, gerarItensCustomizadosPadrao } from '../engines/pricing.engine'
 import { gerarCondicoesCompletasAtomTech } from '../engines/payment.engine'
@@ -527,6 +527,21 @@ export const propostaRouter = router({
     }),
 
   // ─── EDIÇÃO DO DIMENSIONAMENTO ────────────────────────────────────────────
+  //
+  // ACHADO DE AUDITORIA (2026-08-01): editar quantidade de módulos/inversor
+  // (ex.: logo após clonar uma proposta) só atualizava as linhas cruas de
+  // equipamento — potência final, geração mensal/anual, % de compensação,
+  // economia estimada e a análise financeira (payback/VPL/TIR) inteira
+  // ficavam com os valores ANTIGOS, da proposta original. A tela chegava a
+  // dizer "recalculada automaticamente", o que não era verdade.
+  //
+  // Esta mutation agora recalcula em cadeia sempre que módulos/inversor
+  // mudam: potência final é sempre DERIVADA de módulos × potência unitária
+  // (nunca mais um campo livre — evita o valor ficar dessincronizado da
+  // quantidade real), geração/área/economia usam as mesmas fórmulas do
+  // motor de dimensionamento (sizing.engine), e a análise financeira é
+  // recalculada com o investimento já existente (a precificação não muda
+  // aqui — só quando o usuário edita a aba Precificação).
   updateDimensionamento: protectedProcedure
     .input(z.object({
       propostaId: z.number().int().positive(),
@@ -538,7 +553,6 @@ export const propostaRouter = router({
       modeloInversor: z.string().optional(),
       potenciaInversorWp: z.number().optional(),
       quantidadeInversores: z.number().int().positive().optional(),
-      potenciaFinalKwp: z.number().positive().optional(),
       desvioAzimutal: z.number().optional(),
       inclinacaoGraus: z.number().optional(),
     }))
@@ -550,14 +564,14 @@ export const propostaRouter = router({
         .limit(1)
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
 
-      if (input.potenciaFinalKwp) {
-        await ctx.db.update(dimTable)
-          .set({ potenciaFinalKwp: String(input.potenciaFinalKwp) })
-          .where(eq(dimTable.propostaId, propostaId)).execute()
-      }
+      const [dimAtual] = await ctx.db.select().from(dimTable)
+        .where(eq(dimTable.propostaId, propostaId)).limit(1)
+      if (!dimAtual) throw new TRPCError({ code: 'NOT_FOUND', message: 'Dimensionamento não encontrado' })
 
       const equipsAtuais = await ctx.db.select()
         .from(equipamentoProposta).where(eq(equipamentoProposta.propostaId, propostaId))
+      const equipModuloAtual   = equipsAtuais.find((e: any) => e.tipo === 'modulo')
+      const equipInversorAtual = equipsAtuais.find((e: any) => e.tipo === 'inversor' || e.tipo === 'microinversor')
 
       for (const equip of equipsAtuais) {
         if (equip.tipo === 'modulo') {
@@ -581,6 +595,97 @@ export const propostaRouter = router({
               .where(eq(equipamentoProposta.id, equip.id)).execute()
           }
         }
+      }
+
+      // ── Recalcula dimensionamento a partir dos valores finais (novos ou
+      //    mantidos) de módulos — mesma física do sizing.engine, mas com a
+      //    quantidade de módulos como fonte da verdade (não recalculada).
+      const quantidadeModulosFinal = input.quantidadeModulos ?? equipModuloAtual?.quantidade ?? dimAtual.quantidadeModulos ?? 0
+      const potenciaModuloWpFinal  = input.potenciaModuloWp  ?? equipModuloAtual?.potenciaWp  ?? 620
+      const desvioAzimutalFinal    = input.desvioAzimutal    ?? dimAtual.desvioAzimutal    ?? 0
+      const inclinacaoGrausFinal   = input.inclinacaoGraus   ?? dimAtual.inclinacaoGraus   ?? 20
+
+      const potenciaFinalKwp = (quantidadeModulosFinal * potenciaModuloWpFinal) / 1000
+
+      const [snap] = await ctx.db.select().from(premissasSnapshot)
+        .where(eq(premissasSnapshot.propostaId, propostaId)).limit(1)
+      const premissas = (snap?.dadosJson as any) ?? {}
+
+      const irradiacaoMensal = calcularIrradiacaoMensal(desvioAzimutalFinal, inclinacaoGrausFinal)
+      const taxaDesempenho   = getTaxaDesempenho((dimAtual.topologia as any) ?? 'tradicional', premissas) / 100
+      const areaFator        = getAreaFatorTelhado((dimAtual.tipoTelhado as any) ?? 'ceramico', premissas)
+
+      const diasPorMes = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      const geracaoMensalKwh = irradiacaoMensal.map((h, i) =>
+        Number((potenciaFinalKwp * h * taxaDesempenho * diasPorMes[i]).toFixed(2)))
+      const geracaoAnualKwh = Number(geracaoMensalKwh.reduce((a: number, b: number) => a + b, 0).toFixed(2))
+
+      const areaEstimadaM2 = Number((quantidadeModulosFinal * 3.10 * areaFator).toFixed(2))
+
+      const consumoMedioMensal = Number(dimAtual.consumoMedioMensalKwh ?? 0)
+      const consumoAnual = consumoMedioMensal * 12
+      const percentualCompensacao = consumoAnual > 0
+        ? Number(((geracaoAnualKwh / consumoAnual) * 100).toFixed(2))
+        : 0
+
+      const tarifaMediaKwh = Number(dimAtual.tarifaUsada ?? 0)
+      const economiaMensalEstimada = Number(((geracaoAnualKwh / 12) * tarifaMediaKwh).toFixed(2))
+
+      await ctx.db.update(dimTable).set({
+        potenciaFinalKwp:      String(potenciaFinalKwp),
+        quantidadeModulos:     quantidadeModulosFinal,
+        desvioAzimutal:        desvioAzimutalFinal,
+        inclinacaoGraus:       inclinacaoGrausFinal,
+        areaEstimadaM2:        String(areaEstimadaM2),
+        geracaoMensalKwh:      geracaoMensalKwh as any,
+        geracaoAnualKwh:       String(geracaoAnualKwh),
+        percentualCompensacao: String(percentualCompensacao),
+        economiaMensalEstimada: String(economiaMensalEstimada),
+        calculadoAutomaticamente: false,
+        editadoEm: new Date(),
+        editadoPor: ctx.usuario.id,
+      }).where(eq(dimTable.propostaId, propostaId)).execute()
+
+      // ── Propaga para a análise financeira (payback/VPL/TIR/economia) ──────
+      // Usa o investimento JÁ EXISTENTE (precificação não muda aqui) — só a
+      // geração mudou, então só o retorno financeiro precisa ser recalculado.
+      const [prec] = await ctx.db.select().from(precTable)
+        .where(eq(precTable.propostaId, propostaId)).limit(1)
+      const [afAtual] = await ctx.db.select().from(afTable)
+        .where(eq(afTable.propostaId, propostaId)).limit(1)
+
+      if (prec && afAtual && snap) {
+        const financialResult = calcularFinanceiro({
+          investimentoTotal: Number(prec.precoFinal),
+          geracaoAnualKwh,
+          tarifaInicialKwh: tarifaMediaKwh,
+          premissas: {
+            inflacaoEnergetica: Number(premissas.inflacaoEnergetica),
+            taxaDescontoVpl: Number(premissas.taxaDescontoVpl),
+            perdaEficienciaAnualTradicional: Number(
+              dimAtual.topologia === 'microinversor'
+                ? premissas.perdaEficienciaAnualMicroinversor
+                : premissas.perdaEficienciaAnualTradicional,
+            ),
+            trocaInversorAnosTradicional: Number(premissas.trocaInversorAnosTradicional),
+            custoTrocaInversorTrad: Number(premissas.custoTrocaInversorTrad),
+          },
+          topologia: (dimAtual.topologia as any) ?? 'tradicional',
+        })
+
+        await ctx.db.update(afTable).set({
+          economiaMensalAno1: String(financialResult.economiaMensalAno1),
+          economiaAnualAno1: String(financialResult.economiaAnualAno1),
+          paybackSimplesMeses: financialResult.paybackSimplesMeses,
+          paybackDescontadoMeses: financialResult.paybackDescontadoMeses,
+          vpl: String(financialResult.vpl),
+          tir: String(financialResult.tir),
+          rendimentoPrimeiroAnoPct: String(financialResult.rendimentoPrimeiroAnoPct),
+          saldo25Anos: String(financialResult.saldo25Anos),
+          comparativoPoupanca25a: String(financialResult.comparativoPoupanca25a),
+          comparativoRendaFixa25a: String(financialResult.comparativoRendaFixa25a),
+          fluxoCaixaJson: financialResult.fluxoCaixa as any,
+        }).where(eq(afTable.propostaId, propostaId)).execute()
       }
 
       return { ok: true }

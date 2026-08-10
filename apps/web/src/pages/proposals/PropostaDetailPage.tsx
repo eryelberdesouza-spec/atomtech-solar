@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import {
@@ -58,7 +58,7 @@ function KpiCard({ label, value, color, icon, large }: { label: string; value: s
   )
 }
 
-function TabDimensionamento({ dim, equips, propostaId }: any) {
+function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
   const utils = trpc.useUtils()
   const isMobile = useIsMobile()
   const updateDim = trpc.proposta.updateDimensionamento.useMutation({
@@ -69,9 +69,10 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
   const modulo   = equips?.find((e: any) => e.tipo === 'modulo')
   const inversor = equips?.find((e: any) => e.tipo === 'inversor' || e.tipo === 'microinversor')
 
-  const [editando, setEditando] = useState(false)
+  // Abre direto em edição quando vem de uma clonagem — o próximo passo quase
+  // sempre é ajustar quantitativos de módulos/inversor.
+  const [editando, setEditando] = useState(Boolean(abrirEmEdicao))
   const [form, setForm] = useState({
-    potenciaFinalKwp:     Number(dim?.potenciaFinalKwp ?? 0),
     quantidadeModulos:    modulo?.quantidade ?? 0,
     fabricanteModulo:     modulo?.fabricante ?? '',
     modeloModulo:         modulo?.modelo ?? '',
@@ -88,7 +89,6 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
     const mod = equips?.find((e: any) => e.tipo === 'modulo')
     const inv = equips?.find((e: any) => e.tipo === 'inversor' || e.tipo === 'microinversor')
     setForm({
-      potenciaFinalKwp:     Number(dim?.potenciaFinalKwp ?? 0),
       quantidadeModulos:    mod?.quantidade ?? 0,
       fabricanteModulo:     mod?.fabricante ?? '',
       modeloModulo:         mod?.modelo ?? '',
@@ -101,6 +101,13 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
   }, [dim, equips])
 
   if (!dim) return <EmptyState icon="☀️" title="Dimensionamento não calculado" />
+
+  // Potência final é sempre DERIVADA de módulos × potência unitária — nunca um
+  // campo livre. Editar separadamente permitia a potência ficar dessincronizada
+  // da quantidade real de módulos (achado em 2026-08-01: clonar proposta e mudar
+  // só a quantidade de módulos deixava a potência, geração e economia com os
+  // valores antigos, porque nada disso era recalculado).
+  const potenciaFinalPreviewKwp = (Number(form.quantidadeModulos) * Number(form.potenciaModuloWp)) / 1000
 
   const kpisPrincipais = [
     { label: 'Potência Final',    value: formatKwp(dim.potenciaFinalKwp),            color: C.solar,  icon: '⚡', large: true },
@@ -125,6 +132,15 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 10 }}>
         {kpisSecundarios.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
+
+      {abrirEmEdicao && editando && (
+        <div style={{ background: `${C.accent}10`, border: `1px solid ${C.accent}25`, borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 15 }}>ℹ️</span>
+          <p style={{ color: C.textDim, fontSize: 12, margin: 0 }}>
+            Proposta clonada — confira os quantitativos de módulos e inversor. Ao salvar, geração, economia e análise financeira são recalculadas automaticamente.
+          </p>
+        </div>
+      )}
 
       {/* Parâmetros técnicos */}
       <Card style={{ padding: '16px 20px' }}>
@@ -154,7 +170,12 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Input label="Potência Final (kWp)" type="number" value={form.potenciaFinalKwp} onChange={e => set('potenciaFinalKwp', Number(e.target.value))} />
+              <div>
+                <span style={{ color: C.textMuted, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Potência Final (kWp)</span>
+                <div style={{ padding: '10px 12px', borderRadius: 8, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.solar, fontWeight: 700, fontSize: 14 }}>
+                  {formatKwp(potenciaFinalPreviewKwp)} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 11 }}>(módulos × potência unitária)</span>
+                </div>
+              </div>
               <Input label="Qtd. Módulos" type="number" value={form.quantidadeModulos} onChange={e => set('quantidadeModulos', Number(e.target.value))} />
             </div>
             <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: '4px 0 0' }}>Módulos</p>
@@ -173,7 +194,7 @@ function TabDimensionamento({ dim, equips, propostaId }: any) {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Btn variant="ghost" onClick={() => setEditando(false)}>Cancelar</Btn>
               <Btn onClick={() => updateDim.mutate({ propostaId, ...form, potenciaInversorWp: Math.round(form.potenciaInversorWp * 1000) })} disabled={updateDim.isLoading}>
-                {updateDim.isLoading ? '⏳ Salvando...' : '✔ Salvar Alterações'}
+                {updateDim.isLoading ? '⏳ Recalculando...' : '✔ Salvar e Recalcular'}
               </Btn>
             </div>
           </div>
@@ -1411,10 +1432,24 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
   )
 }
 
+// Força remontagem completa ao navegar entre propostas (ex.: clonar → abrir a
+// nova). React Router NÃO remonta o componente só porque o :id da URL mudou
+// (mesma rota, param diferente) — sem isso, estado local como "modal de clonar
+// aberto" ou a aba selecionada permanecia da proposta anterior, permitindo
+// clonar de novo (e de novo) só clicando em "Confirmar" outra vez.
 export function PropostaDetailPage() {
+  const { id } = useParams()
+  return <PropostaDetailPageInner key={id} />
+}
+
+function PropostaDetailPageInner() {
   const { id }    = useParams()
   const navigate  = useNavigate()
+  const location  = useLocation()
   const isMobile  = useIsMobile()
+  // Ao abrir uma proposta recém-clonada, já entra direto em modo de edição do
+  // Dimensionamento — é sempre o primeiro ajuste necessário (quantitativos).
+  const abrirEmEdicao = Boolean((location.state as any)?.abrirDimensionamentoEmEdicao)
   const [tabSolar, setTabSolar]         = useState('dimensionamento')
   const [tabServico, setTabServico]     = useState('itens')
   const [gerandoPdf, setGerandoPdf] = useState(false)
@@ -1486,8 +1521,11 @@ export function PropostaDetailPage() {
 
   const clonarMutation = (trpc as any).proposta.clonar.useMutation({
     onSuccess: (res: any) => {
-      alert(`✓ Proposta clonada com sucesso!\nNova proposta: aguarde, abrindo...`)
-      navigate(`/propostas/${res.propostaId}`)
+      // Fecha o modal ANTES de navegar — sem isso, "Confirmar" continuava
+      // clicável e clonava de novo indefinidamente (o componente não remonta
+      // sozinho só por causa da troca de :id na URL)
+      setShowClonar(false)
+      navigate(`/propostas/${res.propostaId}`, { state: { abrirDimensionamentoEmEdicao: true } })
     },
     onError: (e: any) => alert('Erro ao clonar: ' + (e?.message ?? 'Tente novamente')),
   })
@@ -1837,7 +1875,7 @@ export function PropostaDetailPage() {
           </>
         ) : (
           <>
-            {tab === 'dimensionamento' && <TabDimensionamento dim={dimensionamento} equips={equipamentos} propostaId={propostaId} />}
+            {tab === 'dimensionamento' && <TabDimensionamento dim={dimensionamento} equips={equipamentos} propostaId={propostaId} abrirEmEdicao={abrirEmEdicao} />}
             {tab === 'financeiro'      && <TabFinanceiro af={analiseFinanceira} />}
             {tab === 'precificacao'    && <TabPrecificacao prec={precificacao} propostaId={propostaId} />}
             {tab === 'pagamento'       && <TabPagamento condicoes={condicoesComerciais} propostaId={propostaId} isServico={false} valorReferencia={Number(precificacao?.precoFinal ?? 0)} />}
