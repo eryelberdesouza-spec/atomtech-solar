@@ -74,6 +74,17 @@ const DESC_PROJETO             = 'Projeto de Engenharia'
 
 const DESCRICOES_ADICIONAIS = [DESC_INSTALACAO_MODULOS, DESC_INSTALACAO_INVERSOR, DESC_PROJETO]
 
+// mysql2 devolve colunas DATE como objeto Date, não string (mesmo com drizzle
+// date() sem mode explícito) — String(dateObj).slice(0,10) vira lixo tipo
+// "Thu May 07" em vez de "2026-05-07", quebrando comparação de string em
+// silêncio. Mesmo padrão já usado em fin.router.ts (fmtDateISO).
+function dataParaISO(d: unknown): string {
+  if (d instanceof Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  return String(d).slice(0, 10)
+}
+
 // ─── AUTO-EXPIRAÇÃO ───────────────────────────────────────────────────────────
 // Propostas em rascunho/enviada cuja data de validade já passou são marcadas
 // como 'expirada' de forma lazy, na primeira leitura após o vencimento (não há
@@ -1024,9 +1035,24 @@ export const propostaRouter = router({
       status: z.enum(['rascunho', 'enviada', 'aceita', 'recusada', 'expirada', 'cancelada']),
     }))
     .mutation(async ({ ctx, input }) => {
+      const set: Record<string, any> = { status: input.status }
+
+      // "Reabrir" (recusada/expirada → rascunho) precisa também empurrar a
+      // validade pra frente — senão a checagem lazy de auto-expiração
+      // (expirarPropostasVencidas, roda a cada leitura) re-expira a proposta
+      // na hora seguinte, e o botão parece não fazer efeito nenhum.
+      if (input.status === 'rascunho' || input.status === 'enviada') {
+        const [atual] = await ctx.db.select({ dataValidade: proposta.dataValidade }).from(proposta)
+          .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, ctx.usuario.empresaId))).limit(1)
+        const hoje = new Date().toISOString().split('T')[0]
+        if (atual && (!atual.dataValidade || dataParaISO(atual.dataValidade) < hoje)) {
+          set.dataValidade = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0]
+        }
+      }
+
       await ctx.db
         .update(proposta)
-        .set({ status: input.status })
+        .set(set)
         .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, ctx.usuario.empresaId)))
         .execute()
       return { ok: true }
@@ -1645,6 +1671,14 @@ export const propostaRouter = router({
       // ── 3. Cria nova proposta ─────────────────────────────────────
       const numero = await gerarNumeroProposta(ctx.db, empresaId)
       const hoje   = new Date().toISOString().split('T')[0]
+      // Validade SEMPRE recalculada a partir de hoje (mesmo padrão de +5 dias
+      // usado na criação de proposta nova) — nunca copiada do original. Copiar
+      // a validade do original fazia o clone de uma proposta expirada NASCER
+      // já expirado (achado em 2026-08-10): a checagem lazy de expiração roda
+      // a cada leitura e re-expira qualquer rascunho com data_validade no
+      // passado, então "Reabrir" parecia não fazer efeito nenhum — voltava
+      // pra rascunho e no proximo load virava expirada de novo.
+      const validadeClone = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0]
 
       const [novaPropResult] = await ctx.db.insert(proposta).values({
         empresaId,
@@ -1657,7 +1691,7 @@ export const propostaRouter = router({
         status:            'rascunho',
         versao:            1,
         dataEmissao:       hoje,
-        dataValidade:      orig.dataValidade,
+        dataValidade:      validadeClone,
         templateOrigemId:  input.propostaId, // referência à origem
         observacoesInternas: orig.observacoesInternas
           ? `[Clonada de ${orig.numero}] ${orig.observacoesInternas}`
