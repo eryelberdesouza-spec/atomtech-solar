@@ -1061,6 +1061,9 @@ const tituloRouter = router({
           categoriaCustoNome: finCategoriaCusto.nome,
           loteRateioId:  finTitulo.loteRateioId,
           propostaId:    finTitulo.propostaId,
+          // Total de parcelas do título — permite exibir "Parcela X/Y" na lista
+          // sem depender de alguém ter digitado isso manualmente na descrição.
+          totalParcelas: sql<number>`(SELECT COUNT(*) FROM fin_parcela fp2 WHERE fp2.titulo_id = ${finParcela.tituloId})`,
         })
         .from(finParcela)
         .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))

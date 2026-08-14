@@ -1224,6 +1224,16 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
             descricao: (
               <div>
                 <span style={{ color: C.text, fontSize: 13 }}>{r.descricao}</span>
+                {Number(r.totalParcelas) > 1 && (
+                  <span
+                    title={`Parcela ${r.numero} de ${r.totalParcelas}`}
+                    style={{
+                      display: 'inline-block', marginLeft: 6,
+                      fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 8,
+                      background: C.emerald + '20', color: C.emerald, border: `1px solid ${C.emerald}40`,
+                    }}
+                  >Parcela {r.numero}/{r.totalParcelas}</span>
+                )}
                 {r.loteRateioId && (
                   <span
                     title="Este lançamento faz parte de uma nota dividida entre projetos"
