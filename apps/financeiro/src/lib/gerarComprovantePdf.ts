@@ -287,6 +287,7 @@ function htmlPagamento(
   titulo: TituloInfo,
   parcela: ParcelaInfo,
   agendamento: AgendamentoInfo | null,
+  totalParcelas: number,
 ): string {
   const statusParcela = parcela.status === 'ABERTA' && normDate(parcela.vencimento) < new Date().toISOString().slice(0, 10)
     ? 'VENCIDA' : parcela.status
@@ -302,6 +303,7 @@ function htmlPagamento(
       </div>
       <div style="text-align:right;">
         <span style="display:inline-block;padding:4px 14px;border-radius:20px;background:${statusBg(statusParcela)};color:${statusColor(statusParcela)};font-size:11px;font-weight:700;text-transform:uppercase;">${statusLabel(statusParcela)}</span>
+        ${totalParcelas > 1 ? `<span style="display:inline-block;margin-left:6px;padding:4px 14px;border-radius:20px;background:#DBEAFE;color:#1E3A5F;font-size:11px;font-weight:700;">PARCELA ${parcela.numero}/${totalParcelas}</span>` : ''}
         <div style="font-size:10px;color:#94A3B8;margin-top:4px;">N° ${numDoc}</div>
         ${titulo.documento ? `<div style="font-size:10px;color:#94A3B8;">Doc: ${titulo.documento}</div>` : ''}
       </div>
@@ -329,7 +331,7 @@ function htmlPagamento(
       campo('Descrição', titulo.descricao),
       campo('Plano de Contas', titulo.planoNome),
       campo('Centro de Custo', titulo.centroNome),
-      campo('Parcela', `${parcela.numero}ª parcela`),
+      campo('Parcela', totalParcelas > 1 ? `${parcela.numero}/${totalParcelas}` : `${parcela.numero}ª parcela (parcela única)`),
       campo('Vencimento', fmtData(parcela.vencimento)),
       parcela.dataPagamento ? campo('Data de Pagamento', fmtData(parcela.dataPagamento)) : '',
       campo('Valor', fmtBRL(parcela.valorPago ?? parcela.valor), true),
@@ -500,7 +502,7 @@ export async function gerarComprovantePdf(params: {
   const logoDataUrl = empresa.logoUrl ? await toDataUrl(empresa.logoUrl) : null
 
   const conteudo = tipo === 'PAGAR'
-    ? htmlPagamento(empresa, titulo, parcela, agendamento)
+    ? htmlPagamento(empresa, titulo, parcela, agendamento, parcelas.length)
     : htmlRecebimento(empresa, titulo, parcelas, agendamento)
 
   const rodape = empresa.rodapeTexto
