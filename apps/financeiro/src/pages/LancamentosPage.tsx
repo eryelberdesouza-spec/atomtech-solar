@@ -105,6 +105,10 @@ import { gerarComprovantePdf } from '../lib/gerarComprovantePdf'
 
 const hoje = () => new Date().toISOString().slice(0, 10)
 const mesAtualIni = () => hoje().slice(0, 7) + '-01'
+const diasAPartirDeHoje = (n: number) => {
+  const d = new Date(); d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 
 function StatusBadge({ s }: { s: string }) {
   const map: Record<string, [string, string, string]> = {
@@ -957,12 +961,12 @@ function ModalDeleteLote({
 
 function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [statusFilter, setStatusFilter] = useState('')
-  // Sem filtro de data por padrão — um título vencido há muito tempo (ex.: um
-  // contrato antigo de 2024 nunca baixado) não pode sumir silenciosamente da
-  // tela só porque o vencimento é anterior ao mês atual. O Dashboard soma TUDO
-  // que está em aberto; esta tela precisa mostrar a mesma verdade por padrão.
-  // Quem quiser um recorte por período ainda pode aplicar o filtro de data.
-  const [dataIni, setDataIni]           = useState('')
+  // Padrão: 5 dias atrás até hoje em diante — evita ter que digitar a data toda
+  // vez só para ver os lançamentos recentes. Isso PODERIA esconder pendência
+  // antiga sem avisar (foi exatamente o bug que corrigimos com o contrato de
+  // 2024 da Porto Belo), então o alerta abaixo sempre soma atrasados/vencendo
+  // SEM filtro de data — nada fica invisível de verdade, só fora da lista por padrão.
+  const [dataIni, setDataIni]           = useState(diasAPartirDeHoje(-5))
   const [dataFim, setDataFim]           = useState('')
   const [buscaTexto, setBuscaTexto]     = useState('')
   const [pessoaFiltro, setPessoaFiltro] = useState('')
@@ -1032,6 +1036,24 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
     onError:   (e: any) => setErro(e.message ?? 'Erro ao estornar'),
   })
 
+  // Alerta de vencimentos — SEMPRE sem filtro de data, independente do que o
+  // usuário selecionou nos filtros acima. Garante que atrasados antigos nunca
+  // fiquem invisíveis mesmo com o padrão "últimos 5 dias" da lista.
+  const { data: alertaRows = [] } = (trpc as any).fin.titulo.list.useQuery({ tipo, status: 'ABERTA' })
+  const alerta = useMemo(() => {
+    const hj = hoje()
+    const em5dias = diasAPartirDeHoje(5)
+    const atrasados = alertaRows.filter((r: any) => r.vencimento.slice(0, 10) < hj)
+    const hojeVenc  = alertaRows.filter((r: any) => r.vencimento.slice(0, 10) === hj)
+    const prox5dias = alertaRows.filter((r: any) => { const v = r.vencimento.slice(0, 10); return v > hj && v <= em5dias })
+    const soma = (arr: any[]) => arr.reduce((s, r) => s + Number(r.valor), 0)
+    return {
+      atrasados: { n: atrasados.length, valor: soma(atrasados) },
+      hoje:      { n: hojeVenc.length,  valor: soma(hojeVenc) },
+      prox5dias: { n: prox5dias.length, valor: soma(prox5dias) },
+    }
+  }, [alertaRows])
+
   const kpis = useMemo(() => {
     const aberta  = rows.filter((r: any) => r.statusDisplay === 'ABERTA')
     const vencida = rows.filter((r: any) => r.statusDisplay === 'VENCIDA')
@@ -1053,8 +1075,37 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
 
   const label = tipo === 'PAGAR' ? 'Pagar' : 'Receber'
 
+  const temAlerta = alerta.atrasados.n > 0 || alerta.hoje.n > 0 || (tipo === 'RECEBER' && alerta.prox5dias.n > 0)
+
   return (
     <>
+      {/* Alerta de vencimentos — sempre visível, independente do filtro de data */}
+      {temAlerta && (
+        <div style={{
+          display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
+          background: alerta.atrasados.n > 0 ? '#7F1D1D18' : '#78350F18',
+          border: `1px solid ${alerta.atrasados.n > 0 ? '#B91C1C50' : '#D9770650'}`,
+          borderRadius: 10, padding: '12px 16px', marginBottom: 18, fontSize: 12.5,
+        }}>
+          <span style={{ fontSize: 16 }}>{alerta.atrasados.n > 0 ? '🚨' : '⏰'}</span>
+          <span style={{ color: C.text }}>
+            {tipo === 'PAGAR' ? (
+              <>
+                {alerta.hoje.n > 0 && <>Você tem <strong>{alerta.hoje.n} pagamento{alerta.hoje.n > 1 ? 's' : ''}</strong> vencendo hoje ({fmtBRLFull(alerta.hoje.valor)})</>}
+                {alerta.hoje.n > 0 && alerta.atrasados.n > 0 && ' · '}
+                {alerta.atrasados.n > 0 && <><strong style={{ color: '#FCA5A5' }}>{alerta.atrasados.n} atrasado{alerta.atrasados.n > 1 ? 's' : ''}</strong> ({fmtBRLFull(alerta.atrasados.valor)})</>}
+              </>
+            ) : (
+              <>
+                {alerta.atrasados.n > 0 && <><strong style={{ color: '#FCA5A5' }}>{alerta.atrasados.n} recebimento{alerta.atrasados.n > 1 ? 's' : ''} atrasado{alerta.atrasados.n > 1 ? 's' : ''}</strong> ({fmtBRLFull(alerta.atrasados.valor)})</>}
+                {alerta.atrasados.n > 0 && alerta.prox5dias.n > 0 && ' · '}
+                {alerta.prox5dias.n > 0 && <><strong>{alerta.prox5dias.n}</strong> vencendo nos próximos 5 dias ({fmtBRLFull(alerta.prox5dias.valor)})</>}
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <KpiCard
