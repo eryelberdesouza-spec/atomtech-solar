@@ -299,11 +299,17 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
     (blocos ?? []).find((b: any) => b.tipoBloco === tipo)?.textoOverride ?? null
 
   // ── CAPA ─────────────────────────────────────────────────────────────────
-  const tituloCapa = prop?.tipoProposta === 'fotovoltaico'
-    ? 'Energia<br>Solar'
-    : prop?.tipoProposta === 'servico_geral'
-      ? 'Proposta de<br>Servi&ccedil;os'
-      : 'Proposta<br>Comercial'
+  // Título da proposta (editável em "✏ Editar" no topo) tem prioridade sobre o
+  // texto genérico — achado em 2026-08-10: o campo salvava e aparecia na tela,
+  // mas o PDF fotovoltaico nunca chegava a lê-lo, sempre mostrando "Energia
+  // Solar" fixo (diferente do PDF de serviço, que já respeitava esse campo).
+  const tituloCapa = prop?.tituloServico
+    ? String(prop.tituloServico)
+    : prop?.tipoProposta === 'fotovoltaico'
+      ? 'Energia<br>Solar'
+      : prop?.tipoProposta === 'servico_geral'
+        ? 'Proposta de<br>Servi&ccedil;os'
+        : 'Proposta<br>Comercial'
 
   const capaImg  = (data as any).capaImg as string | undefined
   const bgUrl    = capaImg
