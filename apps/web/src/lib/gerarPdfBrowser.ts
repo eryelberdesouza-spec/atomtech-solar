@@ -604,7 +604,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
   // desativados neste modelo) viram material de apoio no final.
   const corpo = prop?.modeloProposta === 'direto_ao_ponto'
     ? `${capa}${resumoProposta}${dimensionamentoBloco}${condicoesBloco}${aceite}${garantias}${diferenciais}${apresentacao}${comoFunciona}${regulamentacao}${fornecedores}${analise}${fluxoCaixa}${consideracoesBloco}`
-    : `${capa}${apresentacao}${comoFunciona}${diferenciais}${garantias}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${consideracoesBloco}${aceite}`
+    : `${capa}${apresentacao}${comoFunciona}${diferenciais}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${garantias}${consideracoesBloco}${aceite}`
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
