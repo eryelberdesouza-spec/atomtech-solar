@@ -433,6 +433,7 @@ export interface CondicaoComercial {
 
 export type TipoBloco =
   | 'capa'
+  | 'resumo_proposta'
   | 'apresentacao_empresa'
   | 'o_que_inclui'
   | 'como_funciona'
@@ -466,7 +467,7 @@ export interface BlocoProposta {
   textoOverride?: string
 }
 
-export const BLOCOS_PADRAO: { tipo: TipoBloco; label: string; ordem: number }[] = [
+export const BLOCOS_PADRAO: { tipo: TipoBloco; label: string; ordem: number; ativo?: boolean }[] = [
   { tipo: 'capa', label: 'Capa', ordem: 1 },
   { tipo: 'apresentacao_empresa', label: 'Apresentação da Empresa', ordem: 2 },
   { tipo: 'o_que_inclui', label: 'O que a Proposta Inclui', ordem: 3 },
@@ -508,6 +509,61 @@ export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number
   { tipo: 'consideracoes_gerais',       label: 'Considerações Gerais',            ordem: 12 },
   { tipo: 'aceite',                     label: 'Aceite da Proposta',              ordem: 13 },
   { tipo: 'contato',                    label: 'Contato e Endereço',              ordem: 14 },
+]
+
+// ─── MODELO "DIRETO AO PONTO" ─────────────────────────────────────────────────
+// Pedido do usuário em 2026-08-10: o modelo clássico (acima) abre com ~8 páginas
+// institucionais/educativas antes do cliente ver o que está sendo ofertado e por
+// quanto — formato que já foi padrão de mercado (2019-2022), mas hoje atrasa a
+// decisão sem agregar, num mercado onde o cliente já pesquisou e está comparando
+// preço entre concorrentes. Aqui a lógica se inverte: as primeiras páginas depois
+// da capa já são "bloco de decisão" (cliente, oferta, investimento, pagamento,
+// aceite) — o conteúdo institucional/técnico/financeiro vira material de apoio no
+// final. Payback e demais indicadores financeiros ficam DESATIVADOS por padrão
+// (reativáveis manualmente em "Blocos da Proposta") — a venda passa a ser por
+// engenharia/qualidade, não por matemática de retorno.
+export const BLOCOS_DIRETO_SOLAR: { tipo: TipoBloco; label: string; ordem: number; ativo?: boolean }[] = [
+  { tipo: 'capa',                     label: 'Capa',                          ordem: 1  },
+  { tipo: 'resumo_proposta',          label: 'Resumo da Proposta',            ordem: 2  },
+  { tipo: 'dimensionamento',          label: 'Dimensionamento do Sistema',    ordem: 3  },
+  { tipo: 'equipamentos',             label: 'Equipamentos e Serviços',       ordem: 4  },
+  { tipo: 'condicoes_comerciais',     label: 'Condições Comerciais',          ordem: 5  },
+  { tipo: 'formas_pagamento',         label: 'Formas de Pagamento',           ordem: 6  },
+  { tipo: 'aceite',                   label: 'Aceite da Proposta',            ordem: 7  },
+  // ───── fim do bloco de decisão — material de apoio a partir daqui ─────
+  { tipo: 'cronograma',               label: 'Cronograma',                    ordem: 8  },
+  { tipo: 'garantias',                label: 'Garantias Inclusas',            ordem: 9  },
+  { tipo: 'diferenciais',             label: 'Diferenciais da Atom Tech',     ordem: 10 },
+  { tipo: 'apresentacao_empresa',     label: 'Apresentação da Empresa',       ordem: 11 },
+  { tipo: 'o_que_inclui',             label: 'O que a Proposta Inclui',       ordem: 12 },
+  { tipo: 'como_funciona',            label: 'Como Funciona a Energia Solar', ordem: 13 },
+  { tipo: 'regulamentacao',           label: 'Regulamentação no Brasil',      ordem: 14 },
+  { tipo: 'fornecedores',             label: 'Fornecedores',                  ordem: 15 },
+  { tipo: 'analise_financeira',       label: 'Análise Financeira',            ordem: 16, ativo: false },
+  { tipo: 'indicadores_financeiros',  label: 'Indicadores Financeiros',       ordem: 17, ativo: false },
+  { tipo: 'fluxo_caixa',              label: 'Fluxo de Caixa',                ordem: 18, ativo: false },
+  { tipo: 'reducao_conta',            label: 'Redução da Conta de Energia',   ordem: 19, ativo: false },
+  { tipo: 'consideracoes_gerais',     label: 'Considerações Gerais',          ordem: 20 },
+  { tipo: 'contato',                  label: 'Contato e Endereço',            ordem: 21 },
+]
+
+export const BLOCOS_DIRETO_SERVICO: { tipo: TipoBloco; label: string; ordem: number; ativo?: boolean }[] = [
+  { tipo: 'capa',                       label: 'Capa',                     ordem: 1  },
+  { tipo: 'resumo_proposta',            label: 'Resumo da Proposta',       ordem: 2  },
+  { tipo: 'escopo_entregas',            label: 'O que Propomos Entregar',  ordem: 3  },
+  { tipo: 'escopo_servico',             label: 'Escopo do Serviço',        ordem: 4  },
+  { tipo: 'condicoes_comerciais',       label: 'Condições Comerciais',     ordem: 5  },
+  { tipo: 'aceite',                     label: 'Aceite da Proposta',       ordem: 6  },
+  // ───── fim do bloco de decisão — material de apoio a partir daqui ─────
+  { tipo: 'garantias',                  label: 'Garantias',                ordem: 7  },
+  { tipo: 'diferenciais',               label: 'Diferenciais',             ordem: 8  },
+  { tipo: 'apresentacao_empresa',       label: 'Apresentação da Empresa',  ordem: 9  },
+  { tipo: 'fornecedores',               label: 'Fornecedores',             ordem: 10 },
+  { tipo: 'como_funciona',              label: 'Como Funciona',            ordem: 11, ativo: false },
+  { tipo: 'regulamentacao',             label: 'Regulamentação',           ordem: 12, ativo: false },
+  { tipo: 'observacoes_complementares', label: 'Observações Complementares', ordem: 13, ativo: false },
+  { tipo: 'consideracoes_gerais',       label: 'Considerações Gerais',     ordem: 14 },
+  { tipo: 'contato',                    label: 'Contato e Endereço',       ordem: 15 },
 ]
 
 // ─── MODELO DE BLOCO ─────────────────────────────────────────────────────────

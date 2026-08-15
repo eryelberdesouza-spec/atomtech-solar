@@ -368,11 +368,15 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
     avista: 'À Vista', parcelado_marcos: 'Parcelado por Marcos', financiamento: 'Financiamento', cartao: 'Cartão de Crédito',
   }
 
-  let sections = ''
+  // Cada bloco vira uma string nomeada (em vez de acumular direto em `sections`)
+  // para permitir duas ordens de montagem — clássica e "Direto ao Ponto" — sem
+  // duplicar a lógica de conteúdo de cada bloco.
 
   // Apresentação + Diferenciais
   const temApres = blocoAtivo(blocos, 'apresentacao_empresa')
   const temDif   = blocoAtivo(blocos, 'diferenciais')
+  let secApresentacao = ''
+  let secDiferenciais = ''
   if (temApres || temDif) {
     const txtApres = textoBloco(blocos, 'apresentacao_empresa', textos ?? {}, 'apresentacao_empresa')
     const txtDif   = textoBloco(blocos, 'diferenciais', textos ?? {}, 'diferenciais')
@@ -384,40 +388,45 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
       <li>Atendimento personalizado e suporte pós-serviço</li>
       <li>Orçamento transparente sem custos ocultos</li>
     </ul>`
-    if (temApres) sections += sec('Quem Somos', renderTexto(txtApres) || defaultApres)
-    if (temDif)   sections += sec('Por que nos escolher?', renderTexto(txtDif) || defaultDif)
+    if (temApres) secApresentacao = sec('Quem Somos', renderTexto(txtApres) || defaultApres)
+    if (temDif)   secDiferenciais = sec('Por que nos escolher?', renderTexto(txtDif) || defaultDif)
   }
 
   // Como Funciona + Regulamentação
   const temCF  = blocoAtivo(blocos, 'como_funciona')
   const temReg = blocoAtivo(blocos, 'regulamentacao')
+  let secComoFunciona = ''
+  let secRegulamentacao = ''
   if (temCF) {
     const txt = textoBloco(blocos, 'como_funciona', textos ?? {}, 'como_funciona')
-    sections += sec('Como Funciona', renderTexto(txt) || '<p>Informações sobre o funcionamento do serviço proposto.</p>')
+    secComoFunciona = sec('Como Funciona', renderTexto(txt) || '<p>Informações sobre o funcionamento do serviço proposto.</p>')
   }
   if (temReg) {
     const txt = textoBloco(blocos, 'regulamentacao', textos ?? {}, 'regulamentacao')
-    sections += sec('Regulamentação', renderTexto(txt) || '<p>O serviço é prestado em conformidade com as normas técnicas e legislação vigente aplicáveis.</p>')
+    secRegulamentacao = sec('Regulamentação', renderTexto(txt) || '<p>O serviço é prestado em conformidade com as normas técnicas e legislação vigente aplicáveis.</p>')
   }
 
   // Fornecedores
+  let secFornecedores = ''
   if (blocoAtivo(blocos, 'fornecedores')) {
     const txt = textoBloco(blocos, 'fornecedores', textos ?? {}, 'fornecedores')
-    sections += sec('Fornecedores e Parceiros', renderTexto(txt) || '<p>Trabalhamos com fornecedores homologados que atendem aos mais altos padrões de qualidade e procedência.</p>')
+    secFornecedores = sec('Fornecedores e Parceiros', renderTexto(txt) || '<p>Trabalhamos com fornecedores homologados que atendem aos mais altos padrões de qualidade e procedência.</p>')
   }
 
   // O que Propomos Entregar
   const temEntregas = blocoAtivo(blocos, 'escopo_entregas')
   const txtEntregas = textoBloco(blocos, 'escopo_entregas', textos ?? {}, 'escopo_entregas')
+  let secEntregas = ''
   if (temEntregas && txtEntregas) {
-    sections += sec('O que Propomos Entregar', renderListaLetras(txtEntregas))
+    secEntregas = sec('O que Propomos Entregar', renderListaLetras(txtEntregas))
   }
 
   // Escopo do Serviço (tabela de itens)
   const temEscopo = blocoAtivo(blocos, 'escopo_servico')
+  let secEscopo = ''
   if (temEscopo) {
     const itens = itensServico ?? []
-    sections += sec(tituloServico, `
+    secEscopo = sec(tituloServico, `
       <table class="tabela-itens">
         <thead>
           <tr>
@@ -450,8 +459,9 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
 
   // Condições de Pagamento
   const temConds = blocoAtivo(blocos, 'condicoes_comerciais') && condsAtivas.length > 0
+  let secCondicoes = ''
   if (temConds) {
-    sections += sec('Condições de Pagamento', condsAtivas.map((cond: any) => {
+    secCondicoes = sec('Condições de Pagamento', condsAtivas.map((cond: any) => {
       const parcelas = cond.parcelas ?? []
       return `<div class="cond-card">
         <div class="cond-header">
@@ -471,19 +481,39 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
   }
 
   // Garantias
+  let secGarantias = ''
   if (blocoAtivo(blocos, 'garantias')) {
     const txtGar = textoBloco(blocos, 'garantias', textos ?? {}, 'garantias')
     const defaultGar = `- Todos os serviços executados possuem garantia conforme a legislação vigente e as especificações técnicas dos fabricantes dos materiais utilizados.
 - Nosso compromisso vai além da entrega — estamos presentes no pós-serviço para qualquer suporte necessário.`
-    sections += sec('Garantias Inclusas', renderListaNumerada(txtGar || defaultGar, cor1))
+    secGarantias = sec('Garantias Inclusas', renderListaNumerada(txtGar || defaultGar, cor1))
+  }
+
+  // Resumo da Proposta (modelo Direto ao Ponto) — cliente, o que entregamos e o
+  // valor, logo após a capa, sem esperar o cliente passar por conteúdo
+  // institucional para chegar até aqui.
+  let secResumo = ''
+  if (blocoAtivo(blocos, 'resumo_proposta')) {
+    const resumoEscopo = txtEntregas
+      ? renderListaLetras(txtEntregas)
+      : '<p>Escopo detalhado nas próximas páginas.</p>'
+    secResumo = sec('Resumo da Proposta', `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div class="cond-card"><div class="cond-header-title">Cliente</div><p style="margin-top:4px;font-size:14px;font-weight:600;color:#0E2040">${nomeCliente}</p></div>
+        <div class="cond-card"><div class="cond-header-title">Investimento Total</div><p style="margin-top:4px;font-size:16px;font-weight:700;color:#0E2040">${fmt(totalGeral)}</p></div>
+      </div>
+      <div class="info-box"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
+      <p style="font-size:12px;color:#5F708C;margin-top:10px">Condições de pagamento na sequência.</p>
+    `)
   }
 
   // Observações Complementares
+  let secObservacoes = ''
   if (blocoAtivo(blocos, 'observacoes_complementares')) {
     const bloco = (blocos ?? []).find((b: any) => b.tipoBloco === 'observacoes_complementares')
     const txtObs = bloco?.textoOverride?.trim() || ''
     if (txtObs) {
-      sections += sec('Observações Complementares', renderTexto(txtObs))
+      secObservacoes = sec('Observações Complementares', renderTexto(txtObs))
     }
   }
 
@@ -495,16 +525,18 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
 - **Garantia:** Os serviços executados possuem garantia de 12 (doze) meses contra defeitos de execução e mão de obra, conforme estabelecido no contrato.
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
+  let secConsideracoes = ''
   if (blocoAtivo(blocos, 'consideracoes_gerais')) {
     const fixedTxt   = (textos ?? {})?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES
     const customBloco = (blocos ?? []).find((b: any) => b.tipoBloco === 'consideracoes_gerais')
     const customTxt  = customBloco?.textoOverride?.trim() || ''
-    sections += sec('LEIA COM ATENÇÃO — Informações Importantes', renderListaNumerada(customTxt || fixedTxt, cor1))
+    secConsideracoes = sec('LEIA COM ATENÇÃO — Informações Importantes', renderListaNumerada(customTxt || fixedTxt, cor1))
   }
 
   // Aceite + Contato
   const temAceite  = blocoAtivo(blocos, 'aceite')
   const temContato = blocoAtivo(blocos, 'contato')
+  let secAceite = ''
   if (temAceite) {
     const contatoInline = temContato ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
@@ -527,7 +559,7 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
       </div>` : ''
     // Bloco inteiro (texto + assinaturas + contato) não pode quebrar entre páginas:
     // garante que a assinatura e as informações da empresa fiquem juntas na mesma página.
-    sections += sec('Aceite e Assinatura', `
+    secAceite = sec('Aceite e Assinatura', `
       <div style="break-inside:avoid;page-break-inside:avoid">
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
@@ -547,6 +579,12 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
         ${contatoInline}
       </div>`)
   }
+
+  // Modelo "Direto ao Ponto": cliente/escopo/investimento/pagamento/aceite logo
+  // no início — institucional vira material de apoio no final.
+  const sections = proposta?.modeloProposta === 'direto_ao_ponto'
+    ? `${secResumo}${secEscopo}${secEntregas}${secCondicoes}${secAceite}${secGarantias}${secDiferenciais}${secApresentacao}${secFornecedores}${secComoFunciona}${secRegulamentacao}${secObservacoes}${secConsideracoes}`
+    : `${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secEntregas}${secEscopo}${secCondicoes}${secGarantias}${secObservacoes}${secConsideracoes}${secAceite}`
 
   const footerHtml = footerServico(numero, empresa)
   const headerHtml = headerInterno(numero, nomeEmpresa, logoUrl)

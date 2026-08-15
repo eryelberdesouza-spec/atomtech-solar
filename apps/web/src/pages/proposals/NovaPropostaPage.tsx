@@ -167,6 +167,7 @@ const FORM_INICIAL = {
   observacoes: '',
   titulo: '',
   propostaRapida: false,
+  modeloProposta: 'classico' as 'classico' | 'direto_ao_ponto',
 }
 
 const STEPS = ['Cliente', 'Dados Técnicos', 'Precificação']
@@ -224,6 +225,7 @@ export function NovaPropostaPage() {
       quantidadeInversoresManual: form.quantidadeInversoresManual || undefined,
       observacoesInternas: form.observacoes || undefined, tituloServico: form.titulo || undefined,
       propostaRapida: form.propostaRapida || undefined,
+      modeloProposta: form.modeloProposta,
       descontoAvista: form.descontoAvista || undefined,
       marcoParcelas: form.marcoParcelas,
     } as any)
@@ -482,13 +484,32 @@ export function NovaPropostaPage() {
               <input value={form.titulo} onChange={(e: any) => set('titulo', e.target.value)} placeholder="Opcional — ex: Sistema 12 kWp — Casa de Praia (aparece na listagem)" style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Observações</label>
               <textarea value={form.observacoes} onChange={(e: any) => set('observacoes', e.target.value)} rows={2} placeholder="Informações adicionais ou peculiaridades da instalação..." style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
-              <label onClick={() => set('propostaRapida', !form.propostaRapida)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: form.propostaRapida ? '#F5A62312' : C.dark, border: `1px solid ${form.propostaRapida ? '#F5A62360' : C.darkBorder}` }}>
-                <input type="checkbox" checked={form.propostaRapida} readOnly style={{ marginTop: 2, accentColor: '#F5A623', cursor: 'pointer' }} />
-                <span>
-                  <span style={{ display: 'block', color: C.text, fontSize: 13, fontWeight: 700 }}>⚡ Proposta Rápida</span>
-                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 2 }}>PDF enxuto: capa, dimensionamento, equipamentos, análise financeira, condições de pagamento e aceite — sem os blocos institucionais. Reativáveis depois em "Blocos da Proposta".</span>
-                </span>
-              </label>
+              <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Modelo da Proposta</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div onClick={() => set('modeloProposta', 'classico')} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: form.modeloProposta === 'classico' ? '#F5A62312' : C.dark, border: `1px solid ${form.modeloProposta === 'classico' ? '#F5A62360' : C.darkBorder}` }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.text, fontSize: 13, fontWeight: 700 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${form.modeloProposta === 'classico' ? C.solar : C.textDim}`, background: form.modeloProposta === 'classico' ? C.solar : 'transparent', flexShrink: 0 }} />
+                    📄 Clássico
+                  </span>
+                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 4 }}>Apresentação institucional e técnica primeiro; condições comerciais e análise financeira (com payback) no meio/fim.</span>
+                </div>
+                <div onClick={() => set('modeloProposta', 'direto_ao_ponto')} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: form.modeloProposta === 'direto_ao_ponto' ? '#F5A62312' : C.dark, border: `1px solid ${form.modeloProposta === 'direto_ao_ponto' ? '#F5A62360' : C.darkBorder}` }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.text, fontSize: 13, fontWeight: 700 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${form.modeloProposta === 'direto_ao_ponto' ? C.solar : C.textDim}`, background: form.modeloProposta === 'direto_ao_ponto' ? C.solar : 'transparent', flexShrink: 0 }} />
+                    🎯 Direto ao Ponto
+                  </span>
+                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 4 }}>Cliente, oferta, investimento e pagamento logo no início. Sem payback na abertura — institucional e financeiro viram material de apoio no final. Tudo reativável/reordenável depois em "Blocos da Proposta".</span>
+                </div>
+              </div>
+              {form.modeloProposta === 'classico' && (
+                <label onClick={() => set('propostaRapida', !form.propostaRapida)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', borderRadius: 9, marginTop: 10, background: form.propostaRapida ? '#F5A62312' : C.dark, border: `1px solid ${form.propostaRapida ? '#F5A62360' : C.darkBorder}` }}>
+                  <input type="checkbox" checked={form.propostaRapida} readOnly style={{ marginTop: 2, accentColor: '#F5A623', cursor: 'pointer' }} />
+                  <span>
+                    <span style={{ display: 'block', color: C.text, fontSize: 13, fontWeight: 700 }}>⚡ Proposta Rápida</span>
+                    <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 2 }}>PDF enxuto: capa, dimensionamento, equipamentos, análise financeira, condições de pagamento e aceite — sem os blocos institucionais. Reativáveis depois em "Blocos da Proposta".</span>
+                  </span>
+                </label>
+              )}
             </div>
 
             {createMutation.error && <div style={{ background: '#3A1A1A', border: `1px solid ${C.danger}`, borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}>{(createMutation.error as any).message}</div>}

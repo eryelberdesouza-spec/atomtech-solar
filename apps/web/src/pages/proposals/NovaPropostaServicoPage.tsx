@@ -99,6 +99,7 @@ export function NovaPropostaServicoPage() {
   const [itens, setItens]                   = useState<ItemServico[]>([itemVazio()])
   const [erro, setErro]                     = useState('')
   const [propostaRapida, setPropostaRapida] = useState(false)
+  const [modeloProposta, setModeloProposta] = useState<'classico' | 'direto_ao_ponto'>('classico')
 
   const { data: clientesData, isLoading: carregandoClientes } = trpc.cliente.list.useQuery({ porPagina: 500 })
   const clientes = (clientesData?.data ?? []).map(c => ({
@@ -147,6 +148,7 @@ export function NovaPropostaServicoPage() {
       dataValidade: dataValidade || undefined,
       observacoesInternas: observacoes || undefined,
       propostaRapida: propostaRapida || undefined,
+      modeloProposta,
       itens: itensValidos.map(i => ({
         descricao: i.descricao.trim(),
         unidade: i.unidade,
@@ -209,13 +211,35 @@ export function NovaPropostaServicoPage() {
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
 
-            <label onClick={() => setPropostaRapida(v => !v)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: propostaRapida ? '#F5A62312' : C.dark, border: `1px solid ${propostaRapida ? '#F5A62360' : C.darkBorder}` }}>
-              <input type="checkbox" checked={propostaRapida} readOnly style={{ marginTop: 2, accentColor: '#F5A623', cursor: 'pointer' }} />
-              <span>
-                <span style={{ display: 'block', color: C.text, fontSize: 13, fontWeight: 700 }}>⚡ Proposta Rápida</span>
-                <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 2 }}>PDF enxuto: capa, escopo do serviço, condições de pagamento e aceite — sem os blocos institucionais (Quem Somos, Diferenciais, Garantias...). Ideal para clientes recorrentes. Você pode reativar blocos depois em "Blocos da Proposta".</span>
-              </span>
-            </label>
+            <div>
+              <label style={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Modelo da Proposta</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div onClick={() => setModeloProposta('classico')} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: modeloProposta === 'classico' ? '#F5A62312' : C.dark, border: `1px solid ${modeloProposta === 'classico' ? '#F5A62360' : C.darkBorder}` }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.text, fontSize: 13, fontWeight: 700 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${modeloProposta === 'classico' ? C.solar : C.textDim}`, background: modeloProposta === 'classico' ? C.solar : 'transparent', flexShrink: 0 }} />
+                    📄 Clássico
+                  </span>
+                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 4 }}>Apresentação institucional primeiro; escopo e condições comerciais depois.</span>
+                </div>
+                <div onClick={() => setModeloProposta('direto_ao_ponto')} style={{ cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: modeloProposta === 'direto_ao_ponto' ? '#F5A62312' : C.dark, border: `1px solid ${modeloProposta === 'direto_ao_ponto' ? '#F5A62360' : C.darkBorder}` }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.text, fontSize: 13, fontWeight: 700 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${modeloProposta === 'direto_ao_ponto' ? C.solar : C.textDim}`, background: modeloProposta === 'direto_ao_ponto' ? C.solar : 'transparent', flexShrink: 0 }} />
+                    🎯 Direto ao Ponto
+                  </span>
+                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 4 }}>Cliente, escopo e investimento logo no início. Institucional vira material de apoio no final. Reativável/reordenável em "Blocos da Proposta".</span>
+                </div>
+              </div>
+            </div>
+
+            {modeloProposta === 'classico' && (
+              <label onClick={() => setPropostaRapida(v => !v)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', borderRadius: 9, background: propostaRapida ? '#F5A62312' : C.dark, border: `1px solid ${propostaRapida ? '#F5A62360' : C.darkBorder}` }}>
+                <input type="checkbox" checked={propostaRapida} readOnly style={{ marginTop: 2, accentColor: '#F5A623', cursor: 'pointer' }} />
+                <span>
+                  <span style={{ display: 'block', color: C.text, fontSize: 13, fontWeight: 700 }}>⚡ Proposta Rápida</span>
+                  <span style={{ display: 'block', color: C.textMuted, fontSize: 11, marginTop: 2 }}>PDF enxuto: capa, escopo do serviço, condições de pagamento e aceite — sem os blocos institucionais (Quem Somos, Diferenciais, Garantias...). Ideal para clientes recorrentes. Você pode reativar blocos depois em "Blocos da Proposta".</span>
+                </span>
+              </label>
+            )}
           </div>
         </Card>
 

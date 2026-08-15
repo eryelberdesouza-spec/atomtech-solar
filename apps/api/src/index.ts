@@ -1383,6 +1383,33 @@ app.get('/run-migration-os-avulsa', async (_, res) => {
   }
 })
 
+// ── Migração: modelo de proposta (clássico vs direto ao ponto) ────────────────
+app.get('/run-migration-proposta-modelo', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'proposta' AND COLUMN_NAME = 'modelo_proposta'`
+    )
+    if (cols.length === 0) {
+      await conn.execute(`
+        ALTER TABLE proposta
+          ADD COLUMN modelo_proposta ENUM('classico','direto_ao_ponto') NOT NULL DEFAULT 'classico' AFTER tipo_proposta
+      `)
+      await conn.end()
+      res.json({ ok: true, message: 'Coluna modelo_proposta adicionada a proposta' })
+    } else {
+      await conn.end()
+      res.json({ ok: true, message: 'Coluna já existia' })
+    }
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: resumo do serviço + localização na OS ──────────────────────────
 app.get('/run-migration-os-resumo-localizacao', async (_, res) => {
   try {

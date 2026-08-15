@@ -247,6 +247,10 @@ export const proposta = mysqlTable('proposta', {
   empresaId: int('empresa_id').notNull().references(() => empresa.id),
   numero: varchar('numero', { length: 20 }).notNull().unique(),
   tipoProposta: mysqlEnum('tipo_proposta', ['fotovoltaico','servico_geral']).default('fotovoltaico').notNull(),
+  // 'classico' = ordem institucional tradicional (apresentação → técnico → financeiro → comercial).
+  // 'direto_ao_ponto' = cliente/oferta/preço/pagamento logo no início, institucional e análise
+  // financeira (payback) viram material de apoio no final — pedido do usuário em 2026-08-10.
+  modeloProposta: mysqlEnum('modelo_proposta', ['classico','direto_ao_ponto']).default('classico').notNull(),
   clienteId: int('cliente_id').notNull().references(() => cliente.id),
   faturaId: int('fatura_id').references(() => fatura.id),
   usuarioId: int('usuario_id').references(() => usuario.id),

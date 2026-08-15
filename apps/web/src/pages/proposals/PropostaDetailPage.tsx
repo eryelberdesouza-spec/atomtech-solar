@@ -776,7 +776,8 @@ const BLOCOS_COM_CATALOGO     = new Set(['garantias', 'consideracoes_gerais', 'e
 const BLOCOS_OBRIGATORIOS_PDF = new Set(['garantias', 'escopo_entregas'])
 const BLOCOS_MULTISELECT      = new Set(['consideracoes_gerais', 'escopo_entregas', 'observacoes_complementares'])
 const BLOCOS_LABELS: Record<string, string> = {
-  capa: 'Capa', apresentacao_empresa: 'Apresentação da Empresa',
+  capa: 'Capa', resumo_proposta: 'Resumo da Proposta',
+  apresentacao_empresa: 'Apresentação da Empresa',
   o_que_inclui: 'O que inclui', como_funciona: 'Como funciona',
   regulamentacao: 'Regulamentação', diferenciais: 'Diferenciais',
   garantias: 'Garantias', fornecedores: 'Fornecedores',
