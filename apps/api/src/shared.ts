@@ -499,7 +499,9 @@ export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number
   // específico que não se aplica a propostas de serviço geral. Ative manualmente se necessário.
   { tipo: 'como_funciona',              label: 'Como Funciona',                   ordem: 5,  ativo: false },
   { tipo: 'regulamentacao',             label: 'Regulamentação',                  ordem: 6,  ativo: false },
-  { tipo: 'fornecedores',               label: 'Fornecedores',                    ordem: 7  },
+  // Fornecedores é específico de equipamentos fotovoltaicos (módulos/inversores
+  // homologados) — não se aplica a serviço geral. Ative manualmente se necessário.
+  { tipo: 'fornecedores',               label: 'Fornecedores',                    ordem: 7,  ativo: false },
   { tipo: 'escopo_entregas',            label: 'O que Propomos Entregar',         ordem: 8  },
   { tipo: 'escopo_servico',             label: 'Escopo do Serviço',               ordem: 9  },
   { tipo: 'condicoes_comerciais',       label: 'Condições Comerciais',            ordem: 10 },
@@ -522,6 +524,10 @@ export const BLOCOS_SERVICO_PADRAO: { tipo: string; label: string; ordem: number
 // final. Payback e demais indicadores financeiros ficam DESATIVADOS por padrão
 // (reativáveis manualmente em "Blocos da Proposta") — a venda passa a ser por
 // engenharia/qualidade, não por matemática de retorno.
+// Revisado em 2026-08-14 após feedback do usuário testando o PDF real: Aceite
+// deixou de ser parte do "bloco de decisão" (assinar é o ato final, não algo
+// que acontece logo após condições comerciais) e Apresentação passou a vir
+// antes de Diferenciais — mesma ordem lógica do modelo Clássico.
 export const BLOCOS_DIRETO_SOLAR: { tipo: TipoBloco; label: string; ordem: number; ativo?: boolean }[] = [
   { tipo: 'capa',                     label: 'Capa',                          ordem: 1  },
   { tipo: 'resumo_proposta',          label: 'Resumo da Proposta',            ordem: 2  },
@@ -529,40 +535,51 @@ export const BLOCOS_DIRETO_SOLAR: { tipo: TipoBloco; label: string; ordem: numbe
   { tipo: 'equipamentos',             label: 'Equipamentos e Serviços',       ordem: 4  },
   { tipo: 'condicoes_comerciais',     label: 'Condições Comerciais',          ordem: 5  },
   { tipo: 'formas_pagamento',         label: 'Formas de Pagamento',           ordem: 6  },
-  { tipo: 'aceite',                   label: 'Aceite da Proposta',            ordem: 7  },
   // ───── fim do bloco de decisão — material de apoio a partir daqui ─────
-  { tipo: 'cronograma',               label: 'Cronograma',                    ordem: 8  },
-  { tipo: 'garantias',                label: 'Garantias Inclusas',            ordem: 9  },
-  { tipo: 'diferenciais',             label: 'Diferenciais da Atom Tech',     ordem: 10 },
-  { tipo: 'apresentacao_empresa',     label: 'Apresentação da Empresa',       ordem: 11 },
-  { tipo: 'o_que_inclui',             label: 'O que a Proposta Inclui',       ordem: 12 },
-  { tipo: 'como_funciona',            label: 'Como Funciona a Energia Solar', ordem: 13 },
-  { tipo: 'regulamentacao',           label: 'Regulamentação no Brasil',      ordem: 14 },
-  { tipo: 'fornecedores',             label: 'Fornecedores',                  ordem: 15 },
-  { tipo: 'analise_financeira',       label: 'Análise Financeira',            ordem: 16, ativo: false },
-  { tipo: 'indicadores_financeiros',  label: 'Indicadores Financeiros',       ordem: 17, ativo: false },
-  { tipo: 'fluxo_caixa',              label: 'Fluxo de Caixa',                ordem: 18, ativo: false },
-  { tipo: 'reducao_conta',            label: 'Redução da Conta de Energia',   ordem: 19, ativo: false },
-  { tipo: 'consideracoes_gerais',     label: 'Considerações Gerais',          ordem: 20 },
+  { tipo: 'cronograma',               label: 'Cronograma',                    ordem: 7  },
+  { tipo: 'garantias',                label: 'Garantias Inclusas',            ordem: 8  },
+  { tipo: 'apresentacao_empresa',     label: 'Apresentação da Empresa',       ordem: 9  },
+  { tipo: 'o_que_inclui',             label: 'O que a Proposta Inclui',       ordem: 10 },
+  { tipo: 'diferenciais',             label: 'Diferenciais da Atom Tech',     ordem: 11 },
+  { tipo: 'como_funciona',            label: 'Como Funciona a Energia Solar', ordem: 12 },
+  { tipo: 'regulamentacao',           label: 'Regulamentação no Brasil',      ordem: 13 },
+  { tipo: 'fornecedores',             label: 'Fornecedores',                  ordem: 14 },
+  { tipo: 'analise_financeira',       label: 'Análise Financeira',            ordem: 15, ativo: false },
+  { tipo: 'indicadores_financeiros',  label: 'Indicadores Financeiros',       ordem: 16, ativo: false },
+  { tipo: 'fluxo_caixa',              label: 'Fluxo de Caixa',                ordem: 17, ativo: false },
+  { tipo: 'reducao_conta',            label: 'Redução da Conta de Energia',   ordem: 18, ativo: false },
+  { tipo: 'consideracoes_gerais',     label: 'Considerações Gerais',          ordem: 19 },
+  { tipo: 'aceite',                   label: 'Aceite da Proposta',            ordem: 20 },
   { tipo: 'contato',                  label: 'Contato e Endereço',            ordem: 21 },
 ]
 
+// Revisado em 2026-08-14 após feedback do usuário testando o PDF real:
+// - "O que Propomos Entregar" ficava duplicado com o escopo já mostrado no
+//   Resumo — removido como seção própria neste modelo (o texto passa a
+//   aparecer só dentro do Resumo). O bloco continua listado aqui só para
+//   preservar a fonte do texto; não vira mais uma seção separada.
+// - Aceite não é mais parte do "bloco de decisão" — assinar é o ato FINAL,
+//   depois de todo o conteúdo de apoio, não logo após condições de pagamento.
+// - Apresentação (Quem Somos) vem antes de Diferenciais (Por que nos
+//   escolher) — mesma ordem lógica do modelo Clássico.
+// - Fornecedores é específico de equipamentos fotovoltaicos — não se aplica
+//   a serviço geral, fica desativado por padrão (igual ao Clássico).
 export const BLOCOS_DIRETO_SERVICO: { tipo: TipoBloco; label: string; ordem: number; ativo?: boolean }[] = [
   { tipo: 'capa',                       label: 'Capa',                     ordem: 1  },
   { tipo: 'resumo_proposta',            label: 'Resumo da Proposta',       ordem: 2  },
   { tipo: 'escopo_entregas',            label: 'O que Propomos Entregar',  ordem: 3  },
   { tipo: 'escopo_servico',             label: 'Escopo do Serviço',        ordem: 4  },
   { tipo: 'condicoes_comerciais',       label: 'Condições Comerciais',     ordem: 5  },
-  { tipo: 'aceite',                     label: 'Aceite da Proposta',       ordem: 6  },
   // ───── fim do bloco de decisão — material de apoio a partir daqui ─────
-  { tipo: 'garantias',                  label: 'Garantias',                ordem: 7  },
+  { tipo: 'garantias',                  label: 'Garantias',                ordem: 6  },
+  { tipo: 'apresentacao_empresa',       label: 'Apresentação da Empresa',  ordem: 7  },
   { tipo: 'diferenciais',               label: 'Diferenciais',             ordem: 8  },
-  { tipo: 'apresentacao_empresa',       label: 'Apresentação da Empresa',  ordem: 9  },
-  { tipo: 'fornecedores',               label: 'Fornecedores',             ordem: 10 },
-  { tipo: 'como_funciona',              label: 'Como Funciona',            ordem: 11, ativo: false },
-  { tipo: 'regulamentacao',             label: 'Regulamentação',           ordem: 12, ativo: false },
-  { tipo: 'observacoes_complementares', label: 'Observações Complementares', ordem: 13, ativo: false },
-  { tipo: 'consideracoes_gerais',       label: 'Considerações Gerais',     ordem: 14 },
+  { tipo: 'como_funciona',              label: 'Como Funciona',            ordem: 9,  ativo: false },
+  { tipo: 'regulamentacao',             label: 'Regulamentação',           ordem: 10, ativo: false },
+  { tipo: 'fornecedores',               label: 'Fornecedores',             ordem: 11, ativo: false },
+  { tipo: 'observacoes_complementares', label: 'Observações Complementares', ordem: 12, ativo: false },
+  { tipo: 'consideracoes_gerais',       label: 'Considerações Gerais',     ordem: 13 },
+  { tipo: 'aceite',                     label: 'Aceite da Proposta',       ordem: 14 },
   { tipo: 'contato',                    label: 'Contato e Endereço',       ordem: 15 },
 ]
 

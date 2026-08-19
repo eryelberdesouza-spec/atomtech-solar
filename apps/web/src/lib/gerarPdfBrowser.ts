@@ -375,7 +375,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
         <div class="section-sub">O que estamos propondo</div>
         <p>Sistema fotovoltaico dimensionado para o seu perfil de consumo, com equipamentos, instala&ccedil;&atilde;o e projeto de engenharia inclusos &mdash; detalhado nas pr&oacute;ximas p&aacute;ginas.</p>
       </div>
-      <div class="highlight-box" style="margin-top:18px"><p>Investimento Total: <strong>${formatCurrency(precoFinal)}</strong> &mdash; condi&ccedil;&otilde;es de pagamento na sequ&ecirc;ncia.</p></div>
+      <p style="margin-top:18px;font-size:12px;color:#888">Valor e condi&ccedil;&otilde;es de pagamento a seguir.</p>
       <div style="margin-top:16px;font-size:12px;color:#888">
         <strong style="color:#0E2040">Contato:</strong> ${cli?.telefone ?? ''}${cli?.email ? ` &middot; ${cli.email}` : ''}
       </div>`, numero, logoUrl, emp) : ''
@@ -602,8 +602,14 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
   // Modelo "Direto ao Ponto": cliente/oferta/investimento/pagamento/aceite logo
   // no início — institucional e financeiro (payback etc., normalmente
   // desativados neste modelo) viram material de apoio no final.
+  // Revisado em 2026-08-14 após feedback do usuário testando o PDF real:
+  // Aceite não é mais parte do "bloco de decisão" — assinar é o ato FINAL,
+  // depois de todo o conteúdo de apoio, não logo após condições comerciais.
+  // Apresentação (Conheça a Atom Tech) vem antes de Diferenciais — mesma
+  // ordem lógica do modelo Clássico (primeiro diz quem é, depois por que
+  // escolher).
   const corpo = prop?.modeloProposta === 'direto_ao_ponto'
-    ? `${capa}${resumoProposta}${dimensionamentoBloco}${condicoesBloco}${aceite}${garantias}${diferenciais}${apresentacao}${comoFunciona}${regulamentacao}${fornecedores}${analise}${fluxoCaixa}${consideracoesBloco}`
+    ? `${capa}${resumoProposta}${dimensionamentoBloco}${condicoesBloco}${garantias}${apresentacao}${diferenciais}${comoFunciona}${regulamentacao}${fornecedores}${analise}${fluxoCaixa}${consideracoesBloco}${aceite}`
     : `${capa}${apresentacao}${comoFunciona}${diferenciais}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${garantias}${consideracoesBloco}${aceite}`
 
   return `<!DOCTYPE html>

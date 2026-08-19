@@ -489,21 +489,21 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
     secGarantias = sec('Garantias Inclusas', renderListaNumerada(txtGar || defaultGar, cor1))
   }
 
-  // Resumo da Proposta (modelo Direto ao Ponto) — cliente, o que entregamos e o
-  // valor, logo após a capa, sem esperar o cliente passar por conteúdo
-  // institucional para chegar até aqui.
+  // Resumo da Proposta (modelo Direto ao Ponto) — cliente e o que estamos
+  // propondo, logo após a capa, sem esperar o cliente passar por conteúdo
+  // institucional para chegar até aqui. É a ÚNICA seção de escopo qualitativo
+  // deste modelo (substitui "O que Propomos Entregar", que ficava redundante
+  // logo abaixo) e NÃO repete o valor — o valor aparece uma única vez, na
+  // tabela de itens que vem em seguida.
   let secResumo = ''
   if (blocoAtivo(blocos, 'resumo_proposta')) {
     const resumoEscopo = txtEntregas
       ? renderListaLetras(txtEntregas)
-      : '<p>Escopo detalhado nas próximas páginas.</p>'
+      : '<p>Escopo detalhado a seguir.</p>'
     secResumo = sec('Resumo da Proposta', `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-        <div class="cond-card"><div class="cond-header-title">Cliente</div><p style="margin-top:4px;font-size:14px;font-weight:600;color:#0E2040">${nomeCliente}</p></div>
-        <div class="cond-card"><div class="cond-header-title">Investimento Total</div><p style="margin-top:4px;font-size:16px;font-weight:700;color:#0E2040">${fmt(totalGeral)}</p></div>
-      </div>
+      <div class="cond-card" style="margin-bottom:16px"><div class="cond-header-title">Cliente</div><p style="margin-top:4px;font-size:14px;font-weight:600;color:#0E2040">${nomeCliente}</p></div>
       <div class="info-box"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
-      <p style="font-size:12px;color:#5F708C;margin-top:10px">Condições de pagamento na sequência.</p>
+      <p style="font-size:12px;color:#5F708C;margin-top:10px">Valor e condições de pagamento a seguir.</p>
     `)
   }
 
@@ -582,8 +582,14 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
 
   // Modelo "Direto ao Ponto": cliente/escopo/investimento/pagamento/aceite logo
   // no início — institucional vira material de apoio no final.
+  // Direto ao Ponto: Resumo já cobre o escopo qualitativo (não repete
+  // secEntregas — ver comentário acima). Aceite fica sempre por último, depois
+  // de todo o conteúdo de apoio — assinar é o ato final, não algo que acontece
+  // antes do cliente ver garantias/institucional. Apresentação (Quem Somos)
+  // vem antes de Diferenciais (Por que nos escolher), mesma ordem lógica do
+  // modelo Clássico: primeiro diz quem é, depois por que escolher.
   const sections = proposta?.modeloProposta === 'direto_ao_ponto'
-    ? `${secResumo}${secEscopo}${secEntregas}${secCondicoes}${secAceite}${secGarantias}${secDiferenciais}${secApresentacao}${secFornecedores}${secComoFunciona}${secRegulamentacao}${secObservacoes}${secConsideracoes}`
+    ? `${secResumo}${secEscopo}${secCondicoes}${secGarantias}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secObservacoes}${secConsideracoes}${secAceite}`
     : `${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secEntregas}${secEscopo}${secCondicoes}${secGarantias}${secObservacoes}${secConsideracoes}${secAceite}`
 
   const footerHtml = footerServico(numero, empresa)
@@ -637,7 +643,14 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
             if (availH > 0) {
               // Espaco vazio sobrando na ULTIMA pagina = quanto empurrar o rodape ate o pe
               var remainder = contentH % availH;
-              var fill = remainder > 0 ? (availH - remainder) : 0;
+              // Achado em 2026-08-14: quando o conteudo transborda so uma FRACAO
+              // pequena pra pagina seguinte (ex.: poucas linhas do Aceite), o
+              // "remainder" fica minusculo e "fill" vira quase uma pagina INTEIRA
+              // de padding — resultado: uma pagina em branco no fim do PDF. So
+              // preenche quando a ultima pagina ja tem conteudo substancial
+              // (>25% da altura util); caso contrario deixa o rodape logo apos
+              // o conteudo mesmo, sem tentar colar no pe da pagina.
+              var fill = remainder > availH * 0.25 ? (availH - remainder) : 0;
               // -12px de margem de seguranca evita transbordar e gerar pagina em branco
               if (fill > 24) {
                 content.style.paddingBottom = (16 + fill - 12) + 'px';
