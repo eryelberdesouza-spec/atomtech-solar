@@ -221,24 +221,14 @@ const CSS_SERVICO = `
   .parcelas-table tr:last-child td { border-bottom: none; }
 
   /* ─── ACEITE ───────────────────────────────────────────────────── */
-  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 8px; break-inside: avoid; page-break-inside: avoid; }
-  /* Espaço pra assinar em div PRÓPRIA (não como margin do grid abaixo) —
-     achado em 2026-08-14: com o vão grudado como margin-top DENTRO do
-     elemento break-inside:avoid, o Chrome trata vão+grade como um bloco
-     único que não pode quebrar, e quando não cabe empurra os DOIS (inclusive
-     o vão vazio) pra pagina nova. Como div separada e vazia, o vão pode
-     atravessar a quebra de pagina livremente (nao tem conteudo visivel pra
-     "quebrar"), so a grade de assinatura em si (pequena) fica protegida.
-     Achado em 2026-08-19 (3ª rodada): 100mm (quase 1/3 de pagina A4) somado
-     ao aceite-box já deixava pouca folga na página — o bloco de contato
-     (telefone/e-mail/site/endereço) que vem depois da grade, sem proteção
-     própria, não cabia no resto e sobrava sozinho na página seguinte, mesmo
-     a grade de assinatura cabendo. Reduzido pra 35mm (ainda dá espaço visual
-     de sobra pra assinar) e o bloco de contato passou a ficar agrupado com a
-     grade (ver secAceite) pra nunca mais separar os dois.  */
-  .assinatura-espaco { height: 35mm; }
+  /* Histórico da investigação (rodadas 1-3, ver git log) — vão gigante como
+     margin (100mm) ou como div solta pra "atravessar página" (35mm) sempre
+     acabava separando o texto de aceite da assinatura por uma quebra de
+     página. Rodada 4 (2026-08-21): o wrapper INTEIRO do bloco Aceite e
+     Assinatura (ver secAceite) agora é um único break-inside:avoid com vão
+     pequeno — sem sub-blocos, sem div vazia pra "furar" a quebra. */
+  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 40px; }
   .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
-  .assinatura-fecho { break-inside: avoid; page-break-inside: avoid; }
   .assinatura-linha {
     border-top: 1px solid #333; padding-top: 10px; text-align: center;
     font-size: 12px; font-weight: 300; color: #555;
@@ -584,35 +574,41 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>` : ''
-    // Bloco inteiro (título + texto + assinaturas + contato) sempre abre em
-    // página nova — break-before:page só no wrapper geral, nunca
-    // break-inside:avoid nele (isso empurraria o bloco inteiro, vão vazio de
-    // 35mm incluso, pra próxima página sempre que sobrasse pouco espaço).
-    // .assinatura-fecho (grade de assinatura + contato) é o único trecho
-    // protegido por break-inside:avoid — os dois ficam sempre juntos na mesma
-    // página. Ver comentário do CSS (.assinatura-espaco) pro histórico
-    // completo dessa investigação.
-    secAceite = `<div style="break-before:page;page-break-before:always">` + sec('Aceite e Assinatura', `
+    // Achado em 2026-08-21 (4ª rodada): break-before:page num <div> aninhado
+    // dentro da <td> gigante do doc-table (usada pra repetir thead/tfoot em
+    // cada página impressa) NÃO é confiável — motores de impressão do Chrome
+    // não garantem a quebra forçada nesse contexto de tabela. Resultado: o
+    // aceite-box podia cair perto do fim de uma página, e só a parte com
+    // break-inside:avoid (assinatura-fecho) pulava sozinha pra próxima,
+    // separada visualmente do texto de aceite e ficando "orfã" no topo da
+    // página seguinte — exatamente o problema que a divisão em duas peças
+    // (rodada 3) tentava evitar, só que trocou de figurino.
+    // Solução definitiva: título + aceite-box + assinaturas + contato viram
+    // UM bloco só, com vão pequeno (não mais 35mm nem 100mm) e TODO ele
+    // dentro de break-inside:avoid. Compacto assim (~450px), cabe sozinho
+    // com folga em qualquer página; se não couber mesmo, o bloco INTEIRO
+    // (aceite incluso) migra junto pra próxima — nunca mais fica assinatura
+    // órfã sem o contexto do texto de aceite ao lado.
+    secAceite = sec('Aceite e Assinatura', `
+      <div style="break-inside:avoid;page-break-inside:avoid">
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
           <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
           <p><strong>Cliente:</strong> ${nomeCliente}</p>
         </div>
-        <div class="assinatura-espaco"></div>
-        <div class="assinatura-fecho">
-          <div class="assinatura-grid">
-            <div>
-              <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
-              <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
-            </div>
-            <div>
-              <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
-              <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
-            </div>
+        <div class="assinatura-grid">
+          <div>
+            <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
+            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
           </div>
-          ${contatoInline}
+          <div>
+            <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
+            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
+          </div>
         </div>
-    `) + `</div>`
+        ${contatoInline}
+      </div>
+    `)
   }
 
   // Modelo "Direto ao Ponto": cliente/escopo/investimento/pagamento/aceite logo
