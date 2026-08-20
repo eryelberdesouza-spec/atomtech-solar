@@ -563,6 +563,10 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
   if (temAceite) {
     const contatoInline = temContato ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
+        ${empresa?.cnpj ? `<div>
+          <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">CNPJ</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.cnpj}</p>
+        </div>` : ''}
         ${empresa?.telefone ? `<div>
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
