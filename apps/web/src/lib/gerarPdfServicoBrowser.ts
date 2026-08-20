@@ -221,8 +221,18 @@ const CSS_SERVICO = `
   .parcelas-table tr:last-child td { border-bottom: none; }
 
   /* ─── ACEITE ───────────────────────────────────────────────────── */
-  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 8px; }
-  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 100mm; }
+  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 8px; break-inside: avoid; page-break-inside: avoid; }
+  /* Espaço pra assinar em div PRÓPRIA (não como margin do grid abaixo) —
+     achado em 2026-08-14: com o vão de 100mm grudado como margin-top DENTRO
+     do elemento break-inside:avoid, o Chrome trata vão+grade como um bloco
+     único que não pode quebrar, e quando não cabe empurra os DOIS (inclusive
+     o vão vazio) pra pagina nova — sobrando so um trecho pequeno de texto
+     sozinho. Como div separada e vazia, o vão pode atravessar a quebra de
+     pagina livremente (nao tem conteudo visivel pra "quebrar"), so a grade
+     de assinatura em si (pequena) fica protegida. Mesmo padrao ja usado no
+     PDF solar (.assinatura-espaco).  */
+  .assinatura-espaco { height: 100mm; }
+  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; break-inside: avoid; page-break-inside: avoid; }
   .assinatura-linha {
     border-top: 1px solid #333; padding-top: 10px; text-align: center;
     font-size: 12px; font-weight: 300; color: #555;
@@ -565,19 +575,24 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
         </div>` : ''}
       </div>` : ''
     // Bloco inteiro (título + texto + assinaturas + contato) sempre abre em
-    // página nova e não pode quebrar entre páginas — achado em 2026-08-14:
-    // com break-inside:avoid sozinho (só no conteúdo, não na seção inteira),
-    // o bloco às vezes ainda partia entre páginas, deixando só os campos de
-    // contato "órfãos" numa página final quase vazia, com o rodapé mal
-    // posicionado. O break-before precisa envolver a seção INTEIRA (incluindo
-    // o título "Aceite e Assinatura"), senão o título fica sozinho na página
-    // anterior, separado do próprio conteúdo.
-    secAceite = `<div style="break-before:page;page-break-before:always;break-inside:avoid;page-break-inside:avoid">` + sec('Aceite e Assinatura', `
+    // página nova, com espaço de sobra máximo — achado em 2026-08-14, 2ª
+    // rodada: o wrapper anterior tinha break-inside:avoid cobrindo TAMBÉM o
+    // vão de 100mm do espaço de assinatura (.assinatura-espaco) como se fosse
+    // parte indivisível do bloco. Um vão de 100mm é quase 1/3 de uma página
+    // A4 — exigir que ele NUNCA se separe do resto forçava o Chrome a
+    // empurrar o bloco inteiro pra outra página sempre que sobrava só um
+    // pouco de espaço, deixando um trecho pequeno sozinho ("mesmo cabendo na
+    // página anterior" — relato do usuário). Fix: break-inside:avoid sai do
+    // wrapper geral e vai só nos elementos pequenos que realmente precisam
+    // ficar inteiros (.aceite-box e .assinatura-grid, via CSS) — o vão vazio
+    // (sem conteúdo visível) pode atravessar a quebra de página livremente.
+    secAceite = `<div style="break-before:page;page-break-before:always">` + sec('Aceite e Assinatura', `
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
           <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
           <p><strong>Cliente:</strong> ${nomeCliente}</p>
         </div>
+        <div class="assinatura-espaco"></div>
         <div class="assinatura-grid">
           <div>
             <div class="assinatura-linha">Contratante — ${nomeCliente}</div>

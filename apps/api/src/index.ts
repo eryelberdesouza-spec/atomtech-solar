@@ -1384,6 +1384,34 @@ app.get('/run-migration-os-avulsa', async (_, res) => {
 })
 
 // ── Migração: modelo de proposta (clássico vs direto ao ponto) ────────────────
+// ── Migração: desativa retroativamente "Fornecedores" em propostas de serviço
+// (bloco específico de equipamento fotovoltaico) ────────────────────────────
+// A correção de 2026-08-14 mudou o PADRÃO pra novas propostas, mas não altera
+// bloco_proposta já gravado em propostas antigas — daí o usuário continuar
+// vendo "Fornecedores e Parceiros" ao regenerar o PDF de uma proposta criada
+// antes da correção. Idempotente: só desativa quem ainda está ativo.
+app.get('/run-migration-fornecedores-servico-retroativo', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [result]: any = await conn.execute(`
+      UPDATE bloco_proposta bp
+      INNER JOIN proposta p ON p.id = bp.proposta_id
+      SET bp.ativo = 0
+      WHERE bp.tipo_bloco = 'fornecedores'
+        AND p.tipo_proposta = 'servico_geral'
+        AND bp.ativo = 1
+    `)
+
+    await conn.end()
+    res.json({ ok: true, message: `Fornecedores desativado em ${result.affectedRows} proposta(s) de serviço` })
+  } catch (e: any) {
+    console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/run-migration-proposta-modelo', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
