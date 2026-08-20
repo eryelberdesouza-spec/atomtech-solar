@@ -458,10 +458,17 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
   }
 
   // Condições de Pagamento
+  // Leva com o valor total em destaque ANTES do detalhamento — pedido do
+  // usuário em 2026-08-14: o valor "aparecia no meio" do card da condição,
+  // sem antes ter sido apresentado como manchete. Mesmo padrão já usado no
+  // PDF solar (highlight-box com "Investimento Total" antes da quebra em
+  // formas de pagamento).
   const temConds = blocoAtivo(blocos, 'condicoes_comerciais') && condsAtivas.length > 0
   let secCondicoes = ''
   if (temConds) {
-    secCondicoes = sec('Condições de Pagamento', condsAtivas.map((cond: any) => {
+    secCondicoes = sec('Condições de Pagamento', `
+      <div class="info-box" style="margin-bottom:14px"><p><strong>Valor Total:</strong> ${fmt(totalGeral)}</p></div>
+    ` + condsAtivas.map((cond: any) => {
       const parcelas = cond.parcelas ?? []
       return `<div class="cond-card">
         <div class="cond-header">
@@ -557,10 +564,15 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>` : ''
-    // Bloco inteiro (texto + assinaturas + contato) não pode quebrar entre páginas:
-    // garante que a assinatura e as informações da empresa fiquem juntas na mesma página.
-    secAceite = sec('Aceite e Assinatura', `
-      <div style="break-inside:avoid;page-break-inside:avoid">
+    // Bloco inteiro (título + texto + assinaturas + contato) sempre abre em
+    // página nova e não pode quebrar entre páginas — achado em 2026-08-14:
+    // com break-inside:avoid sozinho (só no conteúdo, não na seção inteira),
+    // o bloco às vezes ainda partia entre páginas, deixando só os campos de
+    // contato "órfãos" numa página final quase vazia, com o rodapé mal
+    // posicionado. O break-before precisa envolver a seção INTEIRA (incluindo
+    // o título "Aceite e Assinatura"), senão o título fica sozinho na página
+    // anterior, separado do próprio conteúdo.
+    secAceite = `<div style="break-before:page;page-break-before:always;break-inside:avoid;page-break-inside:avoid">` + sec('Aceite e Assinatura', `
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
           <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
@@ -577,7 +589,7 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
           </div>
         </div>
         ${contatoInline}
-      </div>`)
+    `) + `</div>`
   }
 
   // Modelo "Direto ao Ponto": cliente/escopo/investimento/pagamento/aceite logo
