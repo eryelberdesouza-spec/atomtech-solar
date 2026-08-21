@@ -589,7 +589,7 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
     // pra empurrar o bloco INTEIRO pro topo da próxima página impressa.
     // Ver bloco "Empurra o Aceite" no <script> mais abaixo.
     secAceite = sec('Aceite e Assinatura', `
-      <div id="pdf-aceite-bloco">
+      <div id="pdf-aceite-bloco" style="break-inside:avoid;page-break-inside:avoid">
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
           <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
@@ -659,25 +659,34 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
       var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
       Promise.race([esperarFontes, timeoutFontes]).then(function() {
       setTimeout(function() {
-        // Empurra o Aceite pro topo da próxima página se ele não couber
-        // inteiro no espaço restante da página atual — break-inside:avoid
-        // não é confiável dentro do doc-table (ver comentário na geração do
-        // HTML), então a medição é feita aqui, em runtime, com o layout já
-        // renderizado de verdade.
+        // Empurra o Aceite pro topo da próxima página se ele não couber com
+        // folga no espaço restante da página atual. break-inside:avoid (CSS,
+        // no elemento) fica como primeira linha de defesa, mas rodada 5
+        // mostrou (proposta AT-2026-08195) que ele sozinho não é suficiente
+        // dentro do doc-table — por isso a medição em runtime é a proteção
+        // principal, com um colchão de segurança generoso (BUFFER) em vez de
+        // matemática de pixel exato: é preferível empurrar um pouco cedo
+        // demais (sobra um respiro no fim da página anterior) do que deixar
+        // por conta do motor de impressão decidir onde cortar — foi
+        // exatamente essa decisão do motor que separou a grade de assinatura
+        // do bloco de contato, com o texto de aceite ainda "cabendo" pelas
+        // contas mas o conjunto se partindo do mesmo jeito.
         try {
           var contentM = document.querySelector('.doc-content');
           var theadM   = document.querySelector('.doc-table thead');
           var tfootM   = document.querySelector('.doc-table tfoot');
           var aceite   = document.getElementById('pdf-aceite-bloco');
           if (contentM && theadM && tfootM && aceite) {
-            var pageHM  = Math.round(297 * 96 / 25.4);
-            var availHM = pageHM - theadM.offsetHeight - tfootM.offsetHeight;
-            var blockH  = aceite.offsetHeight;
-            if (availHM > 0 && blockH > 0 && blockH <= availHM) {
-              var offsetTop  = aceite.getBoundingClientRect().top - contentM.getBoundingClientRect().top;
-              var posInPage  = offsetTop % availHM;
-              if (posInPage + blockH > availHM) {
-                aceite.style.marginTop = (availHM - posInPage + 8) + 'px';
+            var pageHM   = Math.round(297 * 96 / 25.4);
+            var availHM  = pageHM - theadM.offsetHeight - tfootM.offsetHeight;
+            var BUFFER   = 60; // colchão de segurança em px — melhor sobrar respiro que arriscar corte
+            var blockH   = aceite.offsetHeight;
+            if (availHM > 0 && blockH > 0) {
+              var offsetTop = aceite.getBoundingClientRect().top - contentM.getBoundingClientRect().top;
+              var posInPage = ((offsetTop % availHM) + availHM) % availHM; // sempre positivo
+              var alturaEfetiva = Math.min(blockH, availHM); // nunca empurra além do que cabe numa pagina inteira
+              if (posInPage + alturaEfetiva + BUFFER > availHM) {
+                aceite.style.marginTop = (availHM - posInPage + BUFFER) + 'px';
               }
             }
           }
