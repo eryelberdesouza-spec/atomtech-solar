@@ -184,7 +184,13 @@ const CSS_SERVICO = `
   .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 12px 0; }
 
   /* ─── TABELA DE ITENS ──────────────────────────────────────────── */
-  .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 14px; page-break-inside: auto; }
+  /* A tabela não parte no meio quando cabe inteira numa página. Sem isso ela
+     quebrava deixando na página seguinte só a linha de títulos das colunas,
+     sem nenhum item embaixo, e o total logo em seguida (visto em
+     AT-2026-08195). break-inside:avoid é seguro mesmo com muitos itens: o
+     Chrome ignora a regra quando o conteúdo não cabe numa página só e quebra
+     normalmente — aí o thead repetido volta a fazer sentido. */
+  .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
   .tabela-itens thead tr { background: #0E2040; }
   .tabela-itens thead th {
     padding: 10px 12px; text-align: left; color: #fff;
