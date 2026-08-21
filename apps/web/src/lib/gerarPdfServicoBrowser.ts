@@ -228,7 +228,8 @@ const CSS_SERVICO = `
      Assinatura (ver secAceite) agora é um único break-inside:avoid com vão
      pequeno — sem sub-blocos, sem div vazia pra "furar" a quebra. */
   .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 40px; }
-  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+  .assinatura-grid { display: flex; gap: 56px; }
+  .assinatura-grid > div { flex: 1 1 0; }
   .assinatura-linha {
     border-top: 1px solid #333; padding-top: 10px; text-align: center;
     font-size: 12px; font-weight: 300; color: #555;
@@ -590,25 +591,30 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
   const temContato = blocoAtivo(blocos, 'contato')
   let secAceite = ''
   if (temAceite) {
+    // display:grid aqui já causou o bloco quebrar sozinho pra outra página
+    // mesmo dentro de um ancestral break-inside:avoid (bug conhecido do
+    // Chromium: containers CSS Grid fragmentam ignorando break-inside:avoid
+    // herdado do pai — a paginação corta bem na borda do grid). flexbox com
+    // wrap não tem esse problema e respeita a quebra do bloco pai.
     const contatoInline = temContato ? `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
-        ${empresa?.cnpj ? `<div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
+        ${empresa?.cnpj ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">CNPJ</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.cnpj}</p>
         </div>` : ''}
-        ${empresa?.telefone ? `<div>
+        ${empresa?.telefone ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
         </div>` : ''}
-        ${empresa?.email ? `<div>
+        ${empresa?.email ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">E-mail</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
         </div>` : ''}
-        ${empresa?.site ? `<div>
+        ${empresa?.site ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Site</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
         </div>` : ''}
-        ${empresa?.endereco ? `<div style="grid-column:1/-1;margin-top:2px">
+        ${empresa?.endereco ? `<div style="flex:1 1 100%;margin-top:2px">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
