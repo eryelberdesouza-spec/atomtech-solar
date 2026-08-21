@@ -178,13 +178,15 @@ const CSS_SERVICO = `
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
-    margin-bottom: 14px; line-height: 1.2;
+    margin-bottom: 14px;
     page-break-after: avoid; break-after: avoid;
-    /* Sem break-inside, quando o título era empurrado pra página seguinte a
-       linha dele podia fragmentar e deixar a parte de cima dos acentos
-       pintada no rodapé da página anterior — sobrava um "Á" solto boiando
-       acima da barra do rodapé (visto em AT-2026-08195). */
     page-break-inside: avoid; break-inside: avoid;
+    /* line-height folgado + padding-top: quando o título abre uma página, a
+       tinta dos acentos maiúsculos (o "Á" de PALÁCIO) ultrapassava o topo da
+       caixa da linha e era pintada na página ANTERIOR — sobrava um acento
+       solto boiando acima da barra do rodapé (visto em AT-2026-08195, p.2).
+       Com espaço sobrando acima do texto, a tinta fica dentro da caixa. */
+    line-height: 1.45; padding-top: 6px;
   }
   .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 12px 0; }
 
