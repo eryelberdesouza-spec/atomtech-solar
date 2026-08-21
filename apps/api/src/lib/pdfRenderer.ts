@@ -85,6 +85,16 @@ export interface RenderOpts {
   footerTemplate?: string
 }
 
+// Margem reservada pro cabeçalho/rodapé NATIVO do Puppeteer. Tem que ser
+// MAIOR que a altura dos templates (54px/48px), não igual: com valores
+// idênticos não sobra folga nenhuma e qualquer arredondamento de subpixel na
+// paginação joga a primeira linha de conteúdo POR BAIXO da barra do
+// cabeçalho — foi exatamente o que aconteceu (texto cortado ao meio no topo
+// de várias páginas, achado em 2026-08-21 olhando as páginas renderizadas).
+// A folga extra também serve de respiro visual entre a barra e o texto.
+const MARGEM_HEADER_FOOTER = { top: '86px', right: '0', bottom: '76px', left: '0' } as const
+const MARGEM_ZERO = { top: '0', right: '0', bottom: '0', left: '0' } as const
+
 async function prepararPagina(page: Page, html: string, origensPermitidas: string[]): Promise<void> {
   // Sandbox de rede: o HTML vem do cliente, então só deixamos passar o que
   // o próprio documento precisa (imagem de capa e logo). Nada de SSRF.
@@ -117,9 +127,7 @@ export async function renderPdf(html: string, opts: RenderOpts): Promise<Buffer>
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: !usaHeaderFooterNativo,   // com header/footer nativo, margin abaixo manda
-      margin: usaHeaderFooterNativo
-        ? { top: '54px', right: '0', bottom: '48px', left: '0' }  // mesma altura dos templates
-        : { top: '0', right: '0', bottom: '0', left: '0' },
+      margin: usaHeaderFooterNativo ? MARGEM_HEADER_FOOTER : MARGEM_ZERO,
       ...(usaHeaderFooterNativo ? {
         displayHeaderFooter: true,
         headerTemplate: opts.headerTemplate,
@@ -158,7 +166,7 @@ export async function renderPdfComCapaSeparada(
         await prepararPagina(page, capaHtml, opts.origensPermitidas)
         return await page.pdf({
           format: 'A4', printBackground: true, preferCSSPageSize: true,
-          margin: { top: '0', right: '0', bottom: '0', left: '0' },
+          margin: MARGEM_ZERO,
           timeout: 60_000,
         })
       } finally {
@@ -171,7 +179,7 @@ export async function renderPdfComCapaSeparada(
         await prepararPagina(page, contentHtml, opts.origensPermitidas)
         return await page.pdf({
           format: 'A4', printBackground: true, preferCSSPageSize: false,
-          margin: { top: '54px', right: '0', bottom: '48px', left: '0' },
+          margin: MARGEM_HEADER_FOOTER,
           displayHeaderFooter: true,
           headerTemplate: opts.headerTemplate ?? '<div></div>',
           footerTemplate: opts.footerTemplate ?? '<div></div>',
