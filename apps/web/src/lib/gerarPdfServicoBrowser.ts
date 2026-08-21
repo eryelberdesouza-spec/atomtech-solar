@@ -199,7 +199,17 @@ const CSS_SERVICO = `
   }
   .tabela-itens tbody td.num { text-align: right; }
   .tabela-itens tbody td.descricao { font-weight: 400; }
-  .tabela-itens tfoot tr { background: #0E2040; }
+  /* Uma linha de item nunca parte no meio entre duas páginas. */
+  .tabela-itens tbody tr { break-inside: avoid; page-break-inside: avoid; }
+  /* <tfoot> por padrão REPETE em toda página quando a tabela quebra — o
+     "Valor Total da Proposta" aparecia duas vezes, uma no fim da página e
+     outra depois da continuação da tabela (visto em AT-2026-08195). Como
+     aqui o tfoot é o total final e não um rodapé de continuação, ele tem que
+     sair uma vez só, no fim: table-row-group o coloca em ordem normal de
+     documento. O <thead> continua repetindo de propósito, pra continuação da
+     tabela manter os títulos das colunas. */
+  .tabela-itens tfoot { display: table-row-group; }
+  .tabela-itens tfoot tr { background: #0E2040; break-inside: avoid; page-break-inside: avoid; }
   .tabela-itens tfoot td { padding: 11px 12px; color: #fff; font-size: 13px; font-weight: 500; }
   .tabela-itens tfoot td.num { text-align: right; color: #fff; font-size: 15px; font-weight: 700; }
 
