@@ -85,6 +85,15 @@ gerados, sem precisar rodar o pipeline de novo.
 
 **Armadilhas de paginação do Chrome** (custaram várias iterações em 2026-07-18): cabeçalho/rodapé que repetem por página exigem `<table>` com `thead`/`tfoot` e a tabela **não pode ter height fixo** (mata a fragmentação); `break-after: page` é **ignorado em `<table>`** — tem que ficar num `<div>` wrapper.
 
+**Reescrita da paginação de proposta de serviço (2026-08-21)** — o truque de `thead`/`tfoot` acima foi ABANDONADO em `gerarPdfServicoBrowser.ts` (o de solar, `gerarPdfBrowser.ts`, ainda usa). Motivo: dentro da `<td>` gigante do doc-table, `break-inside: avoid` simplesmente **não é honrado**, e nenhuma matemática em JS prevendo limite de página funciona (outros blocos protegidos contra quebra empurram o conteúdo de forma acumulativa). Foram 6 rodadas de correção fracassadas antes de trocar a arquitetura.
+- Agora: `gerarHtmlServico(data, { serverSide: true })` devolve `{ bodyHtml, capaHtml, headerTemplate, footerTemplate }`; a API usa `renderPdfComCapaSeparada()` — **duas** chamadas `page.pdf()` (capa full-bleed com margem 0; conteúdo com `displayHeaderFooter` nativo) unidas com **pdf-lib**. Necessário porque a margem reservada pro header/footer nativo vale pra TODA página de uma mesma chamada, o que cortaria a capa.
+- Os templates de header/footer do Puppeteer renderizam **num contexto isolado** — não enxergam o `<style>` do documento, então precisam de estilo 100% inline.
+- `@page { margin: 0 }` só pode existir na capa e no fallback antigo. No documento de conteúdo ele anula a margem reservada e o cabeçalho nativo passa a **sobrepor** o texto.
+- A margem tem que ser **maior** que a altura do header/footer (hoje 86px/76px pra barras de 54px/48px). Igual = sem folga = texto cortado por baixo da barra por arredondamento de subpixel.
+- Outras armadilhas achadas no mesmo dia, todas visíveis só nas páginas renderizadas: container **CSS Grid ignora `break-inside: avoid` herdado** do pai e fragmenta na borda do grid (trocar por flexbox); `<tfoot>` **repete em cada página** quando a tabela quebra (usar `display: table-row-group` quando for total final, não rodapé de continuação); tabela sem `break-inside: avoid` parte deixando **só a linha de títulos órfã** na página seguinte; e `line-height` apertado (1.2) faz a **tinta dos acentos maiúsculos** (o "Á") vazar acima da caixa da linha e ser pintada no rodapé da página ANTERIOR.
+
+**LIÇÃO DE VERIFICAÇÃO (2026-08-21)**: ao conferir PDF, ler o arquivo com o Read **sem** o parâmetro `pages` — isso devolve as **imagens renderizadas** das páginas. A extração só de texto sai na ordem correta e dá falsa confiança: escondeu por várias rodadas tanto o texto cortado sob o cabeçalho quanto o acento órfão. Todo defeito desta investigação só ficou óbvio olhando a imagem.
+
 ## Bot WhatsApp (Fases 1 e 2 COMPLETAS — em produção desde 06-07/07/2026)
 
 **Infra** (projeto Railway `thriving-youthfulness`, d562f4ed-2cd6-44bf-9826-ad75985cf7e2):
