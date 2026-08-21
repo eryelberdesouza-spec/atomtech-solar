@@ -243,10 +243,22 @@ const CSS_SERVICO = `
     break-inside: avoid; page-break-inside: avoid;
   }
   .info-box p { margin: 0; font-weight: 400; color: #0E2040; font-size: 13px; }
+`
 
+// @page{margin:0} SÓ pode ir na capa (full-bleed, sem cabeçalho/rodapé) e no
+// fallback antigo em doc-table (cujo thead/tfoot repetido cuida do espaço em
+// FLUXO normal, sem margem reservada). Achado em 2026-08-21 (rodada 8): antes
+// isso estava dentro do CSS_SERVICO compartilhado — e como page.pdf() sempre
+// renderiza sob @media print, essa regra também valia pro documento de
+// conteúdo do caminho serverSide (rodada 7), que precisa da margem de 54px/
+// 48px reservada via JS pro cabeçalho/rodapé NATIVO do Puppeteer. Com CSS
+// forçando margin:0, o conteúdo era desenhado como se ocupasse a página
+// inteira (sem reservar aquele espaço), enquanto o cabeçalho/rodapé nativo é
+// desenhado por cima numa faixa separada — resultado: cabeçalho sobrepondo o
+// início do conteúdo em toda página de continuação.
+const CSS_PAGINA_MARGEM_ZERO = `
   @media print {
     body { margin: 0; }
-    /* margin: 0 — o tfoot cuida do rodapé sem precisar de margem reservada */
     @page { size: A4; margin: 0; }
   }
 `
@@ -700,7 +712,7 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
     // page.pdf(), porque a margem reservada pro cabeçalho/rodapé se aplicaria
     // também na capa, cortando o full-bleed dela.
     const capaDocHtml = capaHtml
-      ? `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">${estiloComum}</head><body>${capaHtml}${scriptEsperaFontes}</body></html>`
+      ? `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">${estiloComum}<style>${CSS_PAGINA_MARGEM_ZERO}</style></head><body>${capaHtml}${scriptEsperaFontes}</body></html>`
       : null
 
     const bodyHtml = `<!DOCTYPE html>
@@ -732,6 +744,7 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
   <title>Proposta ${numero} — ${nomeCliente}</title>
   <style>${JOST_FONT_FACE_CSS}</style>
   <style>${CSS_SERVICO.replace(/#F5A623/g, cor1).replace(/#2D9C4E/g, cor2)}</style>
+  <style>${CSS_PAGINA_MARGEM_ZERO}</style>
 </head>
 <body>
   ${capaHtml}
