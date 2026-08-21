@@ -10,9 +10,10 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import puppeteer from 'puppeteer-core'
-import type { Browser } from 'puppeteer-core'
+import type { Browser, Page } from 'puppeteer-core'
 import { existsSync } from 'fs'
 import { execSync } from 'child_process'
+import { PDFDocument } from 'pdf-lib'
 
 const CAMINHOS_CHROMIUM = [
   process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -72,39 +73,123 @@ async function getBrowser(): Promise<Browser> {
 export interface RenderOpts {
   /** Origens cujas requisições o Chrome pode fazer (capa, logo). Resto é bloqueado. */
   origensPermitidas: string[]
+  /**
+   * Cabeçalho/rodapé NATIVOS do Puppeteer, repetidos de verdade em cada
+   * página — usados no lugar do truque de <table><thead>/<tfoot> (que não é
+   * confiável pra controle de quebra de página dentro dele; ver histórico em
+   * gerarPdfServicoBrowser.ts). Quando presentes, margin.top/bottom reserva
+   * exatamente a altura de cada um (54px/48px, mesma medida usada nos
+   * templates) para o conteúdo não ficar por baixo.
+   */
+  headerTemplate?: string
+  footerTemplate?: string
+}
+
+async function prepararPagina(page: Page, html: string, origensPermitidas: string[]): Promise<void> {
+  // Sandbox de rede: o HTML vem do cliente, então só deixamos passar o que
+  // o próprio documento precisa (imagem de capa e logo). Nada de SSRF.
+  await page.setRequestInterception(true)
+  page.on('request', req => {
+    const url = req.url()
+    if (url.startsWith('data:') || url.startsWith('about:') || url.startsWith('blob:')) {
+      return req.continue()
+    }
+    if (origensPermitidas.some(o => url.startsWith(o))) return req.continue()
+    req.abort().catch(() => {})
+  })
+
+  await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
+  // O script do documento faz o cálculo de rodapé e sinaliza quando terminou.
+  await page
+    .waitForFunction('window.__PDF_READY__ === true', { timeout: 20_000 })
+    .catch(() => { /* documento antigo sem o flag — segue mesmo assim */ })
 }
 
 export async function renderPdf(html: string, opts: RenderOpts): Promise<Buffer> {
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
-    // Sandbox de rede: o HTML vem do cliente, então só deixamos passar o que
-    // o próprio documento precisa (imagem de capa e logo). Nada de SSRF.
-    await page.setRequestInterception(true)
-    page.on('request', req => {
-      const url = req.url()
-      if (url.startsWith('data:') || url.startsWith('about:') || url.startsWith('blob:')) {
-        return req.continue()
-      }
-      if (opts.origensPermitidas.some(o => url.startsWith(o))) return req.continue()
-      req.abort().catch(() => {})
-    })
+    await prepararPagina(page, html, opts.origensPermitidas)
 
-    await page.setContent(html, { waitUntil: 'load', timeout: 30_000 })
-    // O script do documento faz o cálculo de rodapé e sinaliza quando terminou.
-    await page
-      .waitForFunction('window.__PDF_READY__ === true', { timeout: 20_000 })
-      .catch(() => { /* documento antigo sem o flag — segue mesmo assim */ })
+    const usaHeaderFooterNativo = Boolean(opts.headerTemplate && opts.footerTemplate)
 
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      preferCSSPageSize: true,   // respeita o @page { size: A4; margin: 0 }
-      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      preferCSSPageSize: !usaHeaderFooterNativo,   // com header/footer nativo, margin abaixo manda
+      margin: usaHeaderFooterNativo
+        ? { top: '54px', right: '0', bottom: '48px', left: '0' }  // mesma altura dos templates
+        : { top: '0', right: '0', bottom: '0', left: '0' },
+      ...(usaHeaderFooterNativo ? {
+        displayHeaderFooter: true,
+        headerTemplate: opts.headerTemplate,
+        footerTemplate: opts.footerTemplate,
+      } : {}),
       timeout: 60_000,
     })
     return Buffer.from(pdf)
   } finally {
     await page.close().catch(() => {})
   }
+}
+
+/**
+ * Renderiza um documento em DUAS passagens e junta o resultado num só PDF:
+ * a capa (full-bleed, margin 0, sem cabeçalho/rodapé) e o restante do
+ * conteúdo (com cabeçalho/rodapé NATIVOS do Puppeteer repetidos por página).
+ *
+ * Por quê: quando cabeçalho/rodapé nativos estão ativos, o Puppeteer reserva
+ * a MESMA margem em TODA página do PDF — incluindo a capa, que é desenhada
+ * pra ocupar a folha inteira (297mm) sem nenhuma margem. As duas coisas são
+ * incompatíveis numa única passagem de render, por isso a capa vira um PDF
+ * de 1 página à parte (sem margem) e é colada na frente do restante.
+ */
+export async function renderPdfComCapaSeparada(
+  capaHtml: string,
+  contentHtml: string,
+  opts: RenderOpts,
+): Promise<Buffer> {
+  const browser = await getBrowser()
+
+  const [capaPdf, contentPdf] = await Promise.all([
+    (async () => {
+      const page = await browser.newPage()
+      try {
+        await prepararPagina(page, capaHtml, opts.origensPermitidas)
+        return await page.pdf({
+          format: 'A4', printBackground: true, preferCSSPageSize: true,
+          margin: { top: '0', right: '0', bottom: '0', left: '0' },
+          timeout: 60_000,
+        })
+      } finally {
+        await page.close().catch(() => {})
+      }
+    })(),
+    (async () => {
+      const page = await browser.newPage()
+      try {
+        await prepararPagina(page, contentHtml, opts.origensPermitidas)
+        return await page.pdf({
+          format: 'A4', printBackground: true, preferCSSPageSize: false,
+          margin: { top: '54px', right: '0', bottom: '48px', left: '0' },
+          displayHeaderFooter: true,
+          headerTemplate: opts.headerTemplate ?? '<div></div>',
+          footerTemplate: opts.footerTemplate ?? '<div></div>',
+          timeout: 60_000,
+        })
+      } finally {
+        await page.close().catch(() => {})
+      }
+    })(),
+  ])
+
+  const merged = await PDFDocument.create()
+  const capaDoc = await PDFDocument.load(capaPdf)
+  const contentDoc = await PDFDocument.load(contentPdf)
+  const [capaPage] = await merged.copyPages(capaDoc, [0])
+  merged.addPage(capaPage)
+  const contentPages = await merged.copyPages(contentDoc, contentDoc.getPageIndices())
+  contentPages.forEach(p => merged.addPage(p))
+
+  return Buffer.from(await merged.save())
 }

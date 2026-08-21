@@ -8,7 +8,7 @@ import { appRouter } from './routers'
 import { createContext, testConnection } from './routers/trpc'
 import { parseInter, parseSicoob } from './lib/extratoParser'
 import { parseOFX } from './lib/ofxParser'
-import { renderPdf, acharChromium } from './lib/pdfRenderer'
+import { renderPdf, renderPdfComCapaSeparada, acharChromium } from './lib/pdfRenderer'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -73,7 +73,7 @@ app.post('/pdf/render', async (req, res) => {
   }
   if (!autenticado) return res.status(401).json({ error: 'Não autenticado' })
 
-  const { html, filename } = req.body ?? {}
+  const { html, filename, headerTemplate, footerTemplate, capaHtml } = req.body ?? {}
   if (typeof html !== 'string' || !html.includes('<html')) {
     return res.status(400).json({ error: 'Campo "html" ausente ou inválido' })
   }
@@ -87,7 +87,16 @@ app.post('/pdf/render', async (req, res) => {
   ]
 
   try {
-    const pdf = await renderPdf(html, { origensPermitidas })
+    // headerTemplate/footerTemplate presentes = usa cabeçalho/rodapé NATIVO
+    // do Puppeteer por página (rodada 7), em vez do truque de tabela — só o
+    // PDF de serviço manda isso por enquanto.
+    const temHeaderFooter = typeof headerTemplate === 'string' && typeof footerTemplate === 'string'
+    const pdf = typeof capaHtml === 'string' && capaHtml.includes('<html') && temHeaderFooter
+      ? await renderPdfComCapaSeparada(capaHtml, html, { origensPermitidas, headerTemplate, footerTemplate })
+      : await renderPdf(html, {
+          origensPermitidas,
+          ...(temHeaderFooter ? { headerTemplate, footerTemplate } : {}),
+        })
     const nome = String(filename ?? 'proposta.pdf').replace(/[^\w.\-]/g, '_')
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Length', String(pdf.length))

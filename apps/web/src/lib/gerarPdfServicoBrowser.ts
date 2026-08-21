@@ -291,13 +291,52 @@ function sec(titulo: string, conteudo: string): string {
   return `<div class="section"><div class="section-title">${titulo}</div>${conteudo}</div>`
 }
 
+// ─── HEADER/FOOTER NATIVOS (Puppeteer headerTemplate/footerTemplate) ──────────
+// Rodada 7 (2026-08-21): o truque de <table><thead>/<tfoot> pra "repetir"
+// cabeçalho/rodapé por página impressa se provou definitivamente não confiável
+// pra controle de quebra de página dentro dela (break-before, break-inside e
+// até medição em JS com colchão de segurança falharam em produção — proposta
+// AT-2026-08195, bloco de assinatura separado do contato mesmo com margem de
+// segurança de 60px). Como o PDF já é gerado no servidor via Puppeteer, dá pra
+// usar o mecanismo NATIVO do Chrome pra cabeçalho/rodapé repetido por página
+// (page.pdf({headerTemplate, footerTemplate})) — aí o conteúdo flui em bloco
+// normal (fora de tabela) e break-inside:avoid volta a ser confiável de
+// verdade, do jeito que é em qualquer documento HTML comum.
+// IMPORTANTE: headerTemplate/footerTemplate rodam isolados — SEM acesso ao
+// <style> do documento principal. Estilo 100% inline aqui.
+function headerTemplateServico(numero: string, nomeEmpresa: string, logoUrl?: string | null) {
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="height:28px;max-width:140px;object-fit:contain;display:block;" alt="Logo"/>`
+    : `<div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;font-family:Arial,Helvetica,sans-serif;">${nomeEmpresa}</div>`
+  return `
+    <div style="width:100%;height:54px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+      <div>${logoHtml}</div>
+      <div style="font-size:9px;font-weight:400;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;">Proposta de Serviços &middot; ${numero}</div>
+    </div>`
+}
+
+function footerTemplateServico(numero: string, empresa: any) {
+  const partes = [
+    empresa?.nome,
+    empresa?.cidade ? `${empresa.cidade}/${empresa.estado ?? ''}` : null,
+    empresa?.email,
+    empresa?.telefone,
+  ].filter(Boolean).join(' &middot; ')
+  return `
+    <div style="width:100%;height:48px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+      <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.92);">${partes}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.8);">${numero}</div>
+    </div>`
+}
+
 // ─── GERADOR PRINCIPAL ───────────────────────────────────────────────────────
 
 // Monta o HTML completo da proposta de serviço.
 // `autoPrint: false` é usado na geração server-side (Chrome headless), onde o
 // PDF sai do page.pdf() e não do diálogo de impressão.
-export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}): string {
+export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverSide?: boolean } = {}): any {
   const autoPrint = opts.autoPrint !== false
+  const serverSide = opts.serverSide === true
   const { proposta, itensServico, condicoesComerciais, blocos, empresa, textos, cliente } = data
 
   const cor1 = empresa?.corPrimaria ?? '#F5A623'
@@ -624,6 +663,60 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
 
   const footerHtml = footerServico(numero, empresa)
   const headerHtml = headerInterno(numero, nomeEmpresa, logoUrl)
+
+  // ── Rodada 7: caminho server-side com header/footer NATIVOS do Puppeteer ──
+  // Sem doc-table, sem thead/tfoot repetido via truque de CSS — conteúdo em
+  // fluxo normal, onde break-inside:avoid (já presente em #pdf-aceite-bloco
+  // e nos outros blocos protegidos) funciona de verdade. Nenhuma medição em
+  // JS de posição de página é mais necessária.
+  if (serverSide) {
+    const estiloComum = `<style>${JOST_FONT_FACE_CSS}</style><style>${CSS_SERVICO.replace(/#F5A623/g, cor1).replace(/#2D9C4E/g, cor2)}</style>`
+    const scriptEsperaFontes = `<script>
+      window.onload = function() {
+        var esperarFontes = Promise.all([
+          document.fonts.load('300 13px Jost'), document.fonts.load('400 13px Jost'),
+          document.fonts.load('500 13px Jost'), document.fonts.load('600 13px Jost'),
+          document.fonts.load('700 13px Jost'), document.fonts.load('800 13px Jost'),
+          document.fonts.load('900 13px Jost'),
+        ]).then(function() { return document.fonts.ready })
+        var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
+        Promise.race([esperarFontes, timeoutFontes]).then(function() {
+          setTimeout(function() { window.__PDF_READY__ = true; }, 200);
+        });
+      };
+    </script>`
+
+    // Capa (se ativa) vira um DOCUMENTO PRÓPRIO — página cheia (297mm), sem
+    // margem, sem cabeçalho/rodapé. O restante do conteúdo é outro documento,
+    // com cabeçalho/rodapé nativos do Puppeteer reservando margem em toda
+    // página. A API renderiza os dois separadamente e cola a capa na frente
+    // (ver renderPdfComCapaSeparada) — não dá pra misturar os dois num único
+    // page.pdf(), porque a margem reservada pro cabeçalho/rodapé se aplicaria
+    // também na capa, cortando o full-bleed dela.
+    const capaDocHtml = capaHtml
+      ? `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">${estiloComum}</head><body>${capaHtml}${scriptEsperaFontes}</body></html>`
+      : null
+
+    const bodyHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposta ${numero} — ${nomeCliente}</title>
+  ${estiloComum}
+</head>
+<body>
+  ${sections ? `<div class="doc-content">${sections}</div>` : ''}
+  ${scriptEsperaFontes}
+</body>
+</html>`
+    return {
+      bodyHtml,
+      capaHtml: capaDocHtml,
+      headerTemplate: headerTemplateServico(numero, nomeEmpresa, logoUrl),
+      footerTemplate: footerTemplateServico(numero, empresa),
+    }
+  }
 
   const fullHtml = `<!DOCTYPE html>
 <html lang="pt-BR">

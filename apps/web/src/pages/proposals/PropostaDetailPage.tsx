@@ -1582,10 +1582,19 @@ function PropostaDetailPageInner() {
       // Caminho principal: a API renderiza com Chrome headless e devolve o PDF
       // vetorial pronto. Não passa pelo diálogo de impressão, então não há como
       // o arquivo sair rasterizado (era o que o "Microsoft Print to PDF" fazia).
-      const html = ehServico
-        ? gerarHtmlServico(dadosPdf, { autoPrint: false })
-        : gerarHTML(dadosPdf, { autoPrint: false })
-      await baixarPdfDoServidor(html, `PROP-${numero}.pdf`)
+      // Serviço usa header/footer NATIVOS do Puppeteer (rodada 7) — sem a
+      // tabela de repetição de cabeçalho/rodapé, break-inside:avoid volta a
+      // funcionar de verdade pro bloco de Aceite e Assinatura.
+      if (ehServico) {
+        const partes = gerarHtmlServico(dadosPdf, { autoPrint: false, serverSide: true })
+        await baixarPdfDoServidor(partes.bodyHtml, `PROP-${numero}.pdf`, {
+          headerTemplate: partes.headerTemplate, footerTemplate: partes.footerTemplate,
+          capaHtml: partes.capaHtml,
+        })
+      } else {
+        const html = gerarHTML(dadosPdf, { autoPrint: false })
+        await baixarPdfDoServidor(html, `PROP-${numero}.pdf`)
+      }
     } catch (e: any) {
       // Fallback: se a API estiver fora do ar, volta ao fluxo de impressão.
       console.error('Geração no servidor falhou, caindo para a impressão:', e)
