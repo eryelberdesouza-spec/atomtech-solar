@@ -574,23 +574,22 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>` : ''
-    // Achado em 2026-08-21 (4ª rodada): break-before:page num <div> aninhado
-    // dentro da <td> gigante do doc-table (usada pra repetir thead/tfoot em
-    // cada página impressa) NÃO é confiável — motores de impressão do Chrome
-    // não garantem a quebra forçada nesse contexto de tabela. Resultado: o
-    // aceite-box podia cair perto do fim de uma página, e só a parte com
-    // break-inside:avoid (assinatura-fecho) pulava sozinha pra próxima,
-    // separada visualmente do texto de aceite e ficando "orfã" no topo da
-    // página seguinte — exatamente o problema que a divisão em duas peças
-    // (rodada 3) tentava evitar, só que trocou de figurino.
-    // Solução definitiva: título + aceite-box + assinaturas + contato viram
-    // UM bloco só, com vão pequeno (não mais 35mm nem 100mm) e TODO ele
-    // dentro de break-inside:avoid. Compacto assim (~450px), cabe sozinho
-    // com folga em qualquer página; se não couber mesmo, o bloco INTEIRO
-    // (aceite incluso) migra junto pra próxima — nunca mais fica assinatura
-    // órfã sem o contexto do texto de aceite ao lado.
+    // Achado em 2026-08-21 (4ª e 5ª rodadas): break-before:page E
+    // break-inside:avoid em <div> aninhado dentro da <td> gigante do
+    // doc-table (usada pra repetir thead/tfoot em cada página impressa) NÃO
+    // são confiáveis — motores de impressão do Chrome não garantem essas
+    // quebras nesse contexto específico de tabela. O bloco de aceite podia
+    // renderizar com o texto numa página e a assinatura/contato quase uma
+    // página inteira depois, com um vão enorme no meio — break-inside:avoid
+    // simplesmente não "segurava" o bloco junto.
+    // Solução definitiva (rodada 5): parar de confiar em CSS de quebra de
+    // página aqui. O bloco carrega um id (#pdf-aceite-bloco) e o script no
+    // fim do documento MEDE em runtime se ele cabe inteiro no espaço
+    // restante da página atual; se não couber, insere um margin-top exato
+    // pra empurrar o bloco INTEIRO pro topo da próxima página impressa.
+    // Ver bloco "Empurra o Aceite" no <script> mais abaixo.
     secAceite = sec('Aceite e Assinatura', `
-      <div style="break-inside:avoid;page-break-inside:avoid">
+      <div id="pdf-aceite-bloco">
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
           <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
@@ -660,6 +659,29 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
       var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
       Promise.race([esperarFontes, timeoutFontes]).then(function() {
       setTimeout(function() {
+        // Empurra o Aceite pro topo da próxima página se ele não couber
+        // inteiro no espaço restante da página atual — break-inside:avoid
+        // não é confiável dentro do doc-table (ver comentário na geração do
+        // HTML), então a medição é feita aqui, em runtime, com o layout já
+        // renderizado de verdade.
+        try {
+          var contentM = document.querySelector('.doc-content');
+          var theadM   = document.querySelector('.doc-table thead');
+          var tfootM   = document.querySelector('.doc-table tfoot');
+          var aceite   = document.getElementById('pdf-aceite-bloco');
+          if (contentM && theadM && tfootM && aceite) {
+            var pageHM  = Math.round(297 * 96 / 25.4);
+            var availHM = pageHM - theadM.offsetHeight - tfootM.offsetHeight;
+            var blockH  = aceite.offsetHeight;
+            if (availHM > 0 && blockH > 0 && blockH <= availHM) {
+              var offsetTop  = aceite.getBoundingClientRect().top - contentM.getBoundingClientRect().top;
+              var posInPage  = offsetTop % availHM;
+              if (posInPage + blockH > availHM) {
+                aceite.style.marginTop = (availHM - posInPage + 8) + 'px';
+              }
+            }
+          }
+        } catch(e) {}
         // Empurra o tfoot ao pé da última página calculando o espaço restante
         try {
           var content  = document.querySelector('.doc-content');
