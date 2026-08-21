@@ -225,9 +225,15 @@ const CSS = `
 
   /* ─── ACEITE / ASSINATURA ─────────────────────────────────────── */
   .aceite-box { background: #f7f8fc; border-radius: 10px; padding: 20px; margin: 14px 0; }
-  /* Espaço de ~10 cm antes das linhas de assinatura */
-  .assinatura-espaco { height: 100mm; }
-  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; break-inside: avoid; page-break-inside: avoid; }
+  /* Respiro pra assinar à mão. Eram 100mm (10 cm), o que jogava as linhas de
+     assinatura e os dados da Atom quase uma página abaixo do texto do aceite.
+     26mm continua dando espaço pra caneta sem esparramar o bloco. */
+  .assinatura-espaco { height: 26mm; }
+  /* flex, não grid: container CSS Grid ignora o break-inside: avoid herdado
+     do pai e fragmenta na borda do grid (mesma armadilha já corrigida em
+     gerarPdfServicoBrowser.ts). */
+  .assinatura-grid { display: flex; gap: 48px; break-inside: avoid; page-break-inside: avoid; }
+  .assinatura-grid > div { flex: 1 1 0; }
   .assinatura-linha { border-top: 1.5px solid #222; padding-top: 10px; text-align: center; font-size: 12px; font-weight: 300; color: #555; }
 
   /* ─── CONTROLE DE QUEBRA DE PÁGINA ────────────────────────────── */
@@ -538,13 +544,13 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
         <div><div class="assinatura-linha">Atom Tech &mdash; Respons&aacute;vel Comercial</div></div>
       </div>
       ${tem('contato') ? `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;padding-top:20px;border-top:1px solid #eee">
-        <div>
+      <div style="display:flex;gap:24px;margin-top:20px;padding-top:16px;border-top:1px solid #eee">
+        <div style="flex:1 1 0">
           <p style="font-size:14px;font-weight:700;color:#0E2040;margin-bottom:6px">Contato</p>
           <p style="font-size:14px">${emp?.telefone ?? '(61) 3978-1738'}</p>
           <p style="font-size:14px">${emp?.email ?? 'contato@atomtech.tec.br'}</p>
         </div>
-        <div>
+        <div style="flex:1 1 0">
           <p style="font-size:14px;font-weight:700;color:#0E2040;margin-bottom:6px">Endere&ccedil;o</p>
           <p style="font-size:14px">${emp?.endereco ?? 'Edif&iacute;cio SIA Centro Empresarial, Sala 231 B'} &mdash; ${emp?.cidade ?? 'Bras&iacute;lia'}/DF</p>
         </div>

@@ -340,14 +340,27 @@ function sec(titulo: string, conteudo: string): string {
 // verdade, do jeito que é em qualquer documento HTML comum.
 // IMPORTANTE: headerTemplate/footerTemplate rodam isolados — SEM acesso ao
 // <style> do documento principal. Estilo 100% inline aqui.
+//
+// O Chrome embrulha o template num #header/#footer com padding e margem
+// próprios, o que deixava as faixas escuras "flutuando", afastadas do topo e
+// da base da folha. Zerar esses containers e esticar o wrapper pra altura
+// toda da faixa reservada permite encostar a barra na borda (align-items:
+// flex-start no cabeçalho, flex-end no rodapé).
+const RESET_TEMPLATE_PUPPETEER = `<style>
+  html, body { margin: 0 !important; padding: 0 !important; width: 100%; height: 100%; }
+  #header, #footer { padding: 0 !important; margin: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; }
+</style>`
+
 function headerTemplateServico(numero: string, nomeEmpresa: string, logoUrl?: string | null) {
   const logoHtml = logoUrl
     ? `<img src="${logoUrl}" style="height:28px;max-width:140px;object-fit:contain;display:block;" alt="Logo"/>`
     : `<div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;font-family:Arial,Helvetica,sans-serif;">${nomeEmpresa}</div>`
-  return `
-    <div style="width:100%;height:54px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
-      <div>${logoHtml}</div>
-      <div style="font-size:9px;font-weight:400;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;">Proposta de Serviços &middot; ${numero}</div>
+  return `${RESET_TEMPLATE_PUPPETEER}
+    <div style="width:100%;height:100%;margin:0;padding:0;display:flex;align-items:flex-start;">
+      <div style="width:100%;height:54px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+        <div>${logoHtml}</div>
+        <div style="font-size:9px;font-weight:400;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;">Proposta de Serviços &middot; ${numero}</div>
+      </div>
     </div>`
 }
 
@@ -358,10 +371,12 @@ function footerTemplateServico(numero: string, empresa: any) {
     empresa?.email,
     empresa?.telefone,
   ].filter(Boolean).join(' &middot; ')
-  return `
-    <div style="width:100%;height:48px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
-      <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.92);">${partes}</div>
-      <div style="font-size:10px;color:rgba(255,255,255,0.8);">${numero}</div>
+  return `${RESET_TEMPLATE_PUPPETEER}
+    <div style="width:100%;height:100%;margin:0;padding:0;display:flex;align-items:flex-end;">
+      <div style="width:100%;height:48px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+        <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.92);">${partes}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.8);">${numero}</div>
+      </div>
     </div>`
 }
 
