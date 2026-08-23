@@ -9,7 +9,11 @@
 
 import { API_BASE } from './trpc'
 
-export async function baixarPdfDoServidor(html: string, filename: string): Promise<void> {
+export async function baixarPdfDoServidor(
+  html: string,
+  filename: string,
+  headerFooter?: { headerTemplate: string; footerTemplate: string; capaHtml?: string | null },
+): Promise<void> {
   const token = localStorage.getItem('atomtech_token')
 
   const resp = await fetch(`${API_BASE}/pdf/render`, {
@@ -18,7 +22,11 @@ export async function baixarPdfDoServidor(html: string, filename: string): Promi
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ html, filename }),
+    body: JSON.stringify({
+      html, filename,
+      ...(headerFooter ? { headerTemplate: headerFooter.headerTemplate, footerTemplate: headerFooter.footerTemplate } : {}),
+      ...(headerFooter?.capaHtml ? { capaHtml: headerFooter.capaHtml } : {}),
+    }),
   })
 
   if (!resp.ok) {

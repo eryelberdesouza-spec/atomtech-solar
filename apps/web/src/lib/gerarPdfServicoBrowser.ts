@@ -178,13 +178,26 @@ const CSS_SERVICO = `
   .section-title {
     font-size: 17px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
-    margin-bottom: 14px; line-height: 1.2;
+    margin-bottom: 14px;
     page-break-after: avoid; break-after: avoid;
+    page-break-inside: avoid; break-inside: avoid;
+    /* line-height folgado + padding-top: quando o título abre uma página, a
+       tinta dos acentos maiúsculos (o "Á" de PALÁCIO) ultrapassava o topo da
+       caixa da linha e era pintada na página ANTERIOR — sobrava um acento
+       solto boiando acima da barra do rodapé (visto em AT-2026-08195, p.2).
+       Com espaço sobrando acima do texto, a tinta fica dentro da caixa. */
+    line-height: 1.45; padding-top: 6px;
   }
   .section-divider { border: none; border-top: 1px solid #E8EDF4; margin: 12px 0; }
 
   /* ─── TABELA DE ITENS ──────────────────────────────────────────── */
-  .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 14px; page-break-inside: auto; }
+  /* A tabela não parte no meio quando cabe inteira numa página. Sem isso ela
+     quebrava deixando na página seguinte só a linha de títulos das colunas,
+     sem nenhum item embaixo, e o total logo em seguida (visto em
+     AT-2026-08195). break-inside:avoid é seguro mesmo com muitos itens: o
+     Chrome ignora a regra quando o conteúdo não cabe numa página só e quebra
+     normalmente — aí o thead repetido volta a fazer sentido. */
+  .tabela-itens { width: 100%; border-collapse: collapse; margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
   .tabela-itens thead tr { background: #0E2040; }
   .tabela-itens thead th {
     padding: 10px 12px; text-align: left; color: #fff;
@@ -199,7 +212,17 @@ const CSS_SERVICO = `
   }
   .tabela-itens tbody td.num { text-align: right; }
   .tabela-itens tbody td.descricao { font-weight: 400; }
-  .tabela-itens tfoot tr { background: #0E2040; }
+  /* Uma linha de item nunca parte no meio entre duas páginas. */
+  .tabela-itens tbody tr { break-inside: avoid; page-break-inside: avoid; }
+  /* <tfoot> por padrão REPETE em toda página quando a tabela quebra — o
+     "Valor Total da Proposta" aparecia duas vezes, uma no fim da página e
+     outra depois da continuação da tabela (visto em AT-2026-08195). Como
+     aqui o tfoot é o total final e não um rodapé de continuação, ele tem que
+     sair uma vez só, no fim: table-row-group o coloca em ordem normal de
+     documento. O <thead> continua repetindo de propósito, pra continuação da
+     tabela manter os títulos das colunas. */
+  .tabela-itens tfoot { display: table-row-group; }
+  .tabela-itens tfoot tr { background: #0E2040; break-inside: avoid; page-break-inside: avoid; }
   .tabela-itens tfoot td { padding: 11px 12px; color: #fff; font-size: 13px; font-weight: 500; }
   .tabela-itens tfoot td.num { text-align: right; color: #fff; font-size: 15px; font-weight: 700; }
 
@@ -221,24 +244,15 @@ const CSS_SERVICO = `
   .parcelas-table tr:last-child td { border-bottom: none; }
 
   /* ─── ACEITE ───────────────────────────────────────────────────── */
-  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 8px; break-inside: avoid; page-break-inside: avoid; }
-  /* Espaço pra assinar em div PRÓPRIA (não como margin do grid abaixo) —
-     achado em 2026-08-14: com o vão grudado como margin-top DENTRO do
-     elemento break-inside:avoid, o Chrome trata vão+grade como um bloco
-     único que não pode quebrar, e quando não cabe empurra os DOIS (inclusive
-     o vão vazio) pra pagina nova. Como div separada e vazia, o vão pode
-     atravessar a quebra de pagina livremente (nao tem conteudo visivel pra
-     "quebrar"), so a grade de assinatura em si (pequena) fica protegida.
-     Achado em 2026-08-19 (3ª rodada): 100mm (quase 1/3 de pagina A4) somado
-     ao aceite-box já deixava pouca folga na página — o bloco de contato
-     (telefone/e-mail/site/endereço) que vem depois da grade, sem proteção
-     própria, não cabia no resto e sobrava sozinho na página seguinte, mesmo
-     a grade de assinatura cabendo. Reduzido pra 35mm (ainda dá espaço visual
-     de sobra pra assinar) e o bloco de contato passou a ficar agrupado com a
-     grade (ver secAceite) pra nunca mais separar os dois.  */
-  .assinatura-espaco { height: 35mm; }
-  .assinatura-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
-  .assinatura-fecho { break-inside: avoid; page-break-inside: avoid; }
+  /* Histórico da investigação (rodadas 1-3, ver git log) — vão gigante como
+     margin (100mm) ou como div solta pra "atravessar página" (35mm) sempre
+     acabava separando o texto de aceite da assinatura por uma quebra de
+     página. Rodada 4 (2026-08-21): o wrapper INTEIRO do bloco Aceite e
+     Assinatura (ver secAceite) agora é um único break-inside:avoid com vão
+     pequeno — sem sub-blocos, sem div vazia pra "furar" a quebra. */
+  .aceite-box { background: #F5F8FC; border-radius: 10px; padding: 24px; margin-bottom: 40px; }
+  .assinatura-grid { display: flex; gap: 56px; }
+  .assinatura-grid > div { flex: 1 1 0; }
   .assinatura-linha {
     border-top: 1px solid #333; padding-top: 10px; text-align: center;
     font-size: 12px; font-weight: 300; color: #555;
@@ -252,10 +266,22 @@ const CSS_SERVICO = `
     break-inside: avoid; page-break-inside: avoid;
   }
   .info-box p { margin: 0; font-weight: 400; color: #0E2040; font-size: 13px; }
+`
 
+// @page{margin:0} SÓ pode ir na capa (full-bleed, sem cabeçalho/rodapé) e no
+// fallback antigo em doc-table (cujo thead/tfoot repetido cuida do espaço em
+// FLUXO normal, sem margem reservada). Achado em 2026-08-21 (rodada 8): antes
+// isso estava dentro do CSS_SERVICO compartilhado — e como page.pdf() sempre
+// renderiza sob @media print, essa regra também valia pro documento de
+// conteúdo do caminho serverSide (rodada 7), que precisa da margem de 54px/
+// 48px reservada via JS pro cabeçalho/rodapé NATIVO do Puppeteer. Com CSS
+// forçando margin:0, o conteúdo era desenhado como se ocupasse a página
+// inteira (sem reservar aquele espaço), enquanto o cabeçalho/rodapé nativo é
+// desenhado por cima numa faixa separada — resultado: cabeçalho sobrepondo o
+// início do conteúdo em toda página de continuação.
+const CSS_PAGINA_MARGEM_ZERO = `
   @media print {
     body { margin: 0; }
-    /* margin: 0 — o tfoot cuida do rodapé sem precisar de margem reservada */
     @page { size: A4; margin: 0; }
   }
 `
@@ -301,13 +327,75 @@ function sec(titulo: string, conteudo: string): string {
   return `<div class="section"><div class="section-title">${titulo}</div>${conteudo}</div>`
 }
 
+// ─── HEADER/FOOTER NATIVOS (Puppeteer headerTemplate/footerTemplate) ──────────
+// Rodada 7 (2026-08-21): o truque de <table><thead>/<tfoot> pra "repetir"
+// cabeçalho/rodapé por página impressa se provou definitivamente não confiável
+// pra controle de quebra de página dentro dela (break-before, break-inside e
+// até medição em JS com colchão de segurança falharam em produção — proposta
+// AT-2026-08195, bloco de assinatura separado do contato mesmo com margem de
+// segurança de 60px). Como o PDF já é gerado no servidor via Puppeteer, dá pra
+// usar o mecanismo NATIVO do Chrome pra cabeçalho/rodapé repetido por página
+// (page.pdf({headerTemplate, footerTemplate})) — aí o conteúdo flui em bloco
+// normal (fora de tabela) e break-inside:avoid volta a ser confiável de
+// verdade, do jeito que é em qualquer documento HTML comum.
+// IMPORTANTE: headerTemplate/footerTemplate rodam isolados — SEM acesso ao
+// <style> do documento principal. Estilo 100% inline aqui.
+//
+// O Chrome embrulha o template num #header/#footer com padding e margem
+// próprios, o que deixava as faixas escuras "flutuando", afastadas do topo e
+// da base da folha. Zerar esses containers e esticar o wrapper pra altura
+// toda da faixa reservada permite encostar a barra na borda (align-items:
+// flex-start no cabeçalho, flex-end no rodapé).
+// NÃO usar height:100% aqui: a altura do container do template não resolve
+// pra altura da faixa, e com align-items:flex-end o rodapé foi parar fora da
+// área visível — sumiu de todas as páginas. Altura em px explícita (igual à
+// margem reservada em pdfRenderer.ts) é o que funciona.
+const RESET_TEMPLATE_PUPPETEER = `<style>
+  html, body { margin: 0 !important; padding: 0 !important; width: 100%; }
+  #header, #footer { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
+</style>`
+
+// Precisam bater com MARGEM_HEADER_FOOTER em apps/api/src/lib/pdfRenderer.ts.
+const ALTURA_FAIXA_HEADER = 86
+const ALTURA_FAIXA_FOOTER = 76
+
+function headerTemplateServico(numero: string, nomeEmpresa: string, logoUrl?: string | null) {
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="height:28px;max-width:140px;object-fit:contain;display:block;" alt="Logo"/>`
+    : `<div style="font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;font-family:Arial,Helvetica,sans-serif;">${nomeEmpresa}</div>`
+  return `${RESET_TEMPLATE_PUPPETEER}
+    <div style="width:100%;height:${ALTURA_FAIXA_HEADER}px;margin:0;padding:0;display:flex;align-items:flex-start;">
+      <div style="width:100%;height:54px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+        <div>${logoHtml}</div>
+        <div style="font-size:9px;font-weight:400;color:rgba(255,255,255,0.85);letter-spacing:1.5px;text-transform:uppercase;">Proposta de Serviços &middot; ${numero}</div>
+      </div>
+    </div>`
+}
+
+function footerTemplateServico(numero: string, empresa: any) {
+  const partes = [
+    empresa?.nome,
+    empresa?.cidade ? `${empresa.cidade}/${empresa.estado ?? ''}` : null,
+    empresa?.email,
+    empresa?.telefone,
+  ].filter(Boolean).join(' &middot; ')
+  return `${RESET_TEMPLATE_PUPPETEER}
+    <div style="width:100%;height:${ALTURA_FAIXA_FOOTER}px;margin:0;padding:0;display:flex;align-items:flex-end;">
+      <div style="width:100%;height:48px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+        <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.92);">${partes}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.8);">${numero}</div>
+      </div>
+    </div>`
+}
+
 // ─── GERADOR PRINCIPAL ───────────────────────────────────────────────────────
 
 // Monta o HTML completo da proposta de serviço.
 // `autoPrint: false` é usado na geração server-side (Chrome headless), onde o
 // PDF sai do page.pdf() e não do diálogo de impressão.
-export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}): string {
+export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverSide?: boolean } = {}): any {
   const autoPrint = opts.autoPrint !== false
+  const serverSide = opts.serverSide === true
   const { proposta, itensServico, condicoesComerciais, blocos, empresa, textos, cliente } = data
 
   const cor1 = empresa?.corPrimaria ?? '#F5A623'
@@ -561,54 +649,68 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
   const temContato = blocoAtivo(blocos, 'contato')
   let secAceite = ''
   if (temAceite) {
+    // display:grid aqui já causou o bloco quebrar sozinho pra outra página
+    // mesmo dentro de um ancestral break-inside:avoid (bug conhecido do
+    // Chromium: containers CSS Grid fragmentam ignorando break-inside:avoid
+    // herdado do pai — a paginação corta bem na borda do grid). flexbox com
+    // wrap não tem esse problema e respeita a quebra do bloco pai.
     const contatoInline = temContato ? `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
-        ${empresa?.telefone ? `<div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:32px;padding-top:24px;border-top:1px solid #E8EEF5">
+        ${empresa?.cnpj ? `<div style="flex:1 1 40%">
+          <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">CNPJ</p>
+          <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.cnpj}</p>
+        </div>` : ''}
+        ${empresa?.telefone ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Telefone</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.telefone}</p>
         </div>` : ''}
-        ${empresa?.email ? `<div>
+        ${empresa?.email ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">E-mail</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.email}</p>
         </div>` : ''}
-        ${empresa?.site ? `<div>
+        ${empresa?.site ? `<div style="flex:1 1 40%">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Site</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.site}</p>
         </div>` : ''}
-        ${empresa?.endereco ? `<div style="grid-column:1/-1;margin-top:2px">
+        ${empresa?.endereco ? `<div style="flex:1 1 100%;margin-top:2px">
           <p style="color:#5F708C;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Endereço</p>
           <p style="font-size:14px;font-weight:600;color:#0E2040;margin:0">${empresa.endereco}${empresa.cidade ? `, ${empresa.cidade}/${empresa.estado}` : ''}</p>
         </div>` : ''}
       </div>` : ''
-    // Bloco inteiro (título + texto + assinaturas + contato) sempre abre em
-    // página nova — break-before:page só no wrapper geral, nunca
-    // break-inside:avoid nele (isso empurraria o bloco inteiro, vão vazio de
-    // 35mm incluso, pra próxima página sempre que sobrasse pouco espaço).
-    // .assinatura-fecho (grade de assinatura + contato) é o único trecho
-    // protegido por break-inside:avoid — os dois ficam sempre juntos na mesma
-    // página. Ver comentário do CSS (.assinatura-espaco) pro histórico
-    // completo dessa investigação.
-    secAceite = `<div style="break-before:page;page-break-before:always">` + sec('Aceite e Assinatura', `
+    // Achado em 2026-08-21 (4ª e 5ª rodadas): break-before:page E
+    // break-inside:avoid em <div> aninhado dentro da <td> gigante do
+    // doc-table (usada pra repetir thead/tfoot em cada página impressa) NÃO
+    // são confiáveis — motores de impressão do Chrome não garantem essas
+    // quebras nesse contexto específico de tabela. O bloco de aceite podia
+    // renderizar com o texto numa página e a assinatura/contato quase uma
+    // página inteira depois, com um vão enorme no meio — break-inside:avoid
+    // simplesmente não "segurava" o bloco junto.
+    // Solução definitiva (rodada 5): parar de confiar em CSS de quebra de
+    // página aqui. O bloco carrega um id (#pdf-aceite-bloco) e o script no
+    // fim do documento MEDE em runtime se ele cabe inteiro no espaço
+    // restante da página atual; se não couber, insere um margin-top exato
+    // pra empurrar o bloco INTEIRO pro topo da próxima página impressa.
+    // Ver bloco "Empurra o Aceite" no <script> mais abaixo.
+    secAceite = sec('Aceite e Assinatura', `
+      <div id="pdf-aceite-bloco" style="break-inside:avoid;page-break-inside:avoid">
         <div class="aceite-box">
           <p>Ao assinar este documento, o contratante declara estar de acordo com todos os termos, condições, escopo de serviços e valores descritos nesta proposta comercial.</p>
           <p style="margin-top:10px"><strong>Proposta:</strong> ${numero} &nbsp;&nbsp; <strong>Valor Total:</strong> ${fmt(totalGeral)}</p>
           <p><strong>Cliente:</strong> ${nomeCliente}</p>
         </div>
-        <div class="assinatura-espaco"></div>
-        <div class="assinatura-fecho">
-          <div class="assinatura-grid">
-            <div>
-              <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
-              <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
-            </div>
-            <div>
-              <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
-              <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
-            </div>
+        <div class="assinatura-grid">
+          <div>
+            <div class="assinatura-linha">Contratante — ${nomeCliente}</div>
+            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
           </div>
-          ${contatoInline}
+          <div>
+            <div class="assinatura-linha">Contratada — ${nomeEmpresa}</div>
+            <p style="text-align:center;font-size:11px;color:#999;margin-top:8px">Data: ___/___/______</p>
+          </div>
         </div>
-    `) + `</div>`
+        ${contatoInline}
+      </div>
+    `)
   }
 
   // Modelo "Direto ao Ponto": cliente/escopo/investimento/pagamento/aceite logo
@@ -626,6 +728,60 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
   const footerHtml = footerServico(numero, empresa)
   const headerHtml = headerInterno(numero, nomeEmpresa, logoUrl)
 
+  // ── Rodada 7: caminho server-side com header/footer NATIVOS do Puppeteer ──
+  // Sem doc-table, sem thead/tfoot repetido via truque de CSS — conteúdo em
+  // fluxo normal, onde break-inside:avoid (já presente em #pdf-aceite-bloco
+  // e nos outros blocos protegidos) funciona de verdade. Nenhuma medição em
+  // JS de posição de página é mais necessária.
+  if (serverSide) {
+    const estiloComum = `<style>${JOST_FONT_FACE_CSS}</style><style>${CSS_SERVICO.replace(/#F5A623/g, cor1).replace(/#2D9C4E/g, cor2)}</style>`
+    const scriptEsperaFontes = `<script>
+      window.onload = function() {
+        var esperarFontes = Promise.all([
+          document.fonts.load('300 13px Jost'), document.fonts.load('400 13px Jost'),
+          document.fonts.load('500 13px Jost'), document.fonts.load('600 13px Jost'),
+          document.fonts.load('700 13px Jost'), document.fonts.load('800 13px Jost'),
+          document.fonts.load('900 13px Jost'),
+        ]).then(function() { return document.fonts.ready })
+        var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
+        Promise.race([esperarFontes, timeoutFontes]).then(function() {
+          setTimeout(function() { window.__PDF_READY__ = true; }, 200);
+        });
+      };
+    </script>`
+
+    // Capa (se ativa) vira um DOCUMENTO PRÓPRIO — página cheia (297mm), sem
+    // margem, sem cabeçalho/rodapé. O restante do conteúdo é outro documento,
+    // com cabeçalho/rodapé nativos do Puppeteer reservando margem em toda
+    // página. A API renderiza os dois separadamente e cola a capa na frente
+    // (ver renderPdfComCapaSeparada) — não dá pra misturar os dois num único
+    // page.pdf(), porque a margem reservada pro cabeçalho/rodapé se aplicaria
+    // também na capa, cortando o full-bleed dela.
+    const capaDocHtml = capaHtml
+      ? `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">${estiloComum}<style>${CSS_PAGINA_MARGEM_ZERO}</style></head><body>${capaHtml}${scriptEsperaFontes}</body></html>`
+      : null
+
+    const bodyHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposta ${numero} — ${nomeCliente}</title>
+  ${estiloComum}
+</head>
+<body>
+  ${sections ? `<div class="doc-content">${sections}</div>` : ''}
+  ${scriptEsperaFontes}
+</body>
+</html>`
+    return {
+      bodyHtml,
+      capaHtml: capaDocHtml,
+      headerTemplate: headerTemplateServico(numero, nomeEmpresa, logoUrl),
+      footerTemplate: footerTemplateServico(numero, empresa),
+    }
+  }
+
   const fullHtml = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -634,6 +790,7 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
   <title>Proposta ${numero} — ${nomeCliente}</title>
   <style>${JOST_FONT_FACE_CSS}</style>
   <style>${CSS_SERVICO.replace(/#F5A623/g, cor1).replace(/#2D9C4E/g, cor2)}</style>
+  <style>${CSS_PAGINA_MARGEM_ZERO}</style>
 </head>
 <body>
   ${capaHtml}
@@ -660,6 +817,38 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean } = {}):
       var timeoutFontes = new Promise(function(res) { setTimeout(res, 5000) })
       Promise.race([esperarFontes, timeoutFontes]).then(function() {
       setTimeout(function() {
+        // Empurra o Aceite pro topo da próxima página se ele não couber com
+        // folga no espaço restante da página atual. break-inside:avoid (CSS,
+        // no elemento) fica como primeira linha de defesa, mas rodada 5
+        // mostrou (proposta AT-2026-08195) que ele sozinho não é suficiente
+        // dentro do doc-table — por isso a medição em runtime é a proteção
+        // principal, com um colchão de segurança generoso (BUFFER) em vez de
+        // matemática de pixel exato: é preferível empurrar um pouco cedo
+        // demais (sobra um respiro no fim da página anterior) do que deixar
+        // por conta do motor de impressão decidir onde cortar — foi
+        // exatamente essa decisão do motor que separou a grade de assinatura
+        // do bloco de contato, com o texto de aceite ainda "cabendo" pelas
+        // contas mas o conjunto se partindo do mesmo jeito.
+        try {
+          var contentM = document.querySelector('.doc-content');
+          var theadM   = document.querySelector('.doc-table thead');
+          var tfootM   = document.querySelector('.doc-table tfoot');
+          var aceite   = document.getElementById('pdf-aceite-bloco');
+          if (contentM && theadM && tfootM && aceite) {
+            var pageHM   = Math.round(297 * 96 / 25.4);
+            var availHM  = pageHM - theadM.offsetHeight - tfootM.offsetHeight;
+            var BUFFER   = 60; // colchão de segurança em px — melhor sobrar respiro que arriscar corte
+            var blockH   = aceite.offsetHeight;
+            if (availHM > 0 && blockH > 0) {
+              var offsetTop = aceite.getBoundingClientRect().top - contentM.getBoundingClientRect().top;
+              var posInPage = ((offsetTop % availHM) + availHM) % availHM; // sempre positivo
+              var alturaEfetiva = Math.min(blockH, availHM); // nunca empurra além do que cabe numa pagina inteira
+              if (posInPage + alturaEfetiva + BUFFER > availHM) {
+                aceite.style.marginTop = (availHM - posInPage + BUFFER) + 'px';
+              }
+            }
+          }
+        } catch(e) {}
         // Empurra o tfoot ao pé da última página calculando o espaço restante
         try {
           var content  = document.querySelector('.doc-content');
