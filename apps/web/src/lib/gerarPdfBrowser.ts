@@ -375,10 +375,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
         <div class="section-sub">O que estamos propondo</div>
         <p>Sistema fotovoltaico dimensionado para o seu perfil de consumo, com equipamentos, instala&ccedil;&atilde;o e projeto de engenharia inclusos &mdash; detalhado nas pr&oacute;ximas p&aacute;ginas.</p>
       </div>
-      <p style="margin-top:18px;font-size:12px;color:#888">Valor e condi&ccedil;&otilde;es de pagamento a seguir.</p>
-      <div style="margin-top:16px;font-size:12px;color:#888">
-        <strong style="color:#0E2040">Contato:</strong> ${cli?.telefone ?? ''}${cli?.email ? ` &middot; ${cli.email}` : ''}
-      </div>`, numero, logoUrl, emp) : ''
+      <p style="margin-top:18px;font-size:12px;color:#888">Valor e condi&ccedil;&otilde;es de pagamento a seguir.</p>`, numero, logoUrl, emp) : ''
 
   // ── APRESENTAÇÃO ─────────────────────────────────────────────────────────
   const apresentacao = tem('apresentacao_empresa') ? sheet(`
