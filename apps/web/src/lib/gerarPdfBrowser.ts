@@ -359,8 +359,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
       <div style="margin-top:4px">
         <div class="section-sub">O que estamos propondo</div>
         <p>Sistema fotovoltaico dimensionado para o seu perfil de consumo, com equipamentos, instala&ccedil;&atilde;o e projeto de engenharia inclusos &mdash; detalhado nas pr&oacute;ximas p&aacute;ginas.</p>
-      </div>
-      <p style="margin-top:18px;font-size:12px;color:#888">Valor e condi&ccedil;&otilde;es de pagamento a seguir.</p>`) : ''
+      </div>`) : ''
 
   // ── APRESENTAÇÃO ─────────────────────────────────────────────────────────
   const secApresentacao = tem('apresentacao_empresa') ? sec('Conhe&ccedil;a a Atom Tech', `

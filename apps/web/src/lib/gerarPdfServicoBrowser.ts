@@ -614,7 +614,6 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
     secResumo = sec('Resumo da Proposta', `
       <div class="cond-card" style="margin-bottom:16px"><div class="cond-header-title">Cliente</div><p style="margin-top:4px;font-size:14px;font-weight:600;color:#0E2040">${nomeCliente}</p></div>
       <div class="info-box"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
-      <p style="font-size:12px;color:#5F708C;margin-top:10px">Valor e condições de pagamento a seguir.</p>
     `)
   }
 
