@@ -127,6 +127,14 @@ const IcoRelatorioEnergia = () => (
   </svg>
 )
 
+// Relatório de Recargas — plugue/carregador
+const IcoRelatorioRecargas = () => (
+  <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M7 3v4M13 3v4M6 7h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7Z"/>
+    <path d="M14 12l-3 4h3l-3 4"/>
+  </svg>
+)
+
 // Configurações — engrenagem
 const IcoConfiguracoes = () => (
   <svg {...s()} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -143,6 +151,7 @@ const NAV: NavItem[] = [
   { path: '/faturas',        label: 'Faturas',       Icon: IcoFaturas,       color: '#BC8CFF', desc: 'Contas de energia' },
   { path: '/ordens-servico', label: 'Operacional',   Icon: IcoOperacional,   color: '#FB923C', desc: 'Ordens de serviço' },
   { path: '/relatorios-energia', label: 'Relatório Energia', Icon: IcoRelatorioEnergia, color: '#F5A623', desc: 'Gestão de energia solar' },
+  { path: '/relatorios-recargas', label: 'Relatório Recargas', Icon: IcoRelatorioRecargas, color: '#3DAE3D', desc: 'Eletropostos Moove' },
   { path: '/configuracoes',  label: 'Configurações', Icon: IcoConfiguracoes, color: '#8B949E', desc: 'Sistema'           },
 ]
 

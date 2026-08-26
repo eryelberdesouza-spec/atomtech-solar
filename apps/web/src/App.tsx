@@ -19,6 +19,7 @@ import { OrdensServicoPage } from './pages/operacional/OrdensServicoPage'
 import { OrdemServicoDetailPage } from './pages/operacional/OrdemServicoDetailPage'
 import { ManutencoesPage } from './pages/operacional/ManutencoesPage'
 import { RelatorioEnergiaPage } from './pages/relatorios/RelatorioEnergiaPage'
+import { RelatorioRecargasPage } from './pages/relatorios/RelatorioRecargasPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('atomtech_token')
@@ -67,6 +68,7 @@ export default function App() {
               <Route path="/ordens-servico/:id" element={<OrdemServicoDetailPage />} />
               <Route path="/manutencoes" element={<ManutencoesPage />} />
               <Route path="/relatorios-energia" element={<RelatorioEnergiaPage />} />
+              <Route path="/relatorios-recargas" element={<RelatorioRecargasPage />} />
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

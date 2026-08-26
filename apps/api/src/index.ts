@@ -9,6 +9,7 @@ import { createContext, testConnection } from './routers/trpc'
 import { parseInter, parseSicoob } from './lib/extratoParser'
 import { parseOFX } from './lib/ofxParser'
 import { renderPdf, renderPdfComCapaSeparada, acharChromium } from './lib/pdfRenderer'
+import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -273,6 +274,171 @@ app.get('/relatorio-energia/historico/:id/download', async (req, res) => {
     if (!arquivo) { res.status(404).send('Relatório não encontrado'); return }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(arquivo.arquivo_nome)}"`)
+    res.send(arquivo.arquivo_dados)
+  } catch (e: any) {
+    res.status(500).send('Erro: ' + e.message)
+  }
+})
+
+// ── Relatório de Recargas (Moove) ─────────────────────────────────────────────
+// Upload multipart do Excel exportado da Moove: /preview lê e lista as estações
+// encontradas (cruzando com o cadastro moove_estacao já existente); /gerar
+// recebe o mesmo arquivo + o mapeamento estação→cliente preenchido na tela
+// (novo ou já cadastrado, tanto faz — sempre faz upsert), gera um .xlsx
+// por cliente (marca Atom Tech, resumo + gráfico de horários + transações
+// detalhadas) e arquiva cada um em moove_relatorio_gerado.
+app.post('/moove/preview', upload.single('arquivo'), async (req, res) => {
+  const payload = payloadBearer(req)
+  if (!payload?.empresaId) return res.status(401).json({ error: 'Não autenticado' })
+
+  const arquivo = req.file
+  if (!arquivo) return res.status(400).json({ error: 'Envie o arquivo Excel da Moove' })
+
+  try {
+    const { estacoes } = await previsualizarArquivo(arquivo.buffer)
+
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [rows]: any = await conn.execute(
+      `SELECT me.nome_estacao, me.cliente_id, me.local, me.comissao_atom_percentual, c.nome AS cliente_nome
+       FROM moove_estacao me JOIN cliente c ON c.id = me.cliente_id
+       WHERE me.empresa_id = ?`,
+      [payload.empresaId],
+    )
+    await conn.end()
+
+    const cadastro = new Map((rows as any[]).map((r) => [r.nome_estacao, r]))
+
+    const resultado = estacoes.map((e) => {
+      const c = cadastro.get(e.nome)
+      return {
+        nome: e.nome,
+        numeroRecargas: e.numeroRecargas,
+        cadastrada: !!c,
+        clienteId: c?.cliente_id ?? null,
+        clienteNome: c?.cliente_nome ?? null,
+        local: c?.local ?? null,
+        comissaoAtomPercentual: c ? Number(c.comissao_atom_percentual) : 10,
+      }
+    })
+
+    res.json({ estacoes: resultado })
+  } catch (e: any) {
+    console.error('Erro ao pré-visualizar arquivo Moove:', e)
+    res.status(500).json({ error: e?.message ?? 'Falha ao ler o arquivo' })
+  }
+})
+
+app.post('/moove/gerar', upload.single('arquivo'), async (req, res) => {
+  const payload = payloadBearer(req)
+  if (!payload?.empresaId) return res.status(401).json({ error: 'Não autenticado' })
+  const { empresaId, userId } = payload
+
+  const arquivo = req.file
+  if (!arquivo) return res.status(400).json({ error: 'Envie o arquivo Excel da Moove' })
+
+  let mapeamentosRecebidos: { nomeEstacao: string; clienteId: number; local?: string; comissaoAtomPercentual: number }[]
+  try {
+    mapeamentosRecebidos = JSON.parse((req.body as any)?.mapeamentos ?? '[]')
+  } catch {
+    return res.status(400).json({ error: '"mapeamentos" inválido' })
+  }
+  if (!Array.isArray(mapeamentosRecebidos) || mapeamentosRecebidos.length === 0) {
+    return res.status(400).json({ error: 'Nenhum mapeamento estação→cliente informado' })
+  }
+
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const mapeamentosResolvidos: { nomeEstacao: string; clienteId: number; clienteNome: string; comissaoAtomPercentual: number }[] = []
+
+    for (const m of mapeamentosRecebidos) {
+      const [clienteRows]: any = await conn.execute(
+        `SELECT nome FROM cliente WHERE id = ? AND empresa_id = ? LIMIT 1`,
+        [m.clienteId, empresaId],
+      )
+      const clienteRow = (clienteRows as any[])[0]
+      if (!clienteRow) {
+        await conn.end()
+        return res.status(404).json({ error: `Cliente id ${m.clienteId} não encontrado (estação "${m.nomeEstacao}")` })
+      }
+
+      await conn.execute(
+        `INSERT INTO moove_estacao (nome_estacao, cliente_id, empresa_id, local, comissao_atom_percentual)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           cliente_id = VALUES(cliente_id), local = VALUES(local),
+           comissao_atom_percentual = VALUES(comissao_atom_percentual), updated_at = CURRENT_TIMESTAMP`,
+        [m.nomeEstacao, m.clienteId, empresaId, m.local ?? null, m.comissaoAtomPercentual],
+      )
+
+      mapeamentosResolvidos.push({
+        nomeEstacao: m.nomeEstacao,
+        clienteId: m.clienteId,
+        clienteNome: clienteRow.nome,
+        comissaoAtomPercentual: m.comissaoAtomPercentual,
+      })
+    }
+
+    const relatorios = await gerarRelatoriosPorCliente(arquivo.buffer, mapeamentosResolvidos)
+
+    const resultado: { clienteId: number; clienteNome: string; relatorioId: number; arquivoNome: string }[] = []
+    for (const r of relatorios) {
+      const buffer = Buffer.from(await r.workbook.xlsx.writeBuffer())
+      const periodoInicioSql = r.periodoInicio ? r.periodoInicio.toISOString().slice(0, 10) : null
+      const periodoFimSql = r.periodoFim ? r.periodoFim.toISOString().slice(0, 10) : null
+
+      const [insertResult]: any = await conn.execute(
+        `INSERT INTO moove_relatorio_gerado
+           (cliente_id, empresa_id, periodo_inicio, periodo_fim, arquivo_nome, arquivo_tamanho, arquivo_dados, gerado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [r.clienteId, empresaId, periodoInicioSql, periodoFimSql, r.arquivoNome, buffer.length, buffer, userId ?? null],
+      )
+
+      resultado.push({
+        clienteId: r.clienteId,
+        clienteNome: r.clienteNome,
+        relatorioId: insertResult.insertId,
+        arquivoNome: r.arquivoNome,
+      })
+    }
+
+    await conn.end()
+    res.json({ relatorios: resultado })
+  } catch (e: any) {
+    console.error('Erro ao gerar relatório de recargas:', e)
+    res.status(500).json({ error: e?.message ?? 'Falha ao gerar relatório' })
+  }
+})
+
+app.get('/moove/historico/:id/download', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const rawToken = (req.headers.authorization ?? '').replace('Bearer ', '').trim()
+                  || (req.query.token as string ?? '')
+
+    let empresaId: number | undefined
+    try {
+      const payload = JSON.parse(Buffer.from(rawToken.split('.')[1], 'base64').toString('utf-8'))
+      empresaId = payload.empresaId
+    } catch { /* token inválido */ }
+    if (!empresaId) { res.status(401).send('Não autorizado'); return }
+
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [rows]: any = await conn.execute(
+      `SELECT arquivo_nome, arquivo_dados FROM moove_relatorio_gerado
+       WHERE id = ? AND empresa_id = ? LIMIT 1`,
+      [id, empresaId],
+    )
+    await conn.end()
+
+    const arquivo = (rows as any[])[0]
+    if (!arquivo) { res.status(404).send('Relatório não encontrado'); return }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(arquivo.arquivo_nome)}"`)
     res.send(arquivo.arquivo_dados)
   } catch (e: any) {
@@ -1545,6 +1711,54 @@ app.get('/run-migration-relatorio-energia-config', async (_, res) => {
     `)
     await conn.end()
     res.json({ ok: true, message: 'Tabelas cliente_energia_solar e relatorio_energia_gerado criadas com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabelas já existiam' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
+// ── Migração: moove_estacao (cadastro estação→cliente + comissão) +
+//    moove_relatorio_gerado (histórico, .xlsx em MEDIUMBLOB — mesmo padrão de
+//    relatorio_energia_gerado/os_anexo) ─────────────────────────────────────
+app.get('/run-migration-moove', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS moove_estacao (
+        id                        INT AUTO_INCREMENT PRIMARY KEY,
+        nome_estacao              VARCHAR(255) NOT NULL,
+        cliente_id                INT NOT NULL,
+        empresa_id                INT NOT NULL,
+        local                     VARCHAR(255),
+        comissao_atom_percentual  DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+        created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at                TIMESTAMP NULL,
+        UNIQUE KEY uq_empresa_estacao (empresa_id, nome_estacao),
+        INDEX idx_me_cliente (cliente_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS moove_relatorio_gerado (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        cliente_id       INT NOT NULL,
+        empresa_id       INT NOT NULL,
+        periodo_inicio   DATE,
+        periodo_fim      DATE,
+        arquivo_nome     VARCHAR(255) NOT NULL,
+        arquivo_tamanho  INT NOT NULL,
+        arquivo_dados    MEDIUMBLOB NOT NULL,
+        gerado_por       INT,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mrg_empresa (empresa_id),
+        INDEX idx_mrg_cliente (cliente_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabelas moove_estacao e moove_relatorio_gerado criadas com sucesso' })
   } catch (e: any) {
     if (e.code === 'ER_TABLE_EXISTS_ERROR') {
       res.json({ ok: true, message: 'Tabelas já existiam' })

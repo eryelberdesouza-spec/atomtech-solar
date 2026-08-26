@@ -533,6 +533,44 @@ export const relatorioEnergiaGeradoRelations = relations(relatorioEnergiaGerado,
   cliente: one(cliente, { fields: [relatorioEnergiaGerado.clienteId], references: [cliente.id] }),
 }))
 
+// ─── MOOVE — RECARGAS DE ELETROPOSTOS ─────────────────────────────────────────
+// Cadastro estação → cliente (proprietário) + comissão negociada, e histórico
+// dos relatórios semanais gerados. Binário do .xlsx fica fora do schema Drizzle
+// (coluna arquivo_dados, MEDIUMBLOB) — mesmo padrão de relatorio_energia_gerado.
+
+export const mooveEstacao = mysqlTable('moove_estacao', {
+  id: int('id').primaryKey().autoincrement(),
+  nomeEstacao: varchar('nome_estacao', { length: 255 }).notNull(), // texto exato da coluna "Estação" do Excel da Moove
+  clienteId: int('cliente_id').notNull().references(() => cliente.id),
+  empresaId: int('empresa_id').notNull().references(() => empresa.id),
+  local: varchar('local', { length: 255 }),
+  comissaoAtomPercentual: decimal('comissao_atom_percentual', { precision: 5, scale: 2 }).default('10.00').notNull(),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp('updated_at'),
+}, (t) => ({
+  uqEmpresaEstacao: uniqueIndex('uq_empresa_estacao').on(t.empresaId, t.nomeEstacao),
+}))
+
+export const mooveEstacaoRelations = relations(mooveEstacao, ({ one }) => ({
+  cliente: one(cliente, { fields: [mooveEstacao.clienteId], references: [cliente.id] }),
+}))
+
+export const mooveRelatorioGerado = mysqlTable('moove_relatorio_gerado', {
+  id: int('id').primaryKey().autoincrement(),
+  clienteId: int('cliente_id').notNull().references(() => cliente.id),
+  empresaId: int('empresa_id').notNull().references(() => empresa.id),
+  periodoInicio: date('periodo_inicio'),
+  periodoFim: date('periodo_fim'),
+  arquivoNome: varchar('arquivo_nome', { length: 255 }).notNull(),
+  arquivoTamanho: int('arquivo_tamanho').notNull(),
+  geradoPor: int('gerado_por').references(() => usuario.id),
+  createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
+})
+
+export const mooveRelatorioGeradoRelations = relations(mooveRelatorioGerado, ({ one }) => ({
+  cliente: one(cliente, { fields: [mooveRelatorioGerado.clienteId], references: [cliente.id] }),
+}))
+
 export const itemServicoProposta = mysqlTable('item_servico_proposta', {
   id: int('id').primaryKey().autoincrement(),
   propostaId: int('proposta_id').notNull().references(() => proposta.id, { onDelete: 'cascade' }),

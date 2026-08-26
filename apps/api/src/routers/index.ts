@@ -14,6 +14,7 @@ import { modeloBlocoRouter }  from './modeloBloco.router'
 import { finRouter }          from './fin.router'
 import { osRouter }           from './os.router'
 import { relatorioEnergiaRouter } from './relatorioEnergia.router'
+import { mooveRouter } from './moove.router'
 
 export const appRouter = router({
   auth:               authRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
   fin:                finRouter,
   os:                 osRouter,
   relatorioEnergia:   relatorioEnergiaRouter,
+  moove:              mooveRouter,
 })
 
 export type AppRouter = typeof appRouter

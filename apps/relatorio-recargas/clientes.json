@@ -1,0 +1,17 @@
+[
+  {
+    "cliente": "Rodão Auto Center",
+    "emails": [
+      "contato@rodao.com.br"
+    ],
+    "estacoes": [
+      {
+        "nome": "01- HIBRIDO RODÃO AUTO CENTER",
+        "cobranca": {
+          "tipo": "valor_fixo_kwh",
+          "valor": 0.75
+        }
+      }
+    ]
+  }
+]
