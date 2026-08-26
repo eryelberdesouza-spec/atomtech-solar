@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════
-// gerarPdfBrowser.ts — Geração de PDF via window.print()
-// Inclui: nome do cliente em destaque, fluxo de caixa 25 anos
+// gerarPdfBrowser.ts — PDF de Proposta Solar (fotovoltaico)
 // ═══════════════════════════════════════════════════════════════════
+
+import { JOST_FONT_FACE_CSS } from './jostFontEmbed'
 
 const formatCurrency = (v: number | string | null | undefined): string => {
   const n = Number(v ?? 0)
@@ -41,7 +42,7 @@ function renderTexto(txt: string | undefined | null): string {
 
 const CSS = `
   /* ─── RESET ──────────────────────────────────────────────────── */
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
   /* ─── TIPOGRAFIA ─────────────────────────────────────────────── */
   body {
@@ -69,31 +70,6 @@ const CSS = `
   }
   ul { padding-left: 20px; margin: 8px 0 12px; }
   li { font-size: 15px; font-weight: 300; color: #444; line-height: 1.9; }
-
-  /* ─── FOLHA A4 ────────────────────────────────────────────────── */
-  /* Cada folha é uma <table>: o Chrome repete thead no topo e tfoot no pé
-     de CADA página impressa quando o conteúdo transborda — é o que garante
-     cabeçalho/rodapé íntegros com conteúdo de tamanho variável (mesma
-     técnica do gerarPdfServicoBrowser.ts).
-     IMPORTANTE: a tabela NÃO pode ter height fixo (impede a fragmentação e
-     o thead deixa de repetir) e o break-after precisa ficar no div wrapper
-     (o Chrome ignora break-after em <table>). O rodapé é colado no pé da
-     última página via preenchimento medido em JS antes do print. */
-  .sheet-wrap { page-break-after: always; break-after: page; }
-  .sheet-wrap:last-of-type { page-break-after: auto; break-after: auto; }
-  table.sheet {
-    width: 210mm;
-    border-collapse: collapse;
-    border-spacing: 0;
-  }
-  table.sheet > thead { display: table-header-group; }
-  table.sheet > tfoot { display: table-footer-group; }
-  table.sheet > thead > tr > td,
-  table.sheet > tfoot > tr > td,
-  table.sheet > tbody > tr > td {
-    padding: 0; border: none; background: transparent; text-align: left;
-  }
-  table.sheet > tbody > tr > td { vertical-align: top; }
 
   /* ─── CAPA ────────────────────────────────────────────────────── */
   .capa {
@@ -145,33 +121,23 @@ const CSS = `
   .capa-footer { display: flex; gap: 3mm; align-items: center; color: rgba(255,255,255,0.85); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; }
   .capa-footer-bar { width: 1.2mm; height: 8mm; background: #f2c23b !important; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  /* ─── HEADER INTERNO ─────────────────────────────────────────── */
-  .header-interno {
-    background: #0E2040;
-    padding: 12px 36px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .header-logo { font-family: Calibri, Candara, sans-serif; font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
-  .header-logo span { color: #F5A623; }
-  .header-tag { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.8); letter-spacing: 3px; text-transform: uppercase; }
-
-  /* ─── FOOTER ─────────────────────────────────────────────────── */
-  .footer {
-    background: #0E2040;
-    padding: 12px 36px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .footer-text { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.85); line-height: 1.5; }
-  .footer-numero { font-size: 10px; color: rgba(255,255,255,0.7); font-family: Calibri, Candara, monospace; }
-
-  /* ─── SEÇÃO CONTEÚDO ─────────────────────────────────────────── */
-  .section { padding: 20px 36px; }
+  /* ─── DOCUMENTO DE CONTEÚDO (fluxo normal — cabeçalho/rodapé NATIVOS do
+         Puppeteer reservam a margem; ver gerarHTML/serverSide) ──────────── */
+  .doc-content { padding: 0 36px 16px; }
+  .section { margin-bottom: 32px; }
+  .section + .section { margin-top: 8px; }
   .section-title {
     font-family: Calibri, Candara, sans-serif;
     font-size: 22px; font-weight: 600; color: #0E2040;
     border-left: 4px solid #F5A623; padding-left: 12px;
     margin-bottom: 16px;
     break-after: avoid; page-break-after: avoid;
+    page-break-inside: avoid; break-inside: avoid;
+    /* line-height folgado + padding-top: sem isso a tinta dos acentos
+       maiúsculos (o "Á" de PALÁCIO) vazava acima da caixa da linha quando o
+       título abria página nova, e era pintada no rodapé da página ANTERIOR —
+       mesma armadilha já corrigida no gerador de serviço. */
+    line-height: 1.45; padding-top: 6px;
   }
   .section-sub { font-family: Calibri, Candara, sans-serif; font-size: 16px; font-weight: 600; color: #0E2040; margin: 28px 0 12px; padding-top: 16px; border-top: 1px solid #eee; break-after: avoid; page-break-after: avoid; }
 
@@ -183,8 +149,7 @@ const CSS = `
   .kpi-value { font-family: Calibri, Candara, sans-serif; font-size: 23px; font-weight: 700; color: #0E2040; margin-top: 4px; }
   .kpi-unit { font-family: Calibri, Candara, sans-serif; font-size: 12px; font-weight: 300; color: #888; }
 
-  /* ─── TABELAS DE CONTEÚDO (escopadas em .section para não afetar a
-         tabela-folha .sheet) ─────────────────────────────────────── */
+  /* ─── TABELAS DE CONTEÚDO ─────────────────────────────────────── */
   .section table { width: 100%; border-collapse: collapse; margin: 8px 0; }
   .section table thead { display: table-header-group; } /* repete o cabeçalho da tabela se ela quebrar de página */
   .section tr { break-inside: avoid; page-break-inside: avoid; }
@@ -196,12 +161,12 @@ const CSS = `
   .fluxo-negativo { color: #d32f2f; }
 
   /* ─── HIGHLIGHT ───────────────────────────────────────────────── */
-  .highlight-box { background: linear-gradient(135deg, #fff8e8, #fff3d0); border-left: 4px solid #F5A623; padding: 13px 18px; border-radius: 0 8px 8px 0; margin: 10px 0 14px; }
+  .highlight-box { background: linear-gradient(135deg, #fff8e8, #fff3d0); border-left: 4px solid #F5A623; padding: 13px 18px; border-radius: 0 8px 8px 0; margin: 10px 0 14px; break-inside: avoid; page-break-inside: avoid; }
   .highlight-box p { margin: 0; font-weight: 400; color: #0E2040; font-size: 15px; }
 
   /* ─── COMPARATIVO ─────────────────────────────────────────────── */
   .comparativo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-  .comp-card { border-radius: 10px; padding: 14px; text-align: center; }
+  .comp-card { border-radius: 10px; padding: 14px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
   .comp-poupanca { background: #f0f7f0; }
   .comp-rf { background: #f0f4f7; }
   .comp-solar { background: linear-gradient(135deg, #fff8e8, #fff3d0); border: 2px solid #F5A623; }
@@ -210,7 +175,7 @@ const CSS = `
   .comp-badge { font-size: 12px; color: #F5A623; font-weight: 600; margin-top: 4px; }
 
   /* ─── REDUÇÃO DA CONTA ────────────────────────────────────────── */
-  .reducao-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; margin: 10px 0; }
+  .reducao-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; margin: 10px 0; break-inside: avoid; page-break-inside: avoid; }
   .reducao-header { background: #0E2040; color: #fff; padding: 9px 14px; font-family: Calibri, Candara, sans-serif; font-size: 10px; font-weight: 400; }
   .reducao-cell { background: #f7f8fc; padding: 12px 14px; }
   .reducao-label { font-size: 9px; font-weight: 300; color: #888; text-transform: uppercase; letter-spacing: 1px; }
@@ -218,79 +183,94 @@ const CSS = `
   .reducao-value.economia { color: #2D9C4E; }
 
   /* ─── PAGAMENTO ───────────────────────────────────────────────── */
-  .pagamento-box { border: 2px solid #F5A623; border-radius: 10px; padding: 14px; margin: 20px 0; }
+  .pagamento-box { border: 2px solid #F5A623; border-radius: 10px; padding: 14px; margin: 20px 0; break-inside: avoid; page-break-inside: avoid; }
   .pagamento-tipo { font-family: Calibri, Candara, sans-serif; font-size: 14px; font-weight: 600; color: #0E2040; margin-bottom: 8px; }
   .pagamento-linha { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f5f5f5; font-size: 14px; font-weight: 300; }
   .pagamento-linha:last-child { border-bottom: none; }
 
   /* ─── ACEITE / ASSINATURA ─────────────────────────────────────── */
   .aceite-box { background: #f7f8fc; border-radius: 10px; padding: 20px; margin: 14px 0; }
-  /* Respiro pra assinar à mão. Eram 100mm (10 cm), o que jogava as linhas de
-     assinatura e os dados da Atom quase uma página abaixo do texto do aceite.
-     26mm continua dando espaço pra caneta sem esparramar o bloco. */
   .assinatura-espaco { height: 26mm; }
   /* flex, não grid: container CSS Grid ignora o break-inside: avoid herdado
-     do pai e fragmenta na borda do grid (mesma armadilha já corrigida em
-     gerarPdfServicoBrowser.ts). */
-  .assinatura-grid { display: flex; gap: 48px; break-inside: avoid; page-break-inside: avoid; }
+     do pai e fragmenta na borda do grid (armadilha conhecida do Chromium). */
+  .assinatura-grid { display: flex; gap: 48px; }
   .assinatura-grid > div { flex: 1 1 0; }
   .assinatura-linha { border-top: 1.5px solid #222; padding-top: 10px; text-align: center; font-size: 12px; font-weight: 300; color: #555; }
 
   /* ─── CONTROLE DE QUEBRA DE PÁGINA ────────────────────────────── */
-  .kpi-card, .comp-card, .pagamento-box, .highlight-box, .aceite-box,
-  .reducao-grid, .assinatura-grid {
+  .kpi-card, .aceite-bloco {
     break-inside: avoid; page-break-inside: avoid;
   }
+`
 
-  /* ─── PRINT ───────────────────────────────────────────────────── */
+// @page{margin:0} SÓ pode ir na capa (full-bleed, sem cabeçalho/rodapé) — o
+// documento de conteúdo do caminho serverSide precisa da margem reservada
+// via JS pro cabeçalho/rodapé NATIVO do Puppeteer (ver renderPdfComCapaSeparada
+// em apps/api/src/lib/pdfRenderer.ts). Mesmo achado já documentado em
+// gerarPdfServicoBrowser.ts.
+const CSS_PAGINA_MARGEM_ZERO = `
   @media print {
-    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { font-family: 'Calibri Light', Calibri, Candara, sans-serif; font-weight: 300; }
+    body { margin: 0; }
     @page { size: A4; margin: 0; }
   }
 `
 
-function headerInterno(numero: string, logoUrl?: string | null) {
-  return `<div class="header-interno">
-    <div class="header-logo">
-      ${logoUrl ? `<img src="${logoUrl}" style="height:24px;max-width:130px;object-fit:contain;vertical-align:middle;" alt="Logo"/>` : `ATOM<span>TECH</span>`}
-      <small style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.75);margin-left:8px">Energia Solar e Tecnologia</small>
-    </div>
-    <div class="header-tag">Proposta Comercial &middot; ${numero}</div>
-  </div>`
+function sec(titulo: string, conteudo: string): string {
+  return conteudo ? `<div class="section"><div class="section-title">${titulo}</div>${conteudo}</div>` : ''
 }
 
-function footer(numero: string, emp?: any) {
+// ─── HEADER/FOOTER NATIVOS (Puppeteer headerTemplate/footerTemplate) ──────────
+// Migração decidida em 2026-08-21 (ver CLAUDE.md, "PENDÊNCIA CONHECIDA — rodapé
+// no meio da página no PDF solar"): o truque de <table><thead>/<tfoot> pra
+// "repetir" cabeçalho/rodapé por página impressa, com preenchimento medido em
+// JS, desiste de propósito quando uma seção transborda pra mais de uma página
+// (estimar o vão da última página é impreciso) — resultado: o rodapé aparece
+// no MEIO da página em vez de na base. Já resolvido no gerador de serviço
+// (rodada 7) trocando pro mecanismo NATIVO do Chrome — aqui é a mesma migração,
+// aplicada ao solar. RESET_TEMPLATE_PUPPETEER e as alturas de faixa precisam
+// bater com o que já está em produção pro serviço.
+const RESET_TEMPLATE_PUPPETEER = `<style>
+  html, body { margin: 0 !important; padding: 0 !important; width: 100%; }
+  #header, #footer { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
+</style>`
+
+// Precisam bater com MARGEM_HEADER_FOOTER em apps/api/src/lib/pdfRenderer.ts.
+const ALTURA_FAIXA_HEADER = 86
+const ALTURA_FAIXA_FOOTER = 76
+
+function headerTemplateSolar(numero: string, logoUrl?: string | null) {
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="height:24px;max-width:130px;object-fit:contain;display:block;" alt="Logo"/>`
+    : `<div style="font-size:14px;font-weight:700;color:#fff;letter-spacing:1px;font-family:Arial,Helvetica,sans-serif;">ATOM<span style="color:#F5A623;">TECH</span></div>`
+  return `${RESET_TEMPLATE_PUPPETEER}
+    <div style="width:100%;height:${ALTURA_FAIXA_HEADER}px;margin:0;padding:0;display:flex;align-items:flex-start;">
+      <div style="width:100%;height:48px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+        <div style="display:flex;align-items:center;gap:8px;">${logoHtml}<span style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.75);">Energia Solar e Tecnologia</span></div>
+        <div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.8);letter-spacing:2px;text-transform:uppercase;">Proposta Comercial &middot; ${numero}</div>
+      </div>
+    </div>`
+}
+
+function footerTemplateSolar(numero: string, emp: any) {
   const tel    = emp?.telefone || '(61) 3978-1738'
   const email  = emp?.email    || 'contato@atomtech.tec.br'
   const cidade = emp?.cidade   || 'Brasília/DF'
-  return `<div class="footer">
-    <div class="footer-text">${emp?.nome ?? 'Atom Tech'} &mdash; Energia Solar e Tecnologia<br>${cidade} &middot; ${email} &middot; ${tel}</div>
-    <div class="footer-numero">${numero}</div>
-  </div>`
-}
-
-// Uma folha A4: thead/tfoot da tabela repetem o cabeçalho/rodapé em cada
-// página impressa caso o conteúdo transborde para páginas seguintes.
-function sheet(inner: string, numero: string, logoUrl?: string | null, emp?: any): string {
-  return `<div class="sheet-wrap"><table class="sheet">
-    <thead><tr><td>${headerInterno(numero, logoUrl)}</td></tr></thead>
-    <tfoot><tr><td>${footer(numero, emp)}</td></tr></tfoot>
-    <tbody><tr><td><div class="section">${inner}</div></td></tr></tbody>
-  </table></div>`
-}
-
-function paginaTexto(titulo: string, chave: string, textos: any, numero: string, logoUrl?: string, emp?: any): string {
-  const conteudo = textos?.[chave]?.conteudo
-  if (!conteudo) return ''
-  return sheet(`<div class="section-title">${titulo}</div>
-      ${renderTexto(conteudo)}`, numero, logoUrl, emp)
+  return `${RESET_TEMPLATE_PUPPETEER}
+    <div style="width:100%;height:${ALTURA_FAIXA_FOOTER}px;margin:0;padding:0;display:flex;align-items:flex-end;">
+      <div style="width:100%;height:48px;background:#0E2040;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:0 36px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;margin:0;font-family:Arial,Helvetica,sans-serif;">
+        <div style="font-size:10px;font-weight:400;color:rgba(255,255,255,0.85);">${emp?.nome ?? 'Atom Tech'} &mdash; Energia Solar e Tecnologia &middot; ${cidade} &middot; ${email} &middot; ${tel}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.7);">${numero}</div>
+      </div>
+    </div>`
 }
 
 // `autoPrint: false` é usado na geração server-side (Chrome headless), onde o
-// PDF sai do page.pdf() e não do diálogo de impressão.
-export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string {
+// PDF sai do page.pdf() e não do diálogo de impressão. `serverSide: true`
+// retorna as partes pro caminho com cabeçalho/rodapé NATIVOS do Puppeteer
+// (ver renderPdfComCapaSeparada) em vez de uma string HTML única.
+export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: boolean } = {}): any {
   const autoPrint = opts.autoPrint !== false
+  const serverSide = opts.serverSide === true
   const { proposta: prop, empresa: emp, cliente: cli, fatura: fat,
     dimensionamento: dim, equipamentos: equips, precificacao: prec,
     analiseFinanceira: af, condicoesComerciais: condicoes, blocos, textos } = data
@@ -322,7 +302,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
     ? `${window.location.origin}/assets/covers/${capaImg}.png`
     : null
 
-  const capa = tem('capa') ? `<div class="capa">
+  const capaHtml = tem('capa') ? `<div class="capa">
     ${bgUrl ? `<img class="capa-bg" src="${bgUrl}" alt="" onerror="this.style.display='none'"/>` : ''}
     <div class="capa-overlay"></div>
     <div class="capa-topinfo">
@@ -370,8 +350,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
   // o investimento — sem esperar o cliente passar por conteúdo institucional
   // para chegar até aqui. Substitui o costume de abrir com apresentação da
   // empresa / como funciona a energia solar antes de mostrar a oferta.
-  const resumoProposta = tem('resumo_proposta') ? sheet(`
-      <div class="section-title">Resumo da Proposta</div>
+  const secResumo = tem('resumo_proposta') ? sec('Resumo da Proposta', `
       <div class="kpi-grid" style="margin-bottom:18px">
         <div class="kpi-card"><div class="kpi-label">Cliente</div><div class="kpi-value" style="font-size:16px">${cli?.nome ?? ''}</div></div>
         <div class="kpi-card"><div class="kpi-label">Pot&ecirc;ncia Proposta</div><div class="kpi-value">${Number(dim?.potenciaFinalKwp ?? 0).toFixed(2)} <span class="kpi-unit">kWp</span></div></div>
@@ -380,32 +359,28 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
       <div style="margin-top:4px">
         <div class="section-sub">O que estamos propondo</div>
         <p>Sistema fotovoltaico dimensionado para o seu perfil de consumo, com equipamentos, instala&ccedil;&atilde;o e projeto de engenharia inclusos &mdash; detalhado nas pr&oacute;ximas p&aacute;ginas.</p>
-      </div>
-      <p style="margin-top:18px;font-size:12px;color:#888">Valor e condi&ccedil;&otilde;es de pagamento a seguir.</p>
-      <div style="margin-top:16px;font-size:12px;color:#888">
-        <strong style="color:#0E2040">Contato:</strong> ${cli?.telefone ?? ''}${cli?.email ? ` &middot; ${cli.email}` : ''}
-      </div>`, numero, logoUrl, emp) : ''
+      </div>`) : ''
 
   // ── APRESENTAÇÃO ─────────────────────────────────────────────────────────
-  const apresentacao = tem('apresentacao_empresa') ? sheet(`
-      <div class="section-title">Conhe&ccedil;a a Atom Tech</div>
+  const secApresentacao = tem('apresentacao_empresa') ? sec('Conhe&ccedil;a a Atom Tech', `
       ${renderTexto(textos?.apresentacao_empresa?.conteudo) || '<p>A Atom Tech &eacute; especializada em sistemas fotovoltaicos.</p>'}
       ${tem('o_que_inclui') && textos?.o_que_inclui?.conteudo ? `
       <div style="margin-top:20px">
         <div class="section-sub">Sua Proposta Inclui</div>
         ${renderTexto(textos.o_que_inclui.conteudo)}
-      </div>` : ''}`, numero, logoUrl, emp) : ''
+      </div>` : ''}`) : ''
 
   // ── TEXTOS INSTITUCIONAIS ─────────────────────────────────────────────────
-  const comoFunciona   = tem('como_funciona')   ? paginaTexto('Como Funciona a Energia Solar',    'como_funciona',   textos, numero, logoUrl, emp) : ''
-  const diferenciais   = tem('diferenciais')    ? paginaTexto('Diferenciais da Atom Tech',         'diferenciais',    textos, numero, logoUrl, emp) : ''
-  const garantias      = tem('garantias')       ? paginaTexto('Garantias Inclusas',                'garantias',       textos, numero, logoUrl, emp) : ''
-  const fornecedores   = tem('fornecedores')    ? paginaTexto('Fornecedores e Fabricantes',        'fornecedores',    textos, numero, logoUrl, emp) : ''
-  const regulamentacao = tem('regulamentacao')  ? paginaTexto('Regulamenta&ccedil;&atilde;o no Brasil', 'regulamentacao', textos, numero, logoUrl, emp) : ''
+  const secTexto = (titulo: string, chave: string) =>
+    tem(chave) && textos?.[chave]?.conteudo ? sec(titulo, renderTexto(textos[chave].conteudo)) : ''
+  const secComoFunciona   = secTexto('Como Funciona a Energia Solar', 'como_funciona')
+  const secDiferenciais   = secTexto('Diferenciais da Atom Tech', 'diferenciais')
+  const secGarantias      = secTexto('Garantias Inclusas', 'garantias')
+  const secFornecedores   = secTexto('Fornecedores e Fabricantes', 'fornecedores')
+  const secRegulamentacao = secTexto('Regulamenta&ccedil;&atilde;o no Brasil', 'regulamentacao')
 
   // ── DIMENSIONAMENTO ──────────────────────────────────────────────────────
-  const dimensionamentoBloco = tem('dimensionamento') ? sheet(`
-      <div class="section-title">Dimensionamento do Sistema</div>
+  const secDimensionamento = tem('dimensionamento') ? sec('Dimensionamento do Sistema', `
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Pot&ecirc;ncia Proposta</div><div class="kpi-value">${Number(dim?.potenciaFinalKwp ?? 0).toFixed(2)} <span class="kpi-unit">kWp</span></div></div>
         <div class="kpi-card"><div class="kpi-label">Gera&ccedil;&atilde;o/M&ecirc;s</div><div class="kpi-value">${formatKwh(Number(dim?.geracaoAnualKwh ?? 0) / 12)} <span class="kpi-unit">/m&ecirc;s</span></div></div>
@@ -429,11 +404,10 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
             </tr>`).join('')}
           </tbody>
         </table>
-      </div>` : ''}`, numero, logoUrl, emp) : ''
+      </div>` : ''}`) : ''
 
   // ── ANÁLISE FINANCEIRA ───────────────────────────────────────────────────
-  const analise = tem('analise_financeira') ? sheet(`
-      <div class="section-title">An&aacute;lise Financeira do Investimento</div>
+  const secAnalise = tem('analise_financeira') ? sec('An&aacute;lise Financeira do Investimento', `
       <div class="highlight-box"><p>Investimento de <strong>${formatCurrency(precoFinal)}</strong> com infla&ccedil;&atilde;o energ&eacute;tica de 9,5% a.a. e 25 anos de vida &uacute;til.</p></div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">Payback Simples</div><div class="kpi-value" style="font-size:19px">${formatPayback(Number(af?.paybackSimplesMeses ?? 0))}</div></div>
@@ -454,12 +428,12 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
           <div><div class="reducao-header">Economia M&eacute;dia Mensal</div><div class="reducao-cell"><div class="reducao-label">Gera&ccedil;&atilde;o Solar</div><div class="reducao-value economia">${formatCurrency(af?.economiaMensalAno1)}</div></div></div>
           <div><div class="reducao-header">Depois da Instala&ccedil;&atilde;o</div><div class="reducao-cell"><div class="reducao-label">Custo Residual</div><div class="reducao-value">${formatCurrency(Math.max(0, Number(fat?.valorTotal || 0) - Number(af?.economiaMensalAno1 || 0)))}</div></div></div>
         </div>
-      </div>` : ''}`, numero, logoUrl, emp) : ''
+      </div>` : ''}`) : ''
 
   // ── FLUXO DE CAIXA ───────────────────────────────────────────────────────
-  const fluxoCaixa = tem('fluxo_caixa') ? (() => {
+  const [secFluxoCaixa1, secFluxoCaixa2] = tem('fluxo_caixa') ? (() => {
     const fluxo: any[] = af?.fluxoCaixaJson ?? af?.fluxoCaixa ?? []
-    if (!fluxo.length) return ''
+    if (!fluxo.length) return ['', '']
 
     const thead = `<thead><tr>
       <th style="width:30px">Ano</th>
@@ -492,24 +466,23 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
     const p1 = fluxo.slice(0, 13)   // Anos 0–12
     const p2 = fluxo.slice(13)       // Anos 13–25
 
-    return sheet(`
-      <div class="section-title">Fluxo de Caixa &mdash; 25 Anos</div>
-      ${highlight}
-      <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 0 a 12</p>
-      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p1)}</tbody></table>`, numero, logoUrl, emp)
-    + sheet(`
-      <div class="section-title">Fluxo de Caixa &mdash; 25 Anos</div>
-      ${highlight}
-      <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 13 a 25</p>
-      <table style="font-size:11px">${thead}<tbody>${renderLinhas(p2)}</tbody></table>`, numero, logoUrl, emp)
-  })() : ''
+    return [
+      sec('Fluxo de Caixa &mdash; 25 Anos', `
+        ${highlight}
+        <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 0 a 12</p>
+        <table style="font-size:11px">${thead}<tbody>${renderLinhas(p1)}</tbody></table>`),
+      sec('Fluxo de Caixa &mdash; 25 Anos', `
+        ${highlight}
+        <p style="font-size:10px;color:#888;margin:6px 0 8px;text-transform:uppercase;letter-spacing:.05em">Anos 13 a 25</p>
+        <table style="font-size:11px">${thead}<tbody>${renderLinhas(p2)}</tbody></table>`),
+    ]
+  })() : ['', '']
 
   // ── CONDIÇÕES COMERCIAIS ─────────────────────────────────────────────────
   const prazoExecucaoSolar = prop?.prazoExecucao ?? null
-  const condicoesBloco = tem('condicoes_comerciais') ? sheet(`
-      <div class="section-title">Condi&ccedil;&otilde;es Comerciais</div>
+  const secCondicoes = tem('condicoes_comerciais') ? sec('Condi&ccedil;&otilde;es Comerciais', `
       <div class="highlight-box"><p>Investimento Total: <strong>${formatCurrency(precoFinal)}</strong> &middot; Economia Estimada: <strong>${formatCurrency(af?.economiaMensalAno1)}/m&ecirc;s</strong></p></div>
-      ${prazoExecucaoSolar ? `<div style="margin-top:12px;padding:12px 16px;background:#F5A62310;border-left:3px solid #F5A623;border-radius:4px"><span style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.05em">Prazo de Execu&ccedil;&atilde;o</span><p style="margin:4px 0 0;font-weight:600;color:#0E2040;font-size:14px">${prazoExecucaoSolar}</p></div>` : ''}
+      ${prazoExecucaoSolar ? `<div style="margin-top:12px;padding:12px 16px;background:#F5A62310;border-left:3px solid #F5A623;border-radius:4px;break-inside:avoid;page-break-inside:avoid"><span style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.05em">Prazo de Execu&ccedil;&atilde;o</span><p style="margin:4px 0 0;font-weight:600;color:#0E2040;font-size:14px">${prazoExecucaoSolar}</p></div>` : ''}
       ${tem('formas_pagamento') ? `
       <div style="margin-top:14px">
         <div class="section-sub">Formas de Pagamento</div>
@@ -522,13 +495,11 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
                 <span style="font-weight:700">${c.tipo !== 'financiamento' ? formatCurrency(p.valor) : ''}</span>
               </div>`).join('')}
           </div>`).join('')}
-      </div>` : ''}`, numero, logoUrl, emp) : ''
+      </div>` : ''}`) : ''
 
-  // ── CONTEÚDO DO ACEITE (bloco interno — sem header/footer/page próprios) ──
-  // Embutido ao final da última seção ativa (consideracoes ou pagina propria)
-  const aceiteInner = tem('aceite') ? `
-    <div style="margin-top:32px;break-inside:avoid;page-break-inside:avoid;">
-      <div style="border-left:4px solid #F5A623;padding-left:12px;font-family:Calibri,Candara,sans-serif;font-size:20px;font-weight:600;color:#0E2040;margin-bottom:16px">Aceite da Proposta</div>
+  // ── ACEITE ─────────────────────────────────────────────────────────────
+  const aceiteConteudo = tem('aceite') ? `
+    <div class="aceite-bloco">
       <div class="aceite-box">
         <p><strong>Emiss&atilde;o:</strong> ${formatDate(prop?.dataEmissao)} &nbsp;&nbsp;&nbsp; <strong>Validade:</strong> ${prop?.dataValidade ? formatDate(prop.dataValidade) : '5 dias corridos'}</p>
         <p style="margin-top:6px">Esta proposta foi elaborada com base no seu perfil de consumo e nas melhores solu&ccedil;&otilde;es dispon&iacute;veis no mercado.</p>
@@ -544,21 +515,22 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
         <div><div class="assinatura-linha">Atom Tech &mdash; Respons&aacute;vel Comercial</div></div>
       </div>
       ${tem('contato') ? `
-      <div style="display:flex;gap:24px;margin-top:20px;padding-top:16px;border-top:1px solid #eee">
-        <div style="flex:1 1 0">
+      <div style="display:flex;flex-wrap:wrap;gap:24px;margin-top:20px;padding-top:16px;border-top:1px solid #eee">
+        <div style="flex:1 1 40%">
           <p style="font-size:14px;font-weight:700;color:#0E2040;margin-bottom:6px">Contato</p>
           <p style="font-size:14px">${emp?.telefone ?? '(61) 3978-1738'}</p>
           <p style="font-size:14px">${emp?.email ?? 'contato@atomtech.tec.br'}</p>
         </div>
-        <div style="flex:1 1 0">
+        <div style="flex:1 1 40%">
           <p style="font-size:14px;font-weight:700;color:#0E2040;margin-bottom:6px">Endere&ccedil;o</p>
           <p style="font-size:14px">${emp?.endereco ?? 'Edif&iacute;cio SIA Centro Empresarial, Sala 231 B'} &mdash; ${emp?.cidade ?? 'Bras&iacute;lia'}/DF</p>
         </div>
       </div>` : ''}
     </div>
   ` : ''
+  const secAceite = tem('aceite') ? sec('Aceite da Proposta', aceiteConteudo) : ''
 
-  // ── CONSIDERAÇÕES GERAIS (embute aceiteInner ao final) ───────────────────
+  // ── CONSIDERAÇÕES GERAIS ──────────────────────────────────────────────────
   const DEFAULT_CONSIDERACOES_SOLAR = `- **Atendimento:** Prestado em horário comercial, de segunda a sexta-feira das 8h às 18h.
 - **Autoria do Orçamento:** Este documento é de uso exclusivo desta negociação e não deve ser repassado a terceiros.
 - **Encargos e Taxas:** Taxas de homologação junto à distribuidora, AVCB e outras licenças são responsabilidade do contratante, salvo se expressamente incluídas.
@@ -566,7 +538,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
 - **Garantia:** Os serviços de instalação possuem garantia de 12 (doze) meses a partir da emissão da Nota Fiscal. Equipamentos seguem a garantia do fabricante conforme especificado no contrato.
 - **Horário Comercial:** A execução ocorrerá em horário comercial; serviços noturnos ou em fins de semana serão cobrados à parte.`
 
-  const consideracoesBloco = tem('consideracoes_gerais') ? (() => {
+  const secConsideracoes = tem('consideracoes_gerais') ? (() => {
     const fixedTxt = (textos as any)?.['consideracoes_gerais']?.conteudo || DEFAULT_CONSIDERACOES_SOLAR
     const customTxt = textoOverrideBloco('consideracoes_gerais')?.trim() || ''
     const txt = [fixedTxt, customTxt].filter(Boolean).join('\n')
@@ -597,27 +569,67 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
       }
       return `<p style="font-size:14px;font-weight:300;color:#333;line-height:1.8;margin:0 0 8px 4px">${texto}</p>`
     }).join('')
-    return sheet(`
-      <div class="section-title">LEIA COM ATEN&Ccedil;&Atilde;O &mdash; INFORMA&Ccedil;&Otilde;ES IMPORTANTES</div>
-      ${itensHtml}`, numero, logoUrl, emp)
+    return sec('LEIA COM ATEN&Ccedil;&Atilde;O &mdash; INFORMA&Ccedil;&Otilde;ES IMPORTANTES', itensHtml)
   })() : ''
-
-  // Aceite sempre em página própria com header e footer — garante posicionamento correto
-  const aceite = tem('aceite') ? sheet(aceiteInner, numero, logoUrl, emp) : ''
 
   // Modelo "Direto ao Ponto": cliente/oferta/investimento/pagamento/aceite logo
   // no início — institucional e financeiro (payback etc., normalmente
   // desativados neste modelo) viram material de apoio no final.
-  // Revisado em 2026-08-14 após feedback do usuário testando o PDF real:
-  // Aceite não é mais parte do "bloco de decisão" — assinar é o ato FINAL,
-  // depois de todo o conteúdo de apoio, não logo após condições comerciais.
   // Apresentação (Conheça a Atom Tech) vem antes de Diferenciais — mesma
   // ordem lógica do modelo Clássico (primeiro diz quem é, depois por que
   // escolher).
-  const corpo = prop?.modeloProposta === 'direto_ao_ponto'
-    ? `${capa}${resumoProposta}${dimensionamentoBloco}${condicoesBloco}${garantias}${apresentacao}${diferenciais}${comoFunciona}${regulamentacao}${fornecedores}${analise}${fluxoCaixa}${consideracoesBloco}${aceite}`
-    : `${capa}${apresentacao}${comoFunciona}${diferenciais}${fornecedores}${regulamentacao}${dimensionamentoBloco}${analise}${fluxoCaixa}${condicoesBloco}${garantias}${consideracoesBloco}${aceite}`
+  const sections = prop?.modeloProposta === 'direto_ao_ponto'
+    ? `${secResumo}${secDimensionamento}${secCondicoes}${secGarantias}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secAnalise}${secFluxoCaixa1}${secFluxoCaixa2}${secConsideracoes}${secAceite}`
+    : `${secApresentacao}${secComoFunciona}${secDiferenciais}${secFornecedores}${secRegulamentacao}${secDimensionamento}${secAnalise}${secFluxoCaixa1}${secFluxoCaixa2}${secCondicoes}${secGarantias}${secConsideracoes}${secAceite}`
 
+  const scriptEsperaFontes = `<script>
+    window.onload = function() {
+      setTimeout(function() { window.__PDF_READY__ = true; }, 200);
+    };
+  </script>`
+
+  // ── Caminho server-side: cabeçalho/rodapé NATIVOS do Puppeteer ───────────
+  // Sem tabela de repetição de thead/tfoot nem medição em JS de posição de
+  // página — conteúdo em fluxo normal, onde break-inside:avoid (nos KPIs,
+  // aceite-bloco etc.) funciona de verdade, do jeito que funciona em
+  // qualquer documento HTML comum. Mesma arquitetura já em produção pro PDF
+  // de serviço (ver gerarPdfServicoBrowser.ts).
+  if (serverSide) {
+    const estiloComum = `<style>${JOST_FONT_FACE_CSS}</style><style>${CSS}</style>`
+
+    // Capa (se ativa) vira um DOCUMENTO PRÓPRIO — página cheia (297mm), sem
+    // margem, sem cabeçalho/rodapé — pelo mesmo motivo já documentado em
+    // gerarPdfServicoBrowser.ts (a margem reservada pro cabeçalho/rodapé
+    // nativo cortaria o full-bleed da capa se estivesse no mesmo documento).
+    const capaDocHtml = capaHtml
+      ? `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">${estiloComum}<style>${CSS_PAGINA_MARGEM_ZERO}</style></head><body>${capaHtml}${scriptEsperaFontes}</body></html>`
+      : null
+
+    const bodyHtml = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proposta ${numero} &mdash; ${emp?.nome ?? 'Atom Tech'}</title>
+  ${estiloComum}
+</head>
+<body>
+  ${sections ? `<div class="doc-content">${sections}</div>` : ''}
+  ${scriptEsperaFontes}
+</body>
+</html>`
+    return {
+      bodyHtml,
+      capaHtml: capaDocHtml,
+      headerTemplate: headerTemplateSolar(numero, logoUrl),
+      footerTemplate: footerTemplateSolar(numero, emp),
+    }
+  }
+
+  // ── Fallback: window.print() do navegador do usuário ─────────────────────
+  // Sem servidor disponível pra renderizar, cai no diálogo de impressão do
+  // Chrome — cabeçalho/rodapé nativo não existe nesse caminho, então usa
+  // @page{margin:0} com a barra escura desenhada no próprio HTML.
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -626,41 +638,17 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean } = {}): string
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=block">
   <style>${CSS}</style>
+  <style>${CSS_PAGINA_MARGEM_ZERO}</style>
 </head>
 <body>
-  ${corpo}
+  ${capaHtml}
+  ${sections ? `<div class="doc-content">${sections}</div>` : ''}
   <script>
     window.onload = function() {
       setTimeout(function() {
-        // O tfoot naturalmente fica logo após o conteúdo na última página de
-        // cada folha. Preenche o espaço restante (medido) para empurrá-lo ao
-        // pé da página — técnica do gerarPdfServicoBrowser.ts, aqui por folha.
-        try {
-          var pageH = 297 * 96 / 25.4; // altura A4 em px CSS (~1122.5)
-          document.querySelectorAll('table.sheet').forEach(function(sh) {
-            var thead = sh.tHead, tfoot = sh.tFoot;
-            var cell = sh.querySelector('tbody > tr > td');
-            if (!thead || !tfoot || !cell) return;
-            var theadH = thead.getBoundingClientRect().height;
-            var tfootH = tfoot.getBoundingClientRect().height;
-            var availH = pageH - theadH - tfootH;
-            if (availH <= 0) return;
-            var contentH = cell.getBoundingClientRect().height;
-            // Cabe em uma página: preenchimento exato cola o rodapé no pé.
-            // Se transborda, NÃO preencher: estimar o vão da última página é
-            // impreciso (break-inside:avoid desloca conteúdo) e um erro para
-            // mais vaza o rodapé para uma página órfã. Nesse caso o tfoot
-            // fica logo após o conteúdo — e o Chrome já repete cabeçalho e
-            // rodapé no pé/topo de cada página intermediária.
-            if (contentH <= availH) {
-              cell.style.paddingBottom = (availH - contentH - 1) + 'px';
-            }
-          });
-        } catch (e) {}
-        // Sinaliza ao Chrome headless que o layout terminou (geração no servidor)
         window.__PDF_READY__ = true;
         ${autoPrint ? 'setTimeout(function() { window.print(); }, 100);' : ''}
-      }, 700);
+      }, 300);
     };
   </script>
 </body>
