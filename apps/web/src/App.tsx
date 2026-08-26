@@ -61,8 +61,6 @@ export default function App() {
               <Route path="/propostas/:id" element={<PropostaDetailPage />} />
               <Route path="/clientes" element={<ClientesPage />} />
               <Route path="/clientes/:id" element={<ClienteDetailPage />} />
-              <Route path="/faturas" element={<FaturasPage />} />
-              <Route path="/faturas/nova" element={<NovaFaturaPage />} />
               <Route path="/operacional" element={<Navigate to="/ordens-servico" replace />} />
               <Route path="/ordens-servico" element={<OrdensServicoPage />} />
               <Route path="/ordens-servico/:id" element={<OrdemServicoDetailPage />} />

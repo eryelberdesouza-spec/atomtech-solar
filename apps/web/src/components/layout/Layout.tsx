@@ -148,7 +148,6 @@ const NAV: NavItem[] = [
   { path: '/dashboard',      label: 'Dashboard',     Icon: IcoDashboard,     color: '#F5A623', desc: 'Visão geral'       },
   { path: '/propostas',      label: 'Propostas',     Icon: IcoPropostas,     color: '#58A6FF', desc: 'Gestão comercial'  },
   { path: '/clientes',       label: 'Clientes',      Icon: IcoClientes,      color: '#3EBB7A', desc: 'Base de clientes'  },
-  { path: '/faturas',        label: 'Faturas',       Icon: IcoFaturas,       color: '#BC8CFF', desc: 'Contas de energia' },
   { path: '/ordens-servico', label: 'Operacional',   Icon: IcoOperacional,   color: '#FB923C', desc: 'Ordens de serviço' },
   { path: '/relatorios-energia', label: 'Relatório Energia', Icon: IcoRelatorioEnergia, color: '#F5A623', desc: 'Gestão de energia solar' },
   { path: '/relatorios-recargas', label: 'Relatório Recargas', Icon: IcoRelatorioRecargas, color: '#3DAE3D', desc: 'Eletropostos Moove' },
