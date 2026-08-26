@@ -51,7 +51,12 @@ export function RelatorioRecargasPage() {
   const [carregandoPreview, setCarregandoPreview] = useState(false)
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState('')
-  const [resultado, setResultado] = useState<{ clienteId: number; clienteNome: string; relatorioId: number; arquivoNome: string }[] | null>(null)
+  const [resultado, setResultado] = useState<{
+    clienteId: number
+    clienteNome: string
+    cliente: { relatorioId: number; arquivoNome: string }
+    interno: { relatorioId: number; arquivoNome: string }
+  }[] | null>(null)
 
   const arquivoRef = useRef<HTMLInputElement>(null)
 
@@ -270,16 +275,23 @@ export function RelatorioRecargasPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {resultado.map(r => (
-                <a
-                  key={r.relatorioId}
-                  href={`${API_BASE}/moove/historico/${r.relatorioId}/download?token=${encodeURIComponent(getToken())}`}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#0C1828', borderRadius: 8, textDecoration: 'none' }}
-                >
+                <div key={r.clienteId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#0C1828', borderRadius: 8 }}>
                   <span style={{ color: '#C8D8EC', fontSize: 12.5 }}>{r.clienteNome}</span>
-                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: '#3EBB7A18', color: '#3EBB7A', letterSpacing: '0.02em' }}>
-                    ✓ Baixar
-                  </span>
-                </a>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <a
+                      href={`${API_BASE}/moove/historico/${r.cliente.relatorioId}/download?token=${encodeURIComponent(getToken())}`}
+                      style={{ padding: '3px 10px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: '#3EBB7A18', color: '#3EBB7A', textDecoration: 'none', letterSpacing: '0.02em' }}
+                    >
+                      ✓ PDF (cliente)
+                    </a>
+                    <a
+                      href={`${API_BASE}/moove/historico/${r.interno.relatorioId}/download?token=${encodeURIComponent(getToken())}`}
+                      style={{ padding: '3px 10px', borderRadius: 20, fontSize: 10.5, fontWeight: 700, background: '#F5A62318', color: '#F5A623', textDecoration: 'none', letterSpacing: '0.02em' }}
+                    >
+                      ✓ Excel (interno)
+                    </a>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -301,9 +313,18 @@ export function RelatorioRecargasPage() {
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#0C1828', borderRadius: 8, textDecoration: 'none' }}
               >
                 <span style={{ color: '#C8D8EC', fontSize: 12.5 }}>{h.clienteNome}</span>
-                <span style={{ color: '#7488A8', fontSize: 11 }}>
-                  {new Date(h.createdAt).toLocaleDateString('pt-BR')}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 20, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.02em',
+                    background: h.tipo === 'cliente_pdf' ? '#3EBB7A18' : '#F5A62318',
+                    color: h.tipo === 'cliente_pdf' ? '#3EBB7A' : '#F5A623',
+                  }}>
+                    {h.tipo === 'cliente_pdf' ? 'PDF cliente' : 'Excel interno'}
+                  </span>
+                  <span style={{ color: '#7488A8', fontSize: 11 }}>
+                    {new Date(h.createdAt).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
               </a>
             ))}
           </div>

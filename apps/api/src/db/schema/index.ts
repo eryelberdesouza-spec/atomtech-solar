@@ -559,6 +559,10 @@ export const mooveRelatorioGerado = mysqlTable('moove_relatorio_gerado', {
   id: int('id').primaryKey().autoincrement(),
   clienteId: int('cliente_id').notNull().references(() => cliente.id),
   empresaId: int('empresa_id').notNull().references(() => empresa.id),
+  // 'cliente_pdf' = PDF enviado ao proprietário da estação (taxa única, sem
+  // detalhar Moove/Atom). 'interno_xlsx' = planilha de conferência interna
+  // da Atom Tech (Moove e comissão Atom Tech detalhadas separadamente).
+  tipo: varchar('tipo', { length: 20 }).notNull().default('interno_xlsx'),
   periodoInicio: date('periodo_inicio'),
   periodoFim: date('periodo_fim'),
   arquivoNome: varchar('arquivo_nome', { length: 255 }).notNull(),

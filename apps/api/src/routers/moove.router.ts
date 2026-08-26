@@ -39,6 +39,7 @@ export const mooveRouter = router({
             id: mooveRelatorioGerado.id,
             clienteId: mooveRelatorioGerado.clienteId,
             clienteNome: cliente.nome,
+            tipo: mooveRelatorioGerado.tipo,
             periodoInicio: mooveRelatorioGerado.periodoInicio,
             periodoFim: mooveRelatorioGerado.periodoFim,
             arquivoNome: mooveRelatorioGerado.arquivoNome,

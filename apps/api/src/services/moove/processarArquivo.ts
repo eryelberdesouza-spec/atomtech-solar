@@ -1,7 +1,7 @@
 import { lerMoove, estacoesUnicas } from "./lerMoove";
 import { agregarPorEstacao } from "./agregar";
 import { gerarRelatorioCliente, type ClienteParaRelatorio } from "./gerarRelatorio";
-import type ExcelJS from "exceljs";
+import { gerarRelatorioClientePdf } from "./gerarRelatorioClientePdf";
 
 export interface EstacaoEncontrada {
   nome: string;
@@ -28,10 +28,16 @@ export interface MapeamentoEstacao {
 export interface RelatorioGeradoPorCliente {
   clienteId: number;
   clienteNome: string;
-  workbook: ExcelJS.Workbook;
   periodoInicio: Date | null;
   periodoFim: Date | null;
-  arquivoNome: string;
+  // Interno (Atom Tech): detalha separadamente a taxa da Moove e a comissão
+  // Atom Tech, para conferir com o que cai na conta corrente.
+  arquivoNomeInterno: string;
+  bufferInterno: Buffer;
+  // Cliente (proprietário da estação): mesmo conteúdo, mas com as duas taxas
+  // somadas numa única linha ("Taxa de Gestão, Cobrança e Atendimento").
+  arquivoNomeCliente: string;
+  bufferCliente: Buffer;
 }
 
 export async function gerarRelatoriosPorCliente(
@@ -61,7 +67,11 @@ export async function gerarRelatoriosPorCliente(
       estacoes: estacoes.map((e) => ({ nome: e.nomeEstacao, comissaoAtomPercentual: e.comissaoAtomPercentual })),
     };
 
-    const workbook = await gerarRelatorioCliente(clienteParaRelatorio, totaisDoCliente, recargasDoCliente);
+    const [workbookInterno, pdfCliente] = await Promise.all([
+      gerarRelatorioCliente(clienteParaRelatorio, totaisDoCliente, recargasDoCliente),
+      gerarRelatorioClientePdf(clienteParaRelatorio, totaisDoCliente, recargasDoCliente),
+    ]);
+    const bufferInterno = Buffer.from(await workbookInterno.xlsx.writeBuffer());
 
     const todasDatas = totaisDoCliente
       .flatMap((t) => [t.periodoInicio, t.periodoFim])
@@ -70,9 +80,18 @@ export async function gerarRelatoriosPorCliente(
     const periodoFim = todasDatas.length > 0 ? new Date(Math.max(...todasDatas.map((d) => d.getTime()))) : null;
 
     const carimbo = new Date().toISOString().slice(0, 10);
-    const arquivoNome = `relatorio-recargas-${clienteNome.replace(/[^a-zA-Z0-9]+/g, "-")}-${carimbo}.xlsx`;
+    const slugCliente = clienteNome.replace(/[^a-zA-Z0-9]+/g, "-");
 
-    resultados.push({ clienteId, clienteNome, workbook, periodoInicio, periodoFim, arquivoNome });
+    resultados.push({
+      clienteId,
+      clienteNome,
+      periodoInicio,
+      periodoFim,
+      arquivoNomeInterno: `relatorio-recargas-interno-${slugCliente}-${carimbo}.xlsx`,
+      bufferInterno,
+      arquivoNomeCliente: `relatorio-recargas-${slugCliente}-${carimbo}.pdf`,
+      bufferCliente: pdfCliente,
+    });
   }
 
   return resultados;

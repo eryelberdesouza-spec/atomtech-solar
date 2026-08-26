@@ -384,24 +384,35 @@ app.post('/moove/gerar', upload.single('arquivo'), async (req, res) => {
 
     const relatorios = await gerarRelatoriosPorCliente(arquivo.buffer, mapeamentosResolvidos)
 
-    const resultado: { clienteId: number; clienteNome: string; relatorioId: number; arquivoNome: string }[] = []
+    const resultado: {
+      clienteId: number
+      clienteNome: string
+      cliente: { relatorioId: number; arquivoNome: string }
+      interno: { relatorioId: number; arquivoNome: string }
+    }[] = []
+
     for (const r of relatorios) {
-      const buffer = Buffer.from(await r.workbook.xlsx.writeBuffer())
       const periodoInicioSql = r.periodoInicio ? r.periodoInicio.toISOString().slice(0, 10) : null
       const periodoFimSql = r.periodoFim ? r.periodoFim.toISOString().slice(0, 10) : null
 
-      const [insertResult]: any = await conn.execute(
-        `INSERT INTO moove_relatorio_gerado
-           (cliente_id, empresa_id, periodo_inicio, periodo_fim, arquivo_nome, arquivo_tamanho, arquivo_dados, gerado_por)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [r.clienteId, empresaId, periodoInicioSql, periodoFimSql, r.arquivoNome, buffer.length, buffer, userId ?? null],
-      )
+      const inserir = async (tipo: 'cliente_pdf' | 'interno_xlsx', arquivoNome: string, buffer: Buffer) => {
+        const [insertResult]: any = await conn.execute(
+          `INSERT INTO moove_relatorio_gerado
+             (cliente_id, empresa_id, tipo, periodo_inicio, periodo_fim, arquivo_nome, arquivo_tamanho, arquivo_dados, gerado_por)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [r.clienteId, empresaId, tipo, periodoInicioSql, periodoFimSql, arquivoNome, buffer.length, buffer, userId ?? null],
+        )
+        return insertResult.insertId as number
+      }
+
+      const relatorioIdCliente = await inserir('cliente_pdf', r.arquivoNomeCliente, r.bufferCliente)
+      const relatorioIdInterno = await inserir('interno_xlsx', r.arquivoNomeInterno, r.bufferInterno)
 
       resultado.push({
         clienteId: r.clienteId,
         clienteNome: r.clienteNome,
-        relatorioId: insertResult.insertId,
-        arquivoNome: r.arquivoNome,
+        cliente: { relatorioId: relatorioIdCliente, arquivoNome: r.arquivoNomeCliente },
+        interno: { relatorioId: relatorioIdInterno, arquivoNome: r.arquivoNomeInterno },
       })
     }
 
@@ -438,7 +449,10 @@ app.get('/moove/historico/:id/download', async (req, res) => {
     const arquivo = (rows as any[])[0]
     if (!arquivo) { res.status(404).send('Relatório não encontrado'); return }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    const contentType = arquivo.arquivo_nome.endsWith('.pdf')
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    res.setHeader('Content-Type', contentType)
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(arquivo.arquivo_nome)}"`)
     res.send(arquivo.arquivo_dados)
   } catch (e: any) {
@@ -1746,6 +1760,7 @@ app.get('/run-migration-moove', async (_, res) => {
         id               INT AUTO_INCREMENT PRIMARY KEY,
         cliente_id       INT NOT NULL,
         empresa_id       INT NOT NULL,
+        tipo             VARCHAR(20) NOT NULL DEFAULT 'interno_xlsx',
         periodo_inicio   DATE,
         periodo_fim      DATE,
         arquivo_nome     VARCHAR(255) NOT NULL,
@@ -1762,6 +1777,27 @@ app.get('/run-migration-moove', async (_, res) => {
   } catch (e: any) {
     if (e.code === 'ER_TABLE_EXISTS_ERROR') {
       res.json({ ok: true, message: 'Tabelas já existiam' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
+// ── Migração: moove_relatorio_gerado passa a ter coluna `tipo` (cliente_pdf
+//    vs interno_xlsx) — cria a coluna se a tabela já existia sem ela ─────────
+app.get('/run-migration-moove-tipo-relatorio', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      ALTER TABLE moove_relatorio_gerado
+        ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'interno_xlsx' AFTER empresa_id
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Coluna tipo adicionada a moove_relatorio_gerado' })
+  } catch (e: any) {
+    if (e.code === 'ER_DUP_FIELDNAME') {
+      res.json({ ok: true, message: 'Coluna já existia' })
     } else {
       res.status(500).json({ ok: false, error: e.message })
     }
