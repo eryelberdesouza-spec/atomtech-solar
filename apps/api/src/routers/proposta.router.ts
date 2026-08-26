@@ -346,6 +346,9 @@ export const propostaRouter = router({
       const margemAplicada = input.margemOverride ?? Number(prem.margemPadrao)
       const itensCustomizados = gerarItensCustomizadosPadrao(
         sizingResult.potenciaFinalKwp, quantidadeModulos, quantidadeInversores, input.custoKitFotovoltaico,
+        Number(prem.custoMaoObraModulo), Number(prem.custoMaoObraInversor),
+        Number(prem.custoProjeto), Number(prem.custoAdmin),
+        (prem.itensAdicionaisPadrao as any[]) ?? [],
       )
 
       const pricingResult = calcularPrecificacao({
