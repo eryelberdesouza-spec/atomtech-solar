@@ -79,17 +79,23 @@ export async function gerarRelatoriosPorCliente(
     const periodoInicio = todasDatas.length > 0 ? new Date(Math.min(...todasDatas.map((d) => d.getTime()))) : null;
     const periodoFim = todasDatas.length > 0 ? new Date(Math.max(...todasDatas.map((d) => d.getTime()))) : null;
 
-    const carimbo = new Date().toISOString().slice(0, 10);
+    // Nome do arquivo carrega o período coberto (não "semanal" — o período real
+    // depende do que veio no Excel da Moove) pra dar pra identificar o relatório
+    // certo só olhando o nome, sem precisar abrir, mesmo com vários gerados no
+    // mesmo dia.
     const slugCliente = clienteNome.replace(/[^a-zA-Z0-9]+/g, "-");
+    const slugPeriodo = periodoInicio && periodoFim
+      ? `${periodoInicio.toISOString().slice(0, 10)}_a_${periodoFim.toISOString().slice(0, 10)}`
+      : new Date().toISOString().slice(0, 10);
 
     resultados.push({
       clienteId,
       clienteNome,
       periodoInicio,
       periodoFim,
-      arquivoNomeInterno: `relatorio-recargas-interno-${slugCliente}-${carimbo}.xlsx`,
+      arquivoNomeInterno: `recargas-interno-${slugCliente}-${slugPeriodo}.xlsx`,
       bufferInterno,
-      arquivoNomeCliente: `relatorio-recargas-${slugCliente}-${carimbo}.pdf`,
+      arquivoNomeCliente: `recargas-${slugCliente}-${slugPeriodo}.pdf`,
       bufferCliente: pdfCliente,
     });
   }

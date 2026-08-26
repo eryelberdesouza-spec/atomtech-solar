@@ -306,27 +306,36 @@ export function RelatorioRecargasPage() {
           <div style={{ color: '#7488A8', fontSize: 12 }}>Nenhum relatório gerado ainda</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {historico.map((h: any) => (
-              <a
-                key={h.id}
-                href={`${API_BASE}/moove/historico/${h.id}/download?token=${encodeURIComponent(getToken())}`}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#0C1828', borderRadius: 8, textDecoration: 'none' }}
-              >
-                <span style={{ color: '#C8D8EC', fontSize: 12.5 }}>{h.clienteNome}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    padding: '2px 8px', borderRadius: 20, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.02em',
-                    background: h.tipo === 'cliente_pdf' ? '#3EBB7A18' : '#F5A62318',
-                    color: h.tipo === 'cliente_pdf' ? '#3EBB7A' : '#F5A623',
-                  }}>
-                    {h.tipo === 'cliente_pdf' ? 'PDF cliente' : 'Excel interno'}
-                  </span>
-                  <span style={{ color: '#7488A8', fontSize: 11 }}>
-                    {new Date(h.createdAt).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-              </a>
-            ))}
+            {historico.map((h: any) => {
+              const periodo = h.periodoInicio && h.periodoFim
+                ? `${new Date(h.periodoInicio).toLocaleDateString('pt-BR')} a ${new Date(h.periodoFim).toLocaleDateString('pt-BR')}`
+                : null
+              return (
+                <a
+                  key={h.id}
+                  href={`${API_BASE}/moove/historico/${h.id}/download?token=${encodeURIComponent(getToken())}`}
+                  title={h.arquivoNome}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#0C1828', borderRadius: 8, textDecoration: 'none' }}
+                >
+                  <div>
+                    <div style={{ color: '#C8D8EC', fontSize: 12.5, fontWeight: 600 }}>{h.clienteNome}</div>
+                    {periodo && <div style={{ color: '#7488A8', fontSize: 10.5, marginTop: 2 }}>Período: {periodo}</div>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 20, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.02em',
+                      background: h.tipo === 'cliente_pdf' ? '#3EBB7A18' : '#F5A62318',
+                      color: h.tipo === 'cliente_pdf' ? '#3EBB7A' : '#F5A623',
+                    }}>
+                      {h.tipo === 'cliente_pdf' ? 'PDF cliente' : 'Excel interno'}
+                    </span>
+                    <span style={{ color: '#7488A8', fontSize: 10 }}>
+                      gerado {new Date(h.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </a>
+              )
+            })}
           </div>
         )}
       </div>

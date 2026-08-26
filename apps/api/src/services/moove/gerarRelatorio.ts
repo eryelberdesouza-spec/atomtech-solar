@@ -74,7 +74,7 @@ export async function gerarRelatorioCliente(
 
   sheet.mergeCells("C1:H1");
   const tituloCell = sheet.getCell("C1");
-  tituloCell.value = "Relatório Semanal de Recargas";
+  tituloCell.value = "Relatório de Recargas";
   tituloCell.font = { size: 18, bold: true, color: { argb: CORES.pretoAtom } };
   tituloCell.alignment = { vertical: "middle" };
 

@@ -133,7 +133,7 @@ export async function gerarRelatorioClientePdf(
   <div class="cabecalho">
     <img src="${logoBase64}" />
     <div>
-      <h1>Relatório Semanal de Recargas</h1>
+      <h1>Relatório de Recargas</h1>
       <p class="cliente">Cliente: ${esc(cliente.clienteNome)}</p>
       <p class="periodo">Período: ${fmtData(periodoInicio)} a ${fmtData(periodoFim)}</p>
     </div>
