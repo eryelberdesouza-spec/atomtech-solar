@@ -259,6 +259,66 @@ export const propostaRouter = router({
       }
     }),
 
+  // ── Propostas perto de vencer ─────────────────────────────────────────────
+  // Criado em 2026-08-31. "Expirada" é o maior grupo do funil (76 de 187 no
+  // histórico, R$ 3,87 mi) e é status AUTOMÁTICO: expirarPropostasVencidas
+  // vira rascunho/enviada em expirada assim que data_validade passa. Ou seja,
+  // proposta morre sozinha por falta de follow-up e ninguém é avisado antes.
+  // Este endpoint alimenta o alerta do Dashboard, com o número da proposta.
+  //
+  // Inclui rascunho de propósito: rascunho também expira automaticamente, e
+  // proposta que nunca chegou a ser enviada e venceu é o caso mais evitável.
+  // Não é recortado pelo período do painel — vencimento é sempre sobre o que
+  // vem à frente, independente do filtro que estiver selecionado na tela.
+  aVencer: protectedProcedure
+    .input(z.object({ dias: z.number().int().min(1).max(60).default(7) }).optional())
+    .query(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+      const dias = input?.dias ?? 7
+
+      await expirarPropostasVencidas(ctx.db, empresaId)
+
+      const itemServicoSum = ctx.db
+        .select({
+          propostaId: itemServicoProposta.propostaId,
+          total: sql<string>`CAST(SUM(${itemServicoProposta.valorTotal}) AS CHAR)`.as('total'),
+        })
+        .from(itemServicoProposta)
+        .groupBy(itemServicoProposta.propostaId)
+        .as('item_servico_sum')
+
+      const linhas = await ctx.db
+        .select({
+          id: proposta.id,
+          numero: proposta.numero,
+          status: proposta.status,
+          dataValidade: proposta.dataValidade,
+          clienteNome: cliente.nome,
+          valorFinal: sql<string>`CAST(COALESCE(${precTable.precoFinal}, ${itemServicoSum.total}, 0) AS CHAR)`,
+          diasRestantes: sql<number>`DATEDIFF(${proposta.dataValidade}, CURDATE())`,
+        })
+        .from(proposta)
+        .leftJoin(cliente, eq(proposta.clienteId, cliente.id))
+        .leftJoin(precTable, eq(precTable.propostaId, proposta.id))
+        .leftJoin(itemServicoSum, eq(itemServicoSum.propostaId, proposta.id))
+        .where(
+          and(
+            eq(proposta.empresaId, empresaId),
+            eq(proposta.isTemplate, false),
+            sql`${proposta.status} IN ('rascunho','enviada')`,
+            sql`${proposta.dataValidade} IS NOT NULL`,
+            sql`DATEDIFF(${proposta.dataValidade}, CURDATE()) BETWEEN 0 AND ${dias}`,
+          ),
+        )
+        .orderBy(sql`${proposta.dataValidade} ASC`)
+
+      return linhas.map((l: any) => ({
+        ...l,
+        valorFinal: Number(l.valorFinal ?? 0),
+        diasRestantes: Number(l.diasRestantes ?? 0),
+      }))
+    }),
+
   // Proposta completa com todos os relacionamentos
   byId: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
