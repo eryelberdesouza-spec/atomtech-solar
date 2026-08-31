@@ -14,11 +14,6 @@ function parseDataYMD(s: string | null | undefined): { y: number; m: number; d: 
   return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) }
 }
 
-function parseDataLocal(s: string | null | undefined): Date | null {
-  const ymd = parseDataYMD(s)
-  return ymd ? new Date(ymd.y, ymd.m - 1, ymd.d) : null
-}
-
 function formatDate(s: string | null | undefined): string {
   const ymd = parseDataYMD(s)
   if (!ymd) return '—'
@@ -127,55 +122,54 @@ const PERIODOS: { id: Periodo; label: string }[] = [
   { id: 'tudo',     label: 'Todo período' },
 ]
 
-function inicioDoMes() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) }
-function inicioDoAno()  { const d = new Date(); return new Date(d.getFullYear(), 0, 1) }
-function quinzenaAtras(){ const d = new Date(); d.setDate(d.getDate() - 15); return d }
-
-function filtrarPorPeriodo(propostas: any[], periodo: Periodo) {
-  if (periodo === 'tudo') return propostas
-  const corte = periodo === 'mes' ? inicioDoMes() : periodo === 'quinzena' ? quinzenaAtras() : inicioDoAno()
-  return propostas.filter(p => {
-    const d = parseDataLocal(p.dataEmissao)
-    return d && d >= corte
-  })
+// Data de corte no fuso de QUEM olha a tela: "mês atual" é o mês do calendário
+// do usuário. O servidor roda em UTC no Railway, então mandar a data pronta
+// daqui evita errar a virada do mês pra quem está em -03.
+function isoLocal(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function desdeDoPeriodo(periodo: Periodo): string | undefined {
+  const d = new Date()
+  if (periodo === 'tudo') return undefined
+  if (periodo === 'mes') return isoLocal(new Date(d.getFullYear(), d.getMonth(), 1))
+  if (periodo === 'ano') return isoLocal(new Date(d.getFullYear(), 0, 1))
+  const q = new Date(); q.setDate(q.getDate() - 15); return isoLocal(q)
 }
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const [periodo, setPeriodo] = useState<Periodo>('mes')
-  const { data: raw, isLoading } = (trpc as any).proposta.list.useQuery({ page: 1, pageSize: 500 })
-  const { data: empresa } = (trpc as any).empresa.get.useQuery()
-  const todasPropostas: any[] = raw?.data ?? []
-  const propostas = useMemo(() => filtrarPorPeriodo(todasPropostas.filter((p: any) => !p.isTemplate), periodo), [todasPropostas, periodo])
+  const desde = useMemo(() => desdeDoPeriodo(periodo), [periodo])
 
-  const stats = useMemo(() => {
-    const reais = propostas  // já filtradas por período e sem templates
-    const t = reais.length
-    const val = (status: string) => reais
-      .filter(p => p.status === status)
-      .reduce((s: number, p: any) => s + Number(p.valorFinal ?? 0), 0)
-    const cnt = (status: string) => reais.filter(p => p.status === status).length
-    const aceitas = cnt('aceita')
-    return {
-      total: t,
-      abertas:    cnt('rascunho') + cnt('enviada'),
-      aguardando: cnt('enviada'),
-      aceitas,
-      conversao:  t > 0 ? Math.round((aceitas / t) * 100) : 0,
-      valorTotal:     reais.reduce((s: number, p: any) => s + Number(p.valorFinal ?? 0), 0),
-      valorAbertas:   val('rascunho') + val('enviada'),
-      valorAguardando:val('enviada'),
-      valorAceitas:   val('aceita'),
-      funil: {
-        rascunho: { count: cnt('rascunho'), valor: val('rascunho') },
-        enviada:  { count: cnt('enviada'),  valor: val('enviada')  },
-        aceita:   { count: cnt('aceita'),   valor: val('aceita')   },
-        recusada: { count: cnt('recusada'), valor: val('recusada') },
-        expirada: { count: cnt('expirada'), valor: val('expirada') },
-      },
-    }
-  }, [propostas])
+  // Os números vêm AGREGADOS do servidor (proposta.resumo). Contar no cliente
+  // exigia baixar todas as propostas, e a paginação truncava silenciosamente:
+  // o painel media só as 20 mais recentes e mostrava 4 aceitas em agosto/2026
+  // quando existiam 15. Agregando em SQL não há página pra truncar.
+  const { data: resumo, isLoading } = (trpc as any).proposta.resumo.useQuery({ desde })
+  const { data: ultimas } = (trpc as any).proposta.list.useQuery({
+    pagina: 1, porPagina: 5, isTemplate: false, desde,
+  })
+  const { data: empresa } = (trpc as any).empresa.get.useQuery()
+
+  const propostas: any[] = ultimas?.data ?? []
+
+  const stats = useMemo(() => ({
+    total:           resumo?.total ?? 0,
+    aguardando:      resumo?.aguardando ?? 0,
+    aceitas:         resumo?.aceitas ?? 0,
+    conversao:       resumo?.conversao ?? 0,
+    valorTotal:      resumo?.valorTotal ?? 0,
+    valorAguardando: resumo?.valorAguardando ?? 0,
+    valorAceitas:    resumo?.valorAceitas ?? 0,
+    funil: {
+      rascunho: { count: resumo?.funil?.rascunho?.quantidade ?? 0, valor: resumo?.funil?.rascunho?.valor ?? 0 },
+      enviada:  { count: resumo?.funil?.enviada?.quantidade  ?? 0, valor: resumo?.funil?.enviada?.valor  ?? 0 },
+      aceita:   { count: resumo?.funil?.aceita?.quantidade   ?? 0, valor: resumo?.funil?.aceita?.valor   ?? 0 },
+      recusada: { count: resumo?.funil?.recusada?.quantidade ?? 0, valor: resumo?.funil?.recusada?.valor ?? 0 },
+      expirada: { count: resumo?.funil?.expirada?.quantidade ?? 0, valor: resumo?.funil?.expirada?.valor ?? 0 },
+    },
+  }), [resumo])
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
@@ -225,7 +219,7 @@ export function DashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid #1A2D45' }}>
             <div>
               <h3 style={{ color: '#E2EAF5', fontSize: 15, fontWeight: 700, margin: 0 }}>Últimas Propostas</h3>
-              <p style={{ color: '#6A80A2', fontSize: 11, margin: '2px 0 0' }}>{propostas.length} proposta{propostas.length !== 1 ? 's' : ''} no período</p>
+              <p style={{ color: '#6A80A2', fontSize: 11, margin: '2px 0 0' }}>{stats.total} proposta{stats.total !== 1 ? 's' : ''} no período</p>
             </div>
             <button onClick={() => navigate('/propostas')}
               style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #1E3050', background: 'transparent', color: '#F5A623', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}

@@ -112,13 +112,15 @@ export const propostaRouter = router({
         clienteId: z.number().optional(),
         usuarioId: z.number().optional(),
         isTemplate: z.boolean().optional(),
+        /** Recorte por data de emissão (YYYY-MM-DD), usado pelo Dashboard. */
+        desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         pagina: z.number().int().default(1),
         porPagina: z.number().int().default(20),
       }).optional(),
     )
     .query(async ({ ctx, input }) => {
       const { empresaId } = ctx.usuario
-      const { pagina = 1, porPagina = 20, status, clienteId, isTemplate } = input ?? {}
+      const { pagina = 1, porPagina = 20, status, clienteId, isTemplate, desde } = input ?? {}
       const offset = (pagina - 1) * porPagina
 
       await expirarPropostasVencidas(ctx.db, empresaId)
@@ -162,6 +164,10 @@ export const propostaRouter = router({
             status ? eq(proposta.status, status) : undefined,
             clienteId ? eq(proposta.clienteId, clienteId) : undefined,
             isTemplate !== undefined ? eq(proposta.isTemplate, isTemplate) : undefined,
+            // sql cru: o Drizzle tipa data_emissao como Date e recusa string,
+            // e converter pra Date reintroduz o bug de fuso já documentado no
+            // CLAUDE.md. A comparação YYYY-MM-DD no MySQL é direta.
+            desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
           ),
         )
         .orderBy(desc(proposta.createdAt))
@@ -169,6 +175,88 @@ export const propostaRouter = router({
         .offset(offset)
 
       return { data: propostas, pagina, porPagina }
+    }),
+
+  // ── Resumo agregado para o Dashboard ──────────────────────────────────────
+  // Criado em 2026-08-31. Antes o Dashboard buscava proposta.list e contava no
+  // cliente — e passava `{page, pageSize}` enquanto este router espera
+  // `{pagina, porPagina}`. O Zod descarta chave desconhecida e aplicava os
+  // DEFAULTS (página 1, 20 por página): o painel media sempre as 20 propostas
+  // mais recentes, rotulando-as como "Mês atual"/"Este ano"/"Todo período".
+  // Em agosto/2026 isso mostrava 4 aceitas quando existiam 15.
+  //
+  // Agregar em SQL elimina a classe inteira do problema: não há página para
+  // truncar silenciosamente, e o painel não degrada conforme a base cresce.
+  // `desde` vem PRONTO do cliente (YYYY-MM-DD) porque "mês atual" é o mês do
+  // calendário de quem olha a tela — calcular no servidor (UTC no Railway)
+  // erraria a virada do mês pra quem está em -03.
+  resumo: protectedProcedure
+    .input(z.object({ desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+      const desde = input?.desde
+
+      await expirarPropostasVencidas(ctx.db, empresaId)
+
+      const itemServicoSum = ctx.db
+        .select({
+          propostaId: itemServicoProposta.propostaId,
+          total: sql<string>`CAST(SUM(${itemServicoProposta.valorTotal}) AS CHAR)`.as('total'),
+        })
+        .from(itemServicoProposta)
+        .groupBy(itemServicoProposta.propostaId)
+        .as('item_servico_sum')
+
+      const linhas = await ctx.db
+        .select({
+          status: proposta.status,
+          quantidade: sql<number>`COUNT(*)`,
+          valor: sql<string>`CAST(COALESCE(SUM(COALESCE(${precTable.precoFinal}, ${itemServicoSum.total}, 0)), 0) AS CHAR)`,
+        })
+        .from(proposta)
+        .leftJoin(precTable, eq(precTable.propostaId, proposta.id))
+        .leftJoin(itemServicoSum, eq(itemServicoSum.propostaId, proposta.id))
+        .where(
+          and(
+            eq(proposta.empresaId, empresaId),
+            eq(proposta.isTemplate, false),
+            // sql cru: o Drizzle tipa data_emissao como Date e recusa string,
+            // e converter pra Date reintroduz o bug de fuso já documentado no
+            // CLAUDE.md. A comparação YYYY-MM-DD no MySQL é direta.
+            desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
+          ),
+        )
+        .groupBy(proposta.status)
+
+      const porStatus: Record<string, { quantidade: number; valor: number }> = {}
+      for (const l of linhas) {
+        porStatus[l.status] = { quantidade: Number(l.quantidade ?? 0), valor: Number(l.valor ?? 0) }
+      }
+      const de = (s: string) => porStatus[s] ?? { quantidade: 0, valor: 0 }
+
+      // "cancelada" fica fora do total: é proposta anulada, não disputada —
+      // mantê-la no denominador afundaria a taxa de conversão sem motivo.
+      const considerados = ['rascunho', 'enviada', 'aceita', 'recusada', 'expirada']
+      const total = considerados.reduce((s, k) => s + de(k).quantidade, 0)
+      const valorTotal = considerados.reduce((s, k) => s + de(k).valor, 0)
+      const aceitas = de('aceita').quantidade
+
+      return {
+        total,
+        valorTotal,
+        aceitas,
+        valorAceitas: de('aceita').valor,
+        aguardando: de('enviada').quantidade,
+        valorAguardando: de('enviada').valor,
+        conversao: total > 0 ? Math.round((aceitas / total) * 100) : 0,
+        funil: {
+          rascunho: de('rascunho'),
+          enviada: de('enviada'),
+          aceita: de('aceita'),
+          recusada: de('recusada'),
+          expirada: de('expirada'),
+        },
+      }
     }),
 
   // Proposta completa com todos os relacionamentos
