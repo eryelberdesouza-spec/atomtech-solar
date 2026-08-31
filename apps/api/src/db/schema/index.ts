@@ -267,6 +267,13 @@ export const proposta = mysqlTable('proposta', {
   observacoesInternas: text('observacoes_internas'),
   contratoFormalizado: boolean('contrato_formalizado').default(false).notNull(),
   dataFormalizacao: date('data_formalizacao'),
+  // Quando a proposta passou para "aceita". Existe desde 2026-08-31 — antes
+  // disso o aceite só mudava o status, sem gravar data, e o painel era
+  // obrigado a medir "fechamos no mês" pela data de EMISSÃO (proposta emitida
+  // em julho e fechada em agosto caía em julho). Fica NULL nas propostas
+  // aceitas antes dessa data: a informação nunca foi registrada e não há como
+  // deduzir — por isso o Dashboard distingue os dois casos em vez de chutar.
+  dataAceite: date('data_aceite'),
   createdBy: int('created_by').references(() => usuario.id),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp('updated_at'),

@@ -1674,7 +1674,15 @@ function PropostaDetailPageInner() {
   const TABS   = isServico ? TABS_SERVICO : TABS_SOLAR
 
   const handleStatus = (status: any) => {
-    updateStatus.mutate({ id: propostaId, status }, { onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }) })
+    // Data do aceite calculada AQUI, no fuso de quem clica: o servidor roda em
+    // UTC, e um aceite às 21h30 em Brasília já seria "amanhã" lá — o que na
+    // virada do mês jogaria o fechamento pro mês seguinte no painel.
+    const hoje = new Date()
+    const dataAceite = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
+    updateStatus.mutate(
+      { id: propostaId, status, ...(status === 'aceita' ? { dataAceite } : {}) } as any,
+      { onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }) },
+    )
   }
 
   const nextStatus: Record<string, { label: string; status: string; color: string }> = {

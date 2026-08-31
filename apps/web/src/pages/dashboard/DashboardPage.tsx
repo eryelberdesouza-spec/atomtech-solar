@@ -167,6 +167,9 @@ export function DashboardPage() {
     valorTotal:      resumo?.valorTotal ?? 0,
     valorAguardando: resumo?.valorAguardando ?? 0,
     valorAceitas:    resumo?.valorAceitas ?? 0,
+    fechadas:        resumo?.fechadas ?? 0,
+    valorFechadas:   resumo?.valorFechadas ?? 0,
+    semDataAceite:   resumo?.aceitasSemDataAceite ?? 0,
     funil: {
       rascunho: { count: resumo?.funil?.rascunho?.quantidade ?? 0, valor: resumo?.funil?.rascunho?.valor ?? 0 },
       enviada:  { count: resumo?.funil?.enviada?.quantidade  ?? 0, valor: resumo?.funil?.enviada?.valor  ?? 0 },
@@ -212,7 +215,18 @@ export function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 28 }}>
         <KpiCard label="Volume Total Orçado"  value={stats.total}              valor={stats.valorTotal}     sub="todas as propostas"    icon="💰" color="#F5A623" onClick={() => navigate('/propostas?status=todos')} />
         <KpiCard label="Aguardando Resposta"  value={stats.aguardando}         valor={stats.valorAguardando} sub="propostas enviadas"    icon="📤" color="#58A6FF" onClick={() => navigate('/propostas?status=enviada')} />
-        <KpiCard label="Propostas Aceitas"    value={stats.aceitas}            valor={stats.valorAceitas}   sub="volume aprovado"       icon="✅" color="#3EBB7A" onClick={() => navigate('/propostas?status=aceita')} />
+        {/* Enquanto houver aceitas sem data de aceite (histórico anterior a
+            2026-08-31), o card mostra a base por EMISSÃO e diz isso. Assim que
+            houver fechamento datado no período, passa a medir por data de
+            aceite — que é a leitura certa de "quanto fechamos no mês". */}
+        <KpiCard
+          label="Propostas Aceitas"
+          value={stats.fechadas > 0 ? stats.fechadas : stats.aceitas}
+          valor={stats.fechadas > 0 ? stats.valorFechadas : stats.valorAceitas}
+          sub={stats.fechadas > 0
+            ? (stats.semDataAceite > 0 ? `fechadas no período · +${stats.semDataAceite} sem data` : 'fechadas no período')
+            : (stats.semDataAceite > 0 ? 'por data de emissão' : 'volume aprovado')}
+          icon="✅" color="#3EBB7A" onClick={() => navigate('/propostas?status=aceita')} />
         <KpiCard label="Taxa de Conversão"    value={stats.conversao + '%'}                                 sub={`${stats.aceitas} de ${stats.total} propostas`} icon="📊" color="#BC8CFF" onClick={() => navigate('/propostas?status=aceita')} />
       </div>
 

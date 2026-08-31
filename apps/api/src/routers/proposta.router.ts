@@ -228,6 +228,46 @@ export const propostaRouter = router({
         )
         .groupBy(proposta.status)
 
+      // "Fechadas no período" — recortadas pela data do ACEITE, não pela de
+      // emissão. Responde "quanto fechamos neste mês", enquanto o funil acima
+      // responde "das que emitimos neste mês, quantas fecharam". São perguntas
+      // diferentes e cada uma tem sua base; misturar as duas produziria taxa
+      // de conversão sem significado.
+      const [fechadasRow]: any = await ctx.db
+        .select({
+          quantidade: sql<number>`COUNT(*)`,
+          valor: sql<string>`CAST(COALESCE(SUM(COALESCE(${precTable.precoFinal}, ${itemServicoSum.total}, 0)), 0) AS CHAR)`,
+        })
+        .from(proposta)
+        .leftJoin(precTable, eq(precTable.propostaId, proposta.id))
+        .leftJoin(itemServicoSum, eq(itemServicoSum.propostaId, proposta.id))
+        .where(
+          and(
+            eq(proposta.empresaId, empresaId),
+            eq(proposta.isTemplate, false),
+            sql`${proposta.status} = 'aceita'`,
+            sql`${proposta.dataAceite} IS NOT NULL`,
+            desde ? sql`${proposta.dataAceite} >= ${desde}` : undefined,
+          ),
+        )
+
+      // Aceitas do período (por emissão) que não têm data de aceite: são as
+      // anteriores a 2026-08-31, quando a data passou a ser gravada. O painel
+      // usa isso pra avisar em vez de mostrar um número incompleto como se
+      // fosse completo.
+      const [semDataRow]: any = await ctx.db
+        .select({ quantidade: sql<number>`COUNT(*)` })
+        .from(proposta)
+        .where(
+          and(
+            eq(proposta.empresaId, empresaId),
+            eq(proposta.isTemplate, false),
+            sql`${proposta.status} = 'aceita'`,
+            sql`${proposta.dataAceite} IS NULL`,
+            desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
+          ),
+        )
+
       const porStatus: Record<string, { quantidade: number; valor: number }> = {}
       for (const l of linhas) {
         porStatus[l.status] = { quantidade: Number(l.quantidade ?? 0), valor: Number(l.valor ?? 0) }
@@ -244,8 +284,16 @@ export const propostaRouter = router({
       return {
         total,
         valorTotal,
+        // aceitas/valorAceitas = coorte por EMISSÃO (das emitidas no período,
+        // quantas estão aceitas hoje). Alimenta a taxa de conversão.
         aceitas,
         valorAceitas: de('aceita').valor,
+        // fechadas/valorFechadas = por data de ACEITE (quanto fechamos no
+        // período). aceitasSemDataAceite > 0 significa histórico anterior ao
+        // registro da data — o painel avisa em vez de fingir completude.
+        fechadas: Number(fechadasRow?.quantidade ?? 0),
+        valorFechadas: Number(fechadasRow?.valor ?? 0),
+        aceitasSemDataAceite: Number(semDataRow?.quantidade ?? 0),
         aguardando: de('enviada').quantidade,
         valorAguardando: de('enviada').valor,
         conversao: total > 0 ? Math.round((aceitas / total) * 100) : 0,
@@ -1191,9 +1239,23 @@ export const propostaRouter = router({
     .input(z.object({
       id: z.number().int().positive(),
       status: z.enum(['rascunho', 'enviada', 'aceita', 'recusada', 'expirada', 'cancelada']),
+      /**
+       * Data do aceite (YYYY-MM-DD), enviada pelo cliente. Vem de lá porque o
+       * servidor roda em UTC no Railway: um aceite às 21h30 em Brasília (-03)
+       * já é "amanhã" em UTC, e como o painel recorta por mês, isso jogaria o
+       * fechamento pro mês seguinte na virada. Só é usada quando status='aceita'.
+       */
+      dataAceite: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const set: Record<string, any> = { status: input.status }
+
+      // Mantém o par status/data coerente: gravada ao virar "aceita", limpa ao
+      // sair de "aceita" (ex.: reabrir a proposta), pra nunca sobrar data de
+      // aceite em proposta que não está mais aceita.
+      set.dataAceite = input.status === 'aceita'
+        ? sql`COALESCE(${input.dataAceite ?? null}, CURDATE())`
+        : sql`NULL`
 
       // "Reabrir" (recusada/expirada → rascunho) precisa também empurrar a
       // validade pra frente — senão a checagem lazy de auto-expiração

@@ -732,6 +732,38 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
 
 // ── Migração: Módulo Operacional (Ordens de Serviço) ─────────────────────────
 // ── Migração: adiciona status 'pendencia' ao ENUM de ordem_servico ────────────
+// Registra QUANDO a proposta foi aceita. Sem essa coluna o Dashboard só podia
+// medir "fechamos no mês" pela data de emissão. Fica NULL no histórico já
+// aceito — de propósito: essa informação nunca foi gravada e inventá-la
+// (ex.: copiar a data de emissão) daria um número errado com cara de certo.
+app.get('/run-migration-proposta-data-aceite', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'proposta' AND COLUMN_NAME = 'data_aceite'`,
+    )
+    if (cols.length > 0) {
+      await conn.end()
+      return res.json({ ok: true, message: 'Coluna data_aceite já existe — nada a fazer' })
+    }
+    await conn.execute(`ALTER TABLE proposta ADD COLUMN data_aceite DATE NULL AFTER data_formalizacao`)
+    const [pend]: any = await conn.execute(
+      `SELECT COUNT(*) AS n FROM proposta WHERE status = 'aceita' AND data_aceite IS NULL`,
+    )
+    await conn.end()
+    res.json({
+      ok: true,
+      message: 'Coluna data_aceite criada',
+      aceitasSemDataAceite: Number(pend?.[0]?.n ?? 0),
+      observacao: 'Histórico fica sem data de aceite por design; passa a ser gravada a partir de agora.',
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/run-migration-os-pendencia', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')
