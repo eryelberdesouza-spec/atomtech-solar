@@ -215,17 +215,22 @@ export function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 10 : 16, marginBottom: isMobile ? 16 : 28 }}>
         <KpiCard label="Volume Total Orçado"  value={stats.total}              valor={stats.valorTotal}     sub="todas as propostas"    icon="💰" color="#F5A623" onClick={() => navigate('/propostas?status=todos')} />
         <KpiCard label="Aguardando Resposta"  value={stats.aguardando}         valor={stats.valorAguardando} sub="propostas enviadas"    icon="📤" color="#58A6FF" onClick={() => navigate('/propostas?status=enviada')} />
-        {/* Enquanto houver aceitas sem data de aceite (histórico anterior a
-            2026-08-31), o card mostra a base por EMISSÃO e diz isso. Assim que
-            houver fechamento datado no período, passa a medir por data de
-            aceite — que é a leitura certa de "quanto fechamos no mês". */}
+        {/* Só troca pra base "data de aceite" quando NÃO sobrar aceita sem data
+            no período. Trocar assim que aparecesse a primeira datada fazia o
+            número despencar (17 aceitas viravam "1 fechada · +16 sem data"):
+            certo na definição, enganoso na leitura — e leitura enganosa no
+            painel foi exatamente o problema que originou esta correção.
+            Até lá mostra a coorte por emissão, que é completa, e informa
+            quantas já têm data pra dar pra acompanhar a virada. */}
         <KpiCard
           label="Propostas Aceitas"
-          value={stats.fechadas > 0 ? stats.fechadas : stats.aceitas}
-          valor={stats.fechadas > 0 ? stats.valorFechadas : stats.valorAceitas}
-          sub={stats.fechadas > 0
-            ? (stats.semDataAceite > 0 ? `fechadas no período · +${stats.semDataAceite} sem data` : 'fechadas no período')
-            : (stats.semDataAceite > 0 ? 'por data de emissão' : 'volume aprovado')}
+          value={stats.semDataAceite === 0 ? stats.fechadas : stats.aceitas}
+          valor={stats.semDataAceite === 0 ? stats.valorFechadas : stats.valorAceitas}
+          sub={stats.semDataAceite === 0
+            ? 'fechadas no período'
+            : stats.fechadas > 0
+              ? `por emissão · ${stats.fechadas} já com data de aceite`
+              : 'por data de emissão'}
           icon="✅" color="#3EBB7A" onClick={() => navigate('/propostas?status=aceita')} />
         <KpiCard label="Taxa de Conversão"    value={stats.conversao + '%'}                                 sub={`${stats.aceitas} de ${stats.total} propostas`} icon="📊" color="#BC8CFF" onClick={() => navigate('/propostas?status=aceita')} />
       </div>
