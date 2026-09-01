@@ -192,9 +192,18 @@ export function PropostasPage() {
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#7488A8' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
           <p style={{ fontSize: 15, color: '#9FB0C9', margin: 0 }}>
-            {busca || filtro !== 'todos' ? 'Nenhuma proposta encontrada com este filtro.' : 'Nenhuma proposta criada ainda.'}
+            {verArquivadas
+              ? (busca ? 'Nenhuma proposta arquivada encontrada com esta busca.' : 'Nenhuma proposta arquivada.')
+              : busca || filtro !== 'todos'
+                ? 'Nenhuma proposta encontrada com este filtro.'
+                : 'Nenhuma proposta criada ainda.'}
           </p>
-          {!busca && filtro === 'todos' && (
+          {verArquivadas && !busca && (
+            <p style={{ fontSize: 12.5, color: '#6A80A2', margin: '10px 0 0' }}>
+              Propostas arquivadas saem das listagens e dos relatórios, mas continuam guardadas e podem ser restauradas aqui.
+            </p>
+          )}
+          {!verArquivadas && !busca && filtro === 'todos' && (
             <button
               onClick={() => navigate('/propostas/nova')}
               style={{ marginTop: 16, padding: '8px 20px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #F5A623, #E8720C)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
