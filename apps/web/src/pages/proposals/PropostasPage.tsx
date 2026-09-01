@@ -54,19 +54,43 @@ export function PropostasPage() {
     if (changed) setSearchParams(params, { replace: true })
   }, [])
 
-  const { data, isLoading } = trpc.proposta.list.useQuery({ isTemplate: false, porPagina: 100 })
-  const lista = data?.data ?? []
+  // Busca com atraso curto pra não disparar uma consulta por tecla digitada.
+  const [buscaAdiada, setBuscaAdiada] = useState(busca)
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaAdiada(busca), 300)
+    return () => clearTimeout(t)
+  }, [busca])
 
+  const POR_PAGINA = 30
+  const [pagina, setPagina] = useState(1)
+  // Trocar busca ou status reinicia a paginação — senão a pessoa fica presa
+  // numa página que não existe mais no novo recorte e vê uma lista vazia.
+  useEffect(() => { setPagina(1) }, [buscaAdiada, filtro])
+
+  // Busca, filtro de status, contagem e total vêm do SERVIDOR. Antes a tela
+  // baixava as 100 mais recentes e filtrava no navegador: proposta mais
+  // antiga que isso não era encontrada de jeito nenhum (caso da
+  // AT-2026-06046, de junho), e os cards por status contavam só o pedaço
+  // baixado, mostrando número parcial como se fosse o total.
+  const { data, isLoading } = trpc.proposta.list.useQuery({
+    isTemplate: false,
+    porPagina: POR_PAGINA,
+    pagina,
+    ...(filtro !== 'todos' ? { status: filtro } : {}),
+    ...(buscaAdiada ? { busca: buscaAdiada } : {}),
+  } as any)
+
+  const filtradas = data?.data ?? []
+  const total = (data as any)?.total ?? 0
+  const totalGeral = (data as any)?.totalGeral ?? 0
+  const porStatus: Record<string, number> = (data as any)?.porStatus ?? {}
   const contagem = STATUS_FILTROS.slice(1).reduce((acc, s) => ({
-    ...acc,
-    [s.id]: lista.filter(p => p.status === s.id).length,
+    ...acc, [s.id]: porStatus[s.id] ?? 0,
   }), {} as Record<string, number>)
 
-  const filtradas = lista.filter(p => {
-    const passaStatus = filtro === 'todos' || p.status === filtro
-    const passaBusca  = !busca || p.clienteNome?.toLowerCase().includes(busca.toLowerCase()) || p.numero.includes(busca) || p.tituloServico?.toLowerCase().includes(busca.toLowerCase())
-    return passaStatus && passaBusca
-  })
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA))
+  const primeiroDaPagina = total === 0 ? 0 : (pagina - 1) * POR_PAGINA + 1
+  const ultimoDaPagina = Math.min(pagina * POR_PAGINA, total)
 
   return (
     <div style={{ padding: isMobile ? '16px 14px' : '24px 32px', maxWidth: 1100 }}>
@@ -75,13 +99,16 @@ export function PropostasPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
-          <p style={{ color: '#7488A8', fontSize: 12, margin: 0 }}>{lista.length} proposta{lista.length !== 1 ? 's' : ''} no total</p>
+          <p style={{ color: '#7488A8', fontSize: 12, margin: 0 }}>
+            {totalGeral} proposta{totalGeral !== 1 ? 's' : ''} no total
+            {buscaAdiada ? ` · ${total} encontrada${total !== 1 ? 's' : ''}` : ''}
+          </p>
         </div>
         <NovaPropostaDropdown />
       </div>
 
       {/* Stats */}
-      {!isLoading && lista.length > 0 && (
+      {!isLoading && totalGeral > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
           {STATUS_FILTROS.slice(1).map(s => (
             <button
@@ -221,6 +248,44 @@ export function PropostasPage() {
               </div>
             )
           })}
+
+          {/* Paginação — sempre mostra o intervalo e o total, pra nunca ficar
+              a dúvida de estar vendo a lista inteira ou só um pedaço dela. */}
+          {total > POR_PAGINA && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, flexWrap: 'wrap', marginTop: 10, padding: '4px 2px',
+            }}>
+              <span style={{ color: '#7488A8', fontSize: 12 }}>
+                Mostrando {primeiroDaPagina}–{ultimoDaPagina} de {total}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={pagina <= 1}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    border: '1px solid #1E3050', background: 'transparent',
+                    color: pagina <= 1 ? '#3D5170' : '#C8D8EC',
+                    cursor: pagina <= 1 ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}
+                >← Anterior</button>
+                <span style={{ color: '#7488A8', fontSize: 12, minWidth: 76, textAlign: 'center' }}>
+                  {pagina} de {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                  disabled={pagina >= totalPaginas}
+                  style={{
+                    padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    border: '1px solid #1E3050', background: 'transparent',
+                    color: pagina >= totalPaginas ? '#3D5170' : '#C8D8EC',
+                    cursor: pagina >= totalPaginas ? 'default' : 'pointer', fontFamily: 'inherit',
+                  }}
+                >Próxima →</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

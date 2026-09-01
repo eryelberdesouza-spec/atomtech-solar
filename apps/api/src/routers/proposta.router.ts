@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { z } from 'zod'
-import { eq, and, desc, like, not, sql } from 'drizzle-orm'
+import { eq, and, or, desc, like, not, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
 import {
@@ -114,14 +114,30 @@ export const propostaRouter = router({
         isTemplate: z.boolean().optional(),
         /** Recorte por data de emissão (YYYY-MM-DD), usado pelo Dashboard. */
         desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        /**
+         * Busca por número, cliente ou título. Feita AQUI, no SQL, e não no
+         * cliente: a tela filtrava só o que já tinha baixado (as 100 mais
+         * recentes), então proposta antiga simplesmente não era encontrada —
+         * a AT-2026-06046 (junho/2026) não aparecia em busca nenhuma.
+         */
+        busca: z.string().trim().max(120).optional(),
         pagina: z.number().int().default(1),
         porPagina: z.number().int().default(20),
       }).optional(),
     )
     .query(async ({ ctx, input }) => {
       const { empresaId } = ctx.usuario
-      const { pagina = 1, porPagina = 20, status, clienteId, isTemplate, desde } = input ?? {}
+      const { pagina = 1, porPagina = 20, status, clienteId, isTemplate, desde, busca } = input ?? {}
       const offset = (pagina - 1) * porPagina
+
+      const termo = busca ? `%${busca}%` : null
+      const filtroBusca = termo
+        ? or(
+            like(proposta.numero, termo),
+            like(cliente.nome, termo),
+            like(proposta.tituloServico, termo),
+          )
+        : undefined
 
       await expirarPropostasVencidas(ctx.db, empresaId)
 
@@ -168,13 +184,43 @@ export const propostaRouter = router({
             // e converter pra Date reintroduz o bug de fuso já documentado no
             // CLAUDE.md. A comparação YYYY-MM-DD no MySQL é direta.
             desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
+            filtroBusca,
           ),
         )
         .orderBy(desc(proposta.createdAt))
         .limit(porPagina)
         .offset(offset)
 
-      return { data: propostas, pagina, porPagina }
+      // Total real (sem paginação) e contagem por status. A tela mostrava
+      // "N propostas no total" e os cards por status contando só a página
+      // baixada — number errado com cara de completo. O `porStatus` ignora de
+      // propósito o filtro de status (senão o card selecionado zeraria os
+      // outros), mas respeita a busca.
+      const filtrosBase = and(
+        eq(proposta.empresaId, empresaId),
+        clienteId ? eq(proposta.clienteId, clienteId) : undefined,
+        isTemplate !== undefined ? eq(proposta.isTemplate, isTemplate) : undefined,
+        desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
+        filtroBusca,
+      )
+
+      const contagens = await ctx.db
+        .select({ status: proposta.status, quantidade: sql<number>`COUNT(*)` })
+        .from(proposta)
+        .leftJoin(cliente, eq(proposta.clienteId, cliente.id))
+        .where(filtrosBase)
+        .groupBy(proposta.status)
+
+      const porStatus: Record<string, number> = {}
+      let totalGeral = 0
+      for (const c of contagens) {
+        const n = Number(c.quantidade ?? 0)
+        porStatus[c.status] = n
+        totalGeral += n
+      }
+      const total = status ? (porStatus[status] ?? 0) : totalGeral
+
+      return { data: propostas, pagina, porPagina, total, totalGeral, porStatus }
     }),
 
   // ── Resumo agregado para o Dashboard ──────────────────────────────────────
