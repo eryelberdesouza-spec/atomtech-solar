@@ -736,6 +736,46 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
 // medir "fechamos no mês" pela data de emissão. Fica NULL no histórico já
 // aceito — de propósito: essa informação nunca foi gravada e inventá-la
 // (ex.: copiar a data de emissão) daria um número errado com cara de certo.
+// Arquivamento de propostas, no lugar da exclusão definitiva.
+app.get('/run-migration-proposta-arquivamento', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'proposta'
+          AND COLUMN_NAME IN ('arquivada','arquivada_em','arquivada_por')`,
+    )
+    const existentes = cols.map((c: any) => c.COLUMN_NAME)
+    const criadas: string[] = []
+    if (!existentes.includes('arquivada')) {
+      await conn.execute(`ALTER TABLE proposta ADD COLUMN arquivada TINYINT(1) NOT NULL DEFAULT 0 AFTER data_aceite`)
+      criadas.push('arquivada')
+    }
+    if (!existentes.includes('arquivada_em')) {
+      await conn.execute(`ALTER TABLE proposta ADD COLUMN arquivada_em TIMESTAMP NULL AFTER arquivada`)
+      criadas.push('arquivada_em')
+    }
+    if (!existentes.includes('arquivada_por')) {
+      await conn.execute(`ALTER TABLE proposta ADD COLUMN arquivada_por INT NULL AFTER arquivada_em`)
+      criadas.push('arquivada_por')
+    }
+    // Índice: toda listagem passa a filtrar arquivada = 0.
+    try {
+      await conn.execute(`CREATE INDEX idx_arquivada ON proposta (empresa_id, arquivada)`)
+      criadas.push('idx_arquivada')
+    } catch { /* índice já existe */ }
+    await conn.end()
+    res.json({
+      ok: true,
+      criadas: criadas.length ? criadas : 'nada — já estava aplicada',
+      observacao: 'Propostas existentes ficam como não arquivadas (arquivada = 0).',
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 app.get('/run-migration-proposta-data-aceite', async (_, res) => {
   try {
     const mysql2 = await import('mysql2/promise')

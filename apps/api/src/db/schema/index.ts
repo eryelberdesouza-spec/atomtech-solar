@@ -274,6 +274,15 @@ export const proposta = mysqlTable('proposta', {
   // aceitas antes dessa data: a informação nunca foi registrada e não há como
   // deduzir — por isso o Dashboard distingue os dois casos em vez de chutar.
   dataAceite: date('data_aceite'),
+  // Arquivamento no lugar de exclusão definitiva (desde 2026-08-31). Antes o
+  // botão "Excluir" apagava a proposta e tudo ligado a ela (itens,
+  // precificação, condições, parcelas) sem deixar rastro — foi o que abriu os
+  // buracos na numeração (AT-2026-06046 e outros 11 só em junho/2026), sem
+  // como saber o que era, quem apagou ou quando. Arquivada some das listas
+  // mas continua no banco e pode voltar.
+  arquivada: boolean('arquivada').default(false).notNull(),
+  arquivadaEm: timestamp('arquivada_em'),
+  arquivadaPor: int('arquivada_por'),
   createdBy: int('created_by').references(() => usuario.id),
   createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`).notNull(),
   updatedAt: timestamp('updated_at'),

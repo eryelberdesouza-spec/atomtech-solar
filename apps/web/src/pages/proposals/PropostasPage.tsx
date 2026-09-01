@@ -72,11 +72,30 @@ export function PropostasPage() {
   // antiga que isso não era encontrada de jeito nenhum (caso da
   // AT-2026-06046, de junho), e os cards por status contavam só o pedaço
   // baixado, mostrando número parcial como se fosse o total.
+  // Modo "Arquivadas": lista só o que foi arquivado, com opção de restaurar.
+  const verArquivadas = searchParams.get('arquivadas') === '1'
+  const setVerArquivadas = (v: boolean) => {
+    setSearchParams(p => {
+      const n = new URLSearchParams(p)
+      v ? n.set('arquivadas', '1') : n.delete('arquivadas')
+      n.delete('status')
+      return n
+    }, { replace: true })
+    setPagina(1)
+  }
+
+  const utils = trpc.useContext()
+  const desarquivar = (trpc as any).proposta.desarquivar.useMutation({
+    onSuccess: () => utils.proposta.list.invalidate(),
+    onError: (e: any) => alert('Erro ao restaurar: ' + (e?.message ?? 'Tente novamente')),
+  })
+
   const { data, isLoading } = trpc.proposta.list.useQuery({
     isTemplate: false,
     porPagina: POR_PAGINA,
     pagina,
-    ...(filtro !== 'todos' ? { status: filtro } : {}),
+    ...(verArquivadas ? { arquivadas: true } : {}),
+    ...(!verArquivadas && filtro !== 'todos' ? { status: filtro } : {}),
     ...(buscaAdiada ? { busca: buscaAdiada } : {}),
   } as any)
 
@@ -100,11 +119,25 @@ export function PropostasPage() {
         <div>
           <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 17 : 20, fontWeight: 800, margin: '0 0 4px' }}>Propostas</h2>
           <p style={{ color: '#7488A8', fontSize: 12, margin: 0 }}>
-            {totalGeral} proposta{totalGeral !== 1 ? 's' : ''} no total
+            {verArquivadas
+              ? `${totalGeral} proposta${totalGeral !== 1 ? 's' : ''} arquivada${totalGeral !== 1 ? 's' : ''}`
+              : `${totalGeral} proposta${totalGeral !== 1 ? 's' : ''} no total`}
             {buscaAdiada ? ` · ${total} encontrada${total !== 1 ? 's' : ''}` : ''}
           </p>
         </div>
-        <NovaPropostaDropdown />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setVerArquivadas(!verArquivadas)}
+            style={{
+              padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              border: `1px solid ${verArquivadas ? '#F5A623' : '#1E3050'}`,
+              background: verArquivadas ? '#F5A62318' : 'transparent',
+              color: verArquivadas ? '#F5A623' : '#7488A8',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >{verArquivadas ? '← Voltar às ativas' : '📦 Arquivadas'}</button>
+          {!verArquivadas && <NovaPropostaDropdown />}
+        </div>
       </div>
 
       {/* Stats */}
@@ -242,7 +275,22 @@ export function PropostasPage() {
                     </div>
                     <Badge status={p.status} />
                     <span style={{ color: '#7488A8', fontSize: 12 }}>{formatDate(p.dataEmissao)}</span>
-                    <span style={{ color: '#6A80A2', fontSize: 18 }}>›</span>
+                    {verArquivadas ? (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()  // senão o clique abre a proposta
+                          if (window.confirm(`Restaurar a proposta ${p.numero}?`)) desarquivar.mutate({ id: p.id })
+                        }}
+                        title="Restaurar"
+                        style={{
+                          padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                          border: '1px solid #2D9C4E60', background: '#2D9C4E14',
+                          color: '#3EBB7A', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        }}
+                      >↩ Restaurar</button>
+                    ) : (
+                      <span style={{ color: '#6A80A2', fontSize: 18 }}>›</span>
+                    )}
                   </>
                 )}
               </div>

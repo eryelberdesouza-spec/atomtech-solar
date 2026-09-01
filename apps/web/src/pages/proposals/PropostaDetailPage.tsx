@@ -1531,9 +1531,11 @@ function PropostaDetailPageInner() {
     onError: (e: any) => alert('Erro ao clonar: ' + (e?.message ?? 'Tente novamente')),
   })
 
-  const excluirMutation = (trpc as any).proposta.delete.useMutation({
-    onSuccess: () => { alert('Proposta excluída com sucesso.'); navigate('/propostas') },
-    onError: (e: any) => alert('Erro ao excluir: ' + (e?.message ?? 'Tente novamente')),
+  // Arquivar, não excluir: a exclusão apagava a proposta e toda a cascata sem
+  // deixar rastro — origem dos buracos de numeração (AT-2026-06046 e outros).
+  const excluirMutation = (trpc as any).proposta.arquivar.useMutation({
+    onSuccess: () => { alert('Proposta arquivada. Ela sai das listagens, mas continua guardada e pode ser restaurada.'); navigate('/propostas') },
+    onError: (e: any) => alert('Erro ao arquivar: ' + (e?.message ?? 'Tente novamente')),
   })
 
   const updateDadosMutation = (trpc as any).proposta.updateDados.useMutation({
@@ -1847,10 +1849,10 @@ function PropostaDetailPageInner() {
                 style={{ color: C.danger, borderColor: C.danger + '30' }}>⊘ Cancelar</Btn>
             )}
             <Btn variant="ghost" size="sm"
-              onClick={() => { if (window.confirm(`EXCLUIR PERMANENTEMENTE a proposta ${proposta.numero}?\n\nEsta ação não pode ser desfeita.`)) excluirMutation.mutate({ id: propostaId }) }}
+              onClick={() => { if (window.confirm(`Arquivar a proposta ${proposta.numero}?\n\nEla sai das listagens e dos relatórios, mas continua guardada e pode ser restaurada em Propostas › Arquivadas.`)) excluirMutation.mutate({ id: propostaId }) }}
               disabled={excluirMutation.isLoading}
-              style={{ color: C.danger, borderColor: C.danger + '50', background: C.danger + '08' }}>
-              {excluirMutation.isLoading ? '⏳...' : '🗑 Excluir'}
+              style={{ color: C.textDim, borderColor: C.darkBorder }}>
+              {excluirMutation.isLoading ? '⏳...' : '📦 Arquivar'}
             </Btn>
             <Btn size="sm" variant="ghost" onClick={handleGerarContrato} disabled={gerandoContrato}
               style={{ borderColor: C.green + '60', color: C.green }}>

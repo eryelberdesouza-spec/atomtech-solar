@@ -121,14 +121,22 @@ export const propostaRouter = router({
          * a AT-2026-06046 (junho/2026) não aparecia em busca nenhuma.
          */
         busca: z.string().trim().max(120).optional(),
+        /** true lista SÓ as arquivadas (tela "Arquivadas"). Padrão: só as ativas. */
+        arquivadas: z.boolean().optional(),
         pagina: z.number().int().default(1),
         porPagina: z.number().int().default(20),
       }).optional(),
     )
     .query(async ({ ctx, input }) => {
       const { empresaId } = ctx.usuario
-      const { pagina = 1, porPagina = 20, status, clienteId, isTemplate, desde, busca } = input ?? {}
+      const { pagina = 1, porPagina = 20, status, clienteId, isTemplate, desde, busca, arquivadas } = input ?? {}
       const offset = (pagina - 1) * porPagina
+
+      // Arquivada nunca aparece junto com as ativas — some das listas, dos
+      // contadores e do funil, mas continua no banco.
+      const filtroArquivo = arquivadas
+        ? sql`${proposta.arquivada} = 1`
+        : sql`${proposta.arquivada} = 0`
 
       const termo = busca ? `%${busca}%` : null
       const filtroBusca = termo
@@ -185,6 +193,7 @@ export const propostaRouter = router({
             // CLAUDE.md. A comparação YYYY-MM-DD no MySQL é direta.
             desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
             filtroBusca,
+            filtroArquivo,
           ),
         )
         .orderBy(desc(proposta.createdAt))
@@ -202,6 +211,7 @@ export const propostaRouter = router({
         isTemplate !== undefined ? eq(proposta.isTemplate, isTemplate) : undefined,
         desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
         filtroBusca,
+        filtroArquivo,
       )
 
       const contagens = await ctx.db
@@ -266,6 +276,7 @@ export const propostaRouter = router({
           and(
             eq(proposta.empresaId, empresaId),
             eq(proposta.isTemplate, false),
+            sql`${proposta.arquivada} = 0`,
             // sql cru: o Drizzle tipa data_emissao como Date e recusa string,
             // e converter pra Date reintroduz o bug de fuso já documentado no
             // CLAUDE.md. A comparação YYYY-MM-DD no MySQL é direta.
@@ -291,6 +302,7 @@ export const propostaRouter = router({
           and(
             eq(proposta.empresaId, empresaId),
             eq(proposta.isTemplate, false),
+            sql`${proposta.arquivada} = 0`,
             sql`${proposta.status} = 'aceita'`,
             sql`${proposta.dataAceite} IS NOT NULL`,
             desde ? sql`${proposta.dataAceite} >= ${desde}` : undefined,
@@ -308,6 +320,7 @@ export const propostaRouter = router({
           and(
             eq(proposta.empresaId, empresaId),
             eq(proposta.isTemplate, false),
+            sql`${proposta.arquivada} = 0`,
             sql`${proposta.status} = 'aceita'`,
             sql`${proposta.dataAceite} IS NULL`,
             desde ? sql`${proposta.dataEmissao} >= ${desde}` : undefined,
@@ -399,6 +412,7 @@ export const propostaRouter = router({
           and(
             eq(proposta.empresaId, empresaId),
             eq(proposta.isTemplate, false),
+            sql`${proposta.arquivada} = 0`,
             sql`${proposta.status} IN ('rascunho','enviada')`,
             sql`${proposta.dataValidade} IS NOT NULL`,
             sql`DATEDIFF(${proposta.dataValidade}, CURDATE()) BETWEEN 0 AND ${dias}`,
@@ -1833,6 +1847,41 @@ export const propostaRouter = router({
     }),
 
 // Exclui proposta e todos os registros relacionados
+  // ── Arquivar / desarquivar ────────────────────────────────────────────────
+  // Substitui a exclusão definitiva (2026-08-31). O `delete` abaixo apaga a
+  // proposta e toda a cascata sem deixar rastro — foi o que produziu os
+  // buracos de numeração (AT-2026-06046 entre outros), impossíveis de auditar
+  // depois. A tela usa estes dois; o `delete` ficou sem uso no app.
+  arquivar: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId, id: usuarioId } = ctx.usuario
+      const pool = getRawPool()
+      const [r]: any = await pool.execute(
+        `UPDATE proposta SET arquivada = 1, arquivada_em = NOW(), arquivada_por = ?
+          WHERE id = ? AND empresa_id = ?`,
+        [usuarioId ?? null, input.id, empresaId],
+      )
+      if (!r?.affectedRows) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+      return { ok: true }
+    }),
+
+  desarquivar: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const { empresaId } = ctx.usuario
+      const pool = getRawPool()
+      const [r]: any = await pool.execute(
+        `UPDATE proposta SET arquivada = 0, arquivada_em = NULL, arquivada_por = NULL
+          WHERE id = ? AND empresa_id = ?`,
+        [input.id, empresaId],
+      )
+      if (!r?.affectedRows) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+      return { ok: true }
+    }),
+
+  // MANTIDO só por compatibilidade — não é mais chamado pela interface.
+  // Apaga em definitivo, sem rastro. Preferir `arquivar`.
   delete: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
