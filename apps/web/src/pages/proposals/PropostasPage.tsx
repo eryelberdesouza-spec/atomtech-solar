@@ -93,7 +93,7 @@ export function PropostasPage() {
   // por padrão já custou caro aqui antes (proposta antiga que não aparecia
   // em busca nenhuma). Quem quer a leitura do mês clica em "Mês atual".
   const [periodo, setPeriodo] = useState<Periodo>('tudo')
-  const desde = useMemo(() => desdeDoPeriodo(periodo), [periodo])
+  const desdePeriodo = useMemo(() => desdeDoPeriodo(periodo), [periodo])
 
   const POR_PAGINA = 30
   const [pagina, setPagina] = useState(1)
@@ -117,6 +117,13 @@ export function PropostasPage() {
     }, { replace: true })
     setPagina(1)
   }
+
+  // Buscar SEMPRE varre a base inteira, ignorando o período. Com o recorte
+  // aplicado à busca, procurar "ADRIANA" em "Mês atual" devolvia zero, mesmo
+  // existindo a proposta em agosto — a mesma armadilha da AT-2026-06046, só
+  // que por outro caminho. Quem digita um nome quer achar, não filtrar.
+  const buscando = !!buscaAdiada
+  const desde = buscando ? undefined : desdePeriodo
 
   const utils = trpc.useContext()
   const desarquivar = (trpc as any).proposta.desarquivar.useMutation({
@@ -190,17 +197,23 @@ export function PropostasPage() {
       {/* Resumo comercial — período governa a tela inteira (resumo, cards e lista) */}
       {!verArquivadas && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
             {PERIODOS.map(p => (
-              <button key={p.id} onClick={() => setPeriodo(p.id)}
+              <button key={p.id} onClick={() => setPeriodo(p.id)} disabled={buscando}
                 style={{
                   padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600,
-                  border: `1px solid ${periodo === p.id ? '#F5A623' : '#1E3050'}`,
-                  background: periodo === p.id ? '#F5A62318' : 'transparent',
-                  color: periodo === p.id ? '#F5A623' : '#7488A8',
-                  cursor: 'pointer', fontFamily: 'inherit',
+                  border: `1px solid ${!buscando && periodo === p.id ? '#F5A623' : '#1E3050'}`,
+                  background: !buscando && periodo === p.id ? '#F5A62318' : 'transparent',
+                  color: !buscando && periodo === p.id ? '#F5A623' : '#7488A8',
+                  cursor: buscando ? 'default' : 'pointer', fontFamily: 'inherit',
+                  opacity: buscando ? 0.45 : 1,
                 }}>{p.label}</button>
             ))}
+            {buscando && (
+              <span style={{ color: '#F5A623', fontSize: 11.5, fontWeight: 600, marginLeft: 4 }}>
+                🔍 buscando em todo o período
+              </span>
+            )}
           </div>
 
           <div style={{
