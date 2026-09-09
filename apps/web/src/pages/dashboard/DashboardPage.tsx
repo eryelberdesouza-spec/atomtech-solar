@@ -63,7 +63,7 @@ export function DashboardPage() {
     justifyContent: isMobile ? 'flex-start' : 'center',
     gap: isMobile ? 14 : 16,
     padding: isMobile ? '18px 16px' : '28px 26px',
-    minHeight: isMobile ? 76 : 168,
+    minHeight: isMobile ? 76 : 200,
     background: 'linear-gradient(135deg, #111D2E, #0E1A2A)',
     border: '1px solid #1E3050',
     borderRadius: 14,
