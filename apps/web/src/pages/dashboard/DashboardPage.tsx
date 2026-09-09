@@ -51,11 +51,19 @@ export function DashboardPage() {
   const destinos = (isTecnico ? NAV.filter(n => n.path === '/ordens-servico') : NAV)
     .filter(n => n.path !== '/dashboard')
 
+  // No celular o card é uma faixa horizontal (ícone à esquerda, texto à
+  // direita) — cabe mais item na tela. No desktop é vertical e alto: preenche
+  // a altura disponível em vez de deixar os botões achatados no topo com meia
+  // tela vazia embaixo.
   const cardBase: React.CSSProperties = {
     position: 'relative',
-    display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 18,
-    padding: isMobile ? '18px 16px' : '26px 26px',
-    minHeight: isMobile ? 76 : 104,
+    display: 'flex',
+    flexDirection: isMobile ? 'row' : 'column',
+    alignItems: isMobile ? 'center' : 'flex-start',
+    justifyContent: isMobile ? 'flex-start' : 'center',
+    gap: isMobile ? 14 : 16,
+    padding: isMobile ? '18px 16px' : '28px 26px',
+    minHeight: isMobile ? 76 : 168,
     background: 'linear-gradient(135deg, #111D2E, #0E1A2A)',
     border: '1px solid #1E3050',
     borderRadius: 14,
@@ -117,26 +125,32 @@ export function DashboardPage() {
                 <Icon />
               </span>
 
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', color: '#E2EAF5', fontSize: isMobile ? 15 : 17, fontWeight: 700 }}>
+              <span style={{ flex: isMobile ? 1 : undefined, width: isMobile ? undefined : '100%', minWidth: 0 }}>
+                <span style={{ display: 'block', color: '#E2EAF5', fontSize: isMobile ? 15 : 18, fontWeight: 700 }}>
                   {item.label}
                 </span>
-                <span style={{ display: 'block', color: '#7488A8', fontSize: isMobile ? 12 : 13, marginTop: 3 }}>
+                <span style={{ display: 'block', color: '#7488A8', fontSize: isMobile ? 12 : 13, marginTop: 4 }}>
                   {alerta
                     ? `${qtdAVencer} proposta${qtdAVencer !== 1 ? 's' : ''} vencendo em até 7 dias`
                     : item.desc}
                 </span>
               </span>
 
-              {alerta && (
-                <span style={{
-                  padding: '3px 9px', borderRadius: 20, flexShrink: 0,
-                  background: '#D2992220', color: '#D29922',
-                  fontSize: 12, fontWeight: 800,
-                }}>{qtdAVencer}</span>
-              )}
-
-              <span style={{ color: '#3D5170', fontSize: 22, flexShrink: 0 }}>›</span>
+              {/* No desktop, contador e seta vão pro canto superior direito —
+                  em coluna eles empilhariam abaixo do texto. */}
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+                ...(isMobile ? {} : { position: 'absolute', top: 18, right: 20 }),
+              }}>
+                {alerta && (
+                  <span style={{
+                    padding: '3px 9px', borderRadius: 20,
+                    background: '#D2992220', color: '#D29922',
+                    fontSize: 12, fontWeight: 800,
+                  }}>{qtdAVencer}</span>
+                )}
+                <span style={{ color: '#3D5170', fontSize: 22 }}>›</span>
+              </span>
             </button>
           )
         })}
@@ -175,15 +189,18 @@ export function DashboardPage() {
               width: isMobile ? 44 : 54, height: isMobile ? 44 : 54, borderRadius: 13, flexShrink: 0,
               background: '#10B98118', color: '#10B981', fontSize: isMobile ? 19 : 23,
             }}>◈</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', color: '#E2EAF5', fontSize: isMobile ? 15 : 17, fontWeight: 700 }}>
+            <span style={{ flex: isMobile ? 1 : undefined, width: isMobile ? undefined : '100%', minWidth: 0 }}>
+              <span style={{ display: 'block', color: '#E2EAF5', fontSize: isMobile ? 15 : 18, fontWeight: 700 }}>
                 AGF Financeiro
               </span>
-              <span style={{ display: 'block', color: '#7488A8', fontSize: isMobile ? 12 : 13, marginTop: 3 }}>
+              <span style={{ display: 'block', color: '#7488A8', fontSize: isMobile ? 12 : 13, marginTop: 4 }}>
                 {isAdmin ? 'Contas a pagar e receber' : 'Restrito a administradores'}
               </span>
             </span>
-            <span style={{ color: '#3D5170', fontSize: 22, flexShrink: 0 }}>
+            <span style={{
+              color: '#3D5170', fontSize: 22, flexShrink: 0,
+              ...(isMobile ? {} : { position: 'absolute', top: 18, right: 20 }),
+            }}>
               {isAdmin ? '↗' : '🔒'}
             </span>
           </a>
