@@ -212,8 +212,28 @@ export function PropostasPage() {
             {[
               { label: 'Volume orçado',  valor: fmtBRL(resumo?.valorTotal ?? 0),      sub: `${resumo?.total ?? 0} propostas`,  cor: '#E2EAF5' },
               { label: 'Aguardando',     valor: fmtBRL(resumo?.valorAguardando ?? 0), sub: `${resumo?.aguardando ?? 0} enviadas`, cor: '#58A6FF' },
-              { label: 'Aceitas',        valor: fmtBRL(resumo?.valorAceitas ?? 0),    sub: `${resumo?.aceitas ?? 0} propostas`, cor: '#3EBB7A' },
-              { label: 'Conversão',      valor: `${resumo?.conversao ?? 0}%`,         sub: `${resumo?.aceitas ?? 0} de ${resumo?.total ?? 0}`, cor: '#BC8CFF' },
+              // "Aceitas" responde QUANTO FECHAMOS no período — por data de
+              // aceite. Medir por emissão subnotifica: em setembro/2026 havia
+              // 1 proposta fechada (emitida antes) e o card mostrava 0.
+              // Enquanto sobrar aceita sem data de aceite (histórico anterior
+              // a 31/08/2026), cai na coorte por emissão, que é completa, e
+              // o rótulo diz qual base está sendo usada.
+              ...(() => {
+                const semData = resumo?.aceitasSemDataAceite ?? 0
+                const porFechamento = semData === 0
+                return [{
+                  label: 'Aceitas',
+                  valor: fmtBRL(porFechamento ? (resumo?.valorFechadas ?? 0) : (resumo?.valorAceitas ?? 0)),
+                  sub: porFechamento
+                    ? `${resumo?.fechadas ?? 0} fechada${(resumo?.fechadas ?? 0) !== 1 ? 's' : ''} no período`
+                    : `${resumo?.aceitas ?? 0} por emissão`,
+                  cor: '#3EBB7A',
+                }]
+              })(),
+              // Conversão é da COORTE: das emitidas no período, quantas
+              // fecharam. Base diferente da de cima de propósito — por isso o
+              // rótulo diz "emitidas".
+              { label: 'Conversão',      valor: `${resumo?.conversao ?? 0}%`,         sub: `${resumo?.aceitas ?? 0} de ${resumo?.total ?? 0} emitidas`, cor: '#BC8CFF' },
             ].map(k => (
               <div key={k.label} style={{ background: '#111D2E', padding: isMobile ? '10px 12px' : '12px 16px' }}>
                 <div style={{ color: '#6A80A2', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{k.label}</div>
