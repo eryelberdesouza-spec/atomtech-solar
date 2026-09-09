@@ -225,6 +225,7 @@ export function Layout() {
   const current   = NAV.find(n => location.pathname.startsWith(n.path))
   const pageTitle = current?.label ?? 'Atom Tech'
   const pageColor = current?.color ?? '#F5A623'
+  const isDashboard = location.pathname.startsWith('/dashboard')
 
   // Fecha sidebar mobile ao trocar de rota
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
@@ -467,6 +468,42 @@ export function Layout() {
                 }}
               >☰</button>
             )}
+
+            {/* Voltar ao início — a barra lateral era a única saída, e no
+                celular ela fica escondida atrás do hambúrguer. Some na
+                própria tela inicial, pra não virar botão que não leva a
+                lugar nenhum. */}
+            {!isDashboard && (
+              <button
+                onClick={() => navigate('/dashboard')}
+                title="Voltar ao início"
+                style={{
+                  height: 34, borderRadius: 8, flexShrink: 0,
+                  padding: isMobile ? '0 9px' : '0 12px',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'transparent', border: '1px solid #1E3050',
+                  color: '#9FB0C9', cursor: 'pointer',
+                  fontSize: isMobile ? 15 : 12.5, fontWeight: 600,
+                  fontFamily: 'inherit', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget
+                  el.style.background = '#F5A62312'
+                  el.style.borderColor = '#F5A62355'
+                  el.style.color = '#F5A623'
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget
+                  el.style.background = 'transparent'
+                  el.style.borderColor = '#1E3050'
+                  el.style.color = '#9FB0C9'
+                }}
+              >
+                <span style={{ lineHeight: 1 }}>⌂</span>
+                {!isMobile && <span>Início</span>}
+              </button>
+            )}
+
             <div style={{
               width: 4, height: 20, borderRadius: 2, flexShrink: 0,
               background: 'linear-gradient(180deg, ' + pageColor + ', ' + pageColor + '88)',
