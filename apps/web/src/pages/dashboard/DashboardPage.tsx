@@ -53,8 +53,9 @@ export function DashboardPage() {
 
   const cardBase: React.CSSProperties = {
     position: 'relative',
-    display: 'flex', alignItems: 'center', gap: 14,
-    padding: isMobile ? '16px 16px' : '20px 22px',
+    display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 18,
+    padding: isMobile ? '18px 16px' : '26px 26px',
+    minHeight: isMobile ? 76 : 104,
     background: 'linear-gradient(135deg, #111D2E, #0E1A2A)',
     border: '1px solid #1E3050',
     borderRadius: 14,
@@ -66,7 +67,9 @@ export function DashboardPage() {
   }
 
   return (
-    <div style={{ padding: isMobile ? '16px 14px' : '28px 32px', maxWidth: 1100 }}>
+    // Sem maxWidth apertado: os botões devem ocupar a largura da tela. O teto
+    // de 1600 existe só pra não esticarem demais em monitor ultrawide.
+    <div style={{ padding: isMobile ? '16px 14px' : '28px 32px', maxWidth: 1600 }}>
 
       <div style={{ marginBottom: isMobile ? 18 : 28 }}>
         <h2 style={{ color: '#E2EAF5', fontSize: isMobile ? 19 : 23, fontWeight: 800, margin: '0 0 4px' }}>
@@ -79,8 +82,11 @@ export function DashboardPage() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
-        gap: isMobile ? 10 : 14,
+        // auto-FIT (não auto-fill): sem colunas fantasmas sobrando, os botões
+        // esticam pra preencher a linha. 340px de mínimo dá 4 colunas em tela
+        // cheia — 7 destinos viram 4+3, que fica equilibrado.
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(340px, 1fr))',
+        gap: isMobile ? 10 : 16,
       }}>
         {destinos.map(item => {
           const { Icon } = item
@@ -105,17 +111,17 @@ export function DashboardPage() {
             >
               <span style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 42, height: 42, borderRadius: 11, flexShrink: 0,
+                width: isMobile ? 44 : 54, height: isMobile ? 44 : 54, borderRadius: 13, flexShrink: 0,
                 background: item.color + '18', color: item.color,
               }}>
                 <Icon />
               </span>
 
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', color: '#E2EAF5', fontSize: 15, fontWeight: 700 }}>
+                <span style={{ display: 'block', color: '#E2EAF5', fontSize: isMobile ? 15 : 17, fontWeight: 700 }}>
                   {item.label}
                 </span>
-                <span style={{ display: 'block', color: '#7488A8', fontSize: 12, marginTop: 2 }}>
+                <span style={{ display: 'block', color: '#7488A8', fontSize: isMobile ? 12 : 13, marginTop: 3 }}>
                   {alerta
                     ? `${qtdAVencer} proposta${qtdAVencer !== 1 ? 's' : ''} vencendo em até 7 dias`
                     : item.desc}
@@ -130,7 +136,7 @@ export function DashboardPage() {
                 }}>{qtdAVencer}</span>
               )}
 
-              <span style={{ color: '#3D5170', fontSize: 20, flexShrink: 0 }}>›</span>
+              <span style={{ color: '#3D5170', fontSize: 22, flexShrink: 0 }}>›</span>
             </button>
           )
         })}
@@ -166,18 +172,18 @@ export function DashboardPage() {
           >
             <span style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 42, height: 42, borderRadius: 11, flexShrink: 0,
-              background: '#10B98118', color: '#10B981', fontSize: 19,
+              width: isMobile ? 44 : 54, height: isMobile ? 44 : 54, borderRadius: 13, flexShrink: 0,
+              background: '#10B98118', color: '#10B981', fontSize: isMobile ? 19 : 23,
             }}>◈</span>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', color: '#E2EAF5', fontSize: 15, fontWeight: 700 }}>
+              <span style={{ display: 'block', color: '#E2EAF5', fontSize: isMobile ? 15 : 17, fontWeight: 700 }}>
                 AGF Financeiro
               </span>
-              <span style={{ display: 'block', color: '#7488A8', fontSize: 12, marginTop: 2 }}>
+              <span style={{ display: 'block', color: '#7488A8', fontSize: isMobile ? 12 : 13, marginTop: 3 }}>
                 {isAdmin ? 'Contas a pagar e receber' : 'Restrito a administradores'}
               </span>
             </span>
-            <span style={{ color: '#3D5170', fontSize: 20, flexShrink: 0 }}>
+            <span style={{ color: '#3D5170', fontSize: 22, flexShrink: 0 }}>
               {isAdmin ? '↗' : '🔒'}
             </span>
           </a>
