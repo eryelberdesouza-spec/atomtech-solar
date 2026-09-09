@@ -143,8 +143,11 @@ const IcoConfiguracoes = () => (
   </svg>
 )
 
-type NavItem = { path: string; label: string; Icon: React.FC; color: string; desc: string }
-const NAV: NavItem[] = [
+// Exportado: o Dashboard virou um hub e monta os mesmos destinos como botões.
+// Uma lista só, pra menu lateral e hub nunca divergirem quando alguém
+// adicionar uma tela nova.
+export type NavItem = { path: string; label: string; Icon: React.FC; color: string; desc: string }
+export const NAV: NavItem[] = [
   { path: '/dashboard',      label: 'Dashboard',     Icon: IcoDashboard,     color: '#F5A623', desc: 'Visão geral'       },
   { path: '/propostas',      label: 'Propostas',     Icon: IcoPropostas,     color: '#58A6FF', desc: 'Gestão comercial'  },
   { path: '/clientes',       label: 'Clientes',      Icon: IcoClientes,      color: '#3EBB7A', desc: 'Base de clientes'  },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
@@ -16,6 +16,32 @@ const STATUS_FILTROS: { id: StatusFiltro; label: string; color: string }[] = [
   { id: 'recusada', label: 'Recusada', color: '#F85149' },
   { id: 'expirada', label: 'Expirada', color: '#D29922' },
 ]
+
+type Periodo = 'mes' | 'quinzena' | 'ano' | 'tudo'
+const PERIODOS: { id: Periodo; label: string }[] = [
+  { id: 'mes',      label: 'Mês atual'    },
+  { id: 'quinzena', label: 'Quinzena'     },
+  { id: 'ano',      label: 'Este ano'     },
+  { id: 'tudo',     label: 'Todo período' },
+]
+
+// Data de corte no fuso de quem olha a tela — o servidor roda em UTC, e
+// calcular lá erraria a virada do mês pra quem está em -03.
+function isoLocal(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function desdeDoPeriodo(periodo: Periodo): string | undefined {
+  const d = new Date()
+  if (periodo === 'tudo') return undefined
+  if (periodo === 'mes') return isoLocal(new Date(d.getFullYear(), d.getMonth(), 1))
+  if (periodo === 'ano') return isoLocal(new Date(d.getFullYear(), 0, 1))
+  const q = new Date(); q.setDate(q.getDate() - 15); return isoLocal(q)
+}
+
+function fmtBRL(v: number): string {
+  if (!v) return '—'
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
 
 const STATUS_COLOR: Record<string, string> = {
   rascunho: '#8B949E',
@@ -61,11 +87,19 @@ export function PropostasPage() {
     return () => clearTimeout(t)
   }, [busca])
 
+  // ── Resumo comercial (veio do Dashboard em 2026-09-09) ──────────────────
+  // O período governa a tela INTEIRA: resumo, contadores por status e lista.
+  // Padrão "Todo período" de propósito — recorte que esconde parte da base
+  // por padrão já custou caro aqui antes (proposta antiga que não aparecia
+  // em busca nenhuma). Quem quer a leitura do mês clica em "Mês atual".
+  const [periodo, setPeriodo] = useState<Periodo>('tudo')
+  const desde = useMemo(() => desdeDoPeriodo(periodo), [periodo])
+
   const POR_PAGINA = 30
   const [pagina, setPagina] = useState(1)
   // Trocar busca ou status reinicia a paginação — senão a pessoa fica presa
   // numa página que não existe mais no novo recorte e vê uma lista vazia.
-  useEffect(() => { setPagina(1) }, [buscaAdiada, filtro])
+  useEffect(() => { setPagina(1) }, [buscaAdiada, filtro, periodo])
 
   // Busca, filtro de status, contagem e total vêm do SERVIDOR. Antes a tela
   // baixava as 100 mais recentes e filtrava no navegador: proposta mais
@@ -94,10 +128,23 @@ export function PropostasPage() {
     isTemplate: false,
     porPagina: POR_PAGINA,
     pagina,
+    ...(desde ? { desde } : {}),
     ...(verArquivadas ? { arquivadas: true } : {}),
     ...(!verArquivadas && filtro !== 'todos' ? { status: filtro } : {}),
     ...(buscaAdiada ? { busca: buscaAdiada } : {}),
   } as any)
+
+  // Valores do período. Os contadores por status já vêm do `list` acima —
+  // aqui entram só os valores em reais e a conversão, que não estavam na tela.
+  const { data: resumo } = (trpc as any).proposta.resumo.useQuery(
+    { ...(desde ? { desde } : {}) },
+    { enabled: !verArquivadas },
+  )
+  const { data: aVencer } = (trpc as any).proposta.aVencer.useQuery(
+    { dias: 7 },
+    { enabled: !verArquivadas },
+  )
+  const propostasAVencer: any[] = aVencer ?? []
 
   const filtradas = data?.data ?? []
   const total = (data as any)?.total ?? 0
@@ -139,6 +186,70 @@ export function PropostasPage() {
           {!verArquivadas && <NovaPropostaDropdown />}
         </div>
       </div>
+
+      {/* Resumo comercial — período governa a tela inteira (resumo, cards e lista) */}
+      {!verArquivadas && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+            {PERIODOS.map(p => (
+              <button key={p.id} onClick={() => setPeriodo(p.id)}
+                style={{
+                  padding: '5px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600,
+                  border: `1px solid ${periodo === p.id ? '#F5A623' : '#1E3050'}`,
+                  background: periodo === p.id ? '#F5A62318' : 'transparent',
+                  color: periodo === p.id ? '#F5A623' : '#7488A8',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>{p.label}</button>
+            ))}
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gap: 1, background: '#1E3050', border: '1px solid #1E3050',
+            borderRadius: 10, overflow: 'hidden',
+          }}>
+            {[
+              { label: 'Volume orçado',  valor: fmtBRL(resumo?.valorTotal ?? 0),      sub: `${resumo?.total ?? 0} propostas`,  cor: '#E2EAF5' },
+              { label: 'Aguardando',     valor: fmtBRL(resumo?.valorAguardando ?? 0), sub: `${resumo?.aguardando ?? 0} enviadas`, cor: '#58A6FF' },
+              { label: 'Aceitas',        valor: fmtBRL(resumo?.valorAceitas ?? 0),    sub: `${resumo?.aceitas ?? 0} propostas`, cor: '#3EBB7A' },
+              { label: 'Conversão',      valor: `${resumo?.conversao ?? 0}%`,         sub: `${resumo?.aceitas ?? 0} de ${resumo?.total ?? 0}`, cor: '#BC8CFF' },
+            ].map(k => (
+              <div key={k.label} style={{ background: '#111D2E', padding: isMobile ? '10px 12px' : '12px 16px' }}>
+                <div style={{ color: '#6A80A2', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{k.label}</div>
+                <div style={{ color: k.cor, fontSize: isMobile ? 15 : 17, fontWeight: 800, marginTop: 3 }}>{k.valor}</div>
+                <div style={{ color: '#6A80A2', fontSize: 11, marginTop: 1 }}>{k.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Vencimento não segue o período: é sempre sobre o que vem à frente */}
+          {propostasAVencer.length > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+              marginTop: 10, padding: '9px 14px', borderRadius: 9,
+              background: '#2A1F0B', border: '1px solid #D2992240', borderLeft: '3px solid #D29922',
+            }}>
+              <span style={{ fontSize: 13 }}>⏰</span>
+              <span style={{ color: '#F0D48A', fontSize: 12.5, fontWeight: 700 }}>
+                {propostasAVencer.length} vencendo em até 7 dias
+              </span>
+              <span style={{ color: '#A8905C', fontSize: 11.5, flex: 1, minWidth: 140 }}>
+                {propostasAVencer.slice(0, 3).map((p: any) => p.numero).join(' · ')}
+                {propostasAVencer.length > 3 ? ` +${propostasAVencer.length - 3}` : ''}
+              </span>
+              <button
+                onClick={() => { setPeriodo('tudo'); setFiltro('enviada') }}
+                style={{
+                  padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+                  border: '1px solid #D2992255', background: 'transparent',
+                  color: '#D29922', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                }}
+              >Ver enviadas →</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       {!isLoading && totalGeral > 0 && (
