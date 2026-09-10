@@ -670,7 +670,14 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
         <div class="cliente-nome">${nomeCliente}</div>
         ${camposCliente ? `<div class="cliente-campos">${camposCliente}</div>` : ''}
       </div>
-      <div class="info-box"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
+      <!-- break-inside:auto SÓ aqui: com os dados do cliente ocupando o topo,
+           este bloco (escopo inteiro, itens a-e) deixou de caber no resto da
+           página e, sendo atômico, pulava inteiro pra seguinte — a página do
+           Resumo ficava 60% vazia. Deixando fluir, ele preenche a página e
+           continua na outra; os itens individuais seguem protegidos contra
+           quebra por renderListaLetras. Os demais .info-box do documento são
+           curtos e continuam atômicos. -->
+      <div class="info-box" style="break-inside:auto;page-break-inside:auto"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
     `)
   }
 
