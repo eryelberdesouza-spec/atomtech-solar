@@ -409,11 +409,6 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
         <div class="kpi-card"><div class="kpi-label">Pot&ecirc;ncia Proposta</div><div class="kpi-value">${Number(dim?.potenciaFinalKwp ?? 0).toFixed(2)} <span class="kpi-unit">kWp</span></div></div>
         <div class="kpi-card kpi-card-green"><div class="kpi-label">Gera&ccedil;&atilde;o/M&ecirc;s Estimada</div><div class="kpi-value">${formatKwh(Number(dim?.geracaoAnualKwh ?? 0) / 12)}</div></div>
       </div>
-      ${camposCliente ? `
-      <div class="cliente-box">
-        <div class="cliente-nome">Dados do Cliente</div>
-        <div class="cliente-campos">${camposCliente}</div>
-      </div>` : ''}
       <div style="margin-top:4px">
         <div class="section-sub">O que estamos propondo</div>
         <p>Sistema fotovoltaico dimensionado para o seu perfil de consumo, com equipamentos, instala&ccedil;&atilde;o e projeto de engenharia inclusos &mdash; detalhado nas pr&oacute;ximas p&aacute;ginas.</p>
@@ -636,9 +631,19 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
   // Apresentação (Conheça a Atom Tech) vem antes de Diferenciais — mesma
   // ordem lógica do modelo Clássico (primeiro diz quem é, depois por que
   // escolher).
+  // Dados do cliente: SEÇÃO PRÓPRIA, abrindo o corpo nos DOIS modelos. Estava
+  // dentro de secResumo, que só entra no "direto ao ponto" — nas propostas
+  // clássicas os dados do cliente não apareciam em lugar nenhum.
+  const secDadosCliente = sec('Dados do Cliente', `
+    <div class="cliente-box">
+      <div class="cliente-nome">${cli?.nome ?? ''}</div>
+      ${camposCliente ? `<div class="cliente-campos">${camposCliente}</div>` : ''}
+    </div>
+  `)
+
   const sections = prop?.modeloProposta === 'direto_ao_ponto'
-    ? `${secResumo}${secDimensionamento}${secCondicoes}${secGarantias}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secAnalise}${secFluxoCaixa1}${secFluxoCaixa2}${secConsideracoes}${secAceite}`
-    : `${secApresentacao}${secComoFunciona}${secDiferenciais}${secFornecedores}${secRegulamentacao}${secDimensionamento}${secAnalise}${secFluxoCaixa1}${secFluxoCaixa2}${secCondicoes}${secGarantias}${secConsideracoes}${secAceite}`
+    ? `${secDadosCliente}${secResumo}${secDimensionamento}${secCondicoes}${secGarantias}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secAnalise}${secFluxoCaixa1}${secFluxoCaixa2}${secConsideracoes}${secAceite}`
+    : `${secDadosCliente}${secApresentacao}${secComoFunciona}${secDiferenciais}${secFornecedores}${secRegulamentacao}${secDimensionamento}${secAnalise}${secFluxoCaixa1}${secFluxoCaixa2}${secCondicoes}${secGarantias}${secConsideracoes}${secAceite}`
 
   const scriptEsperaFontes = `<script>
     window.onload = function() {

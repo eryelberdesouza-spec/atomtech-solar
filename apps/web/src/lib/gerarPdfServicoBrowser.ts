@@ -641,42 +641,48 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
   // deste modelo (substitui "O que Propomos Entregar", que ficava redundante
   // logo abaixo) e NÃO repete o valor — o valor aparece uma única vez, na
   // tabela de itens que vem em seguida.
+  // ── Dados do cliente: SEÇÃO PRÓPRIA, fora do Resumo ──────────────────────
+  // Ficava dentro de secResumo, que só entra no modelo "direto ao ponto" — nas
+  // propostas clássicas (mais da metade da base) os dados do cliente não
+  // apareciam em lugar nenhum. Seção separada entra nos DOIS modelos e não
+  // depende de nenhum bloco estar ativo.
+  // Só entram os campos preenchidos: 47 dos 174 clientes não têm bairro, e
+  // rótulo com valor vazio no PDF passa impressão de dado faltando.
+  const campoCliente = (rotulo: string, valor: any, largo = false) => valor
+    ? `<div class="cliente-campo${largo ? ' largo' : ''}">
+         <p class="cliente-rot">${rotulo}</p>
+         <p class="cliente-val">${valor}</p>
+       </div>`
+    : ''
+  const camposCliente = [
+    campoCliente('CPF / CNPJ', cliente?.cpfCnpj),
+    campoCliente('Responsável', cliente?.nomeResponsavel),
+    campoCliente('Telefone', cliente?.telefone),
+    campoCliente('E-mail', cliente?.email),
+    campoCliente('Endereço', enderecoCliente, true),
+    campoCliente('Bairro', cliente?.bairro),
+    campoCliente('Cidade / UF', cidadeUf),
+    campoCliente('CEP', cliente?.cep),
+  ].join('')
+
+  const secCliente = sec('Dados do Cliente', `
+    <div class="cliente-box">
+      <div class="cliente-nome">${nomeCliente}</div>
+      ${camposCliente ? `<div class="cliente-campos">${camposCliente}</div>` : ''}
+    </div>
+  `)
+
   let secResumo = ''
   if (blocoAtivo(blocos, 'resumo_proposta')) {
     const resumoEscopo = txtEntregas
       ? renderListaLetras(txtEntregas)
       : '<p>Escopo detalhado a seguir.</p>'
-    // Só entram os campos preenchidos: cadastro antigo costuma ter só o nome,
-    // e rótulo com valor vazio no PDF passa impressão de dado faltando.
-    const campoCliente = (rotulo: string, valor: any, largo = false) => valor
-      ? `<div class="cliente-campo${largo ? ' largo' : ''}">
-           <p class="cliente-rot">${rotulo}</p>
-           <p class="cliente-val">${valor}</p>
-         </div>`
-      : ''
-    const camposCliente = [
-      campoCliente('CPF / CNPJ', cliente?.cpfCnpj),
-      campoCliente('Responsável', cliente?.nomeResponsavel),
-      campoCliente('Telefone', cliente?.telefone),
-      campoCliente('E-mail', cliente?.email),
-      campoCliente('Endereço', enderecoCliente, true),
-      campoCliente('Bairro', cliente?.bairro),
-      campoCliente('Cidade / UF', cidadeUf),
-      campoCliente('CEP', cliente?.cep),
-    ].join('')
-
     secResumo = sec('Resumo da Proposta', `
-      <div class="cliente-box">
-        <div class="cliente-nome">${nomeCliente}</div>
-        ${camposCliente ? `<div class="cliente-campos">${camposCliente}</div>` : ''}
-      </div>
-      <!-- break-inside:auto SÓ aqui: com os dados do cliente ocupando o topo,
-           este bloco (escopo inteiro, itens a-e) deixou de caber no resto da
-           página e, sendo atômico, pulava inteiro pra seguinte — a página do
-           Resumo ficava 60% vazia. Deixando fluir, ele preenche a página e
-           continua na outra; os itens individuais seguem protegidos contra
-           quebra por renderListaLetras. Os demais .info-box do documento são
-           curtos e continuam atômicos. -->
+      <!-- break-inside:auto SÓ aqui: bloco longo (escopo inteiro, itens a-e).
+           Sendo atômico, quando não cabia no resto da página pulava inteiro
+           pra seguinte e deixava a anterior quase vazia. Fluindo, preenche a
+           página e continua na outra; os itens individuais seguem protegidos
+           por renderListaLetras. Os demais .info-box são curtos e atômicos. -->
       <div class="info-box" style="break-inside:auto;page-break-inside:auto"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
     `)
   }
@@ -784,9 +790,11 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
   // antes do cliente ver garantias/institucional. Apresentação (Quem Somos)
   // vem antes de Diferenciais (Por que nos escolher), mesma ordem lógica do
   // modelo Clássico: primeiro diz quem é, depois por que escolher.
+  // secCliente abre o corpo nos DOIS modelos — identificação do documento vem
+  // antes de qualquer conteúdo, e assim não depende do modelo escolhido.
   const sections = proposta?.modeloProposta === 'direto_ao_ponto'
-    ? `${secResumo}${secEscopo}${secCondicoes}${secGarantias}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secObservacoes}${secConsideracoes}${secAceite}`
-    : `${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secEntregas}${secEscopo}${secCondicoes}${secGarantias}${secObservacoes}${secConsideracoes}${secAceite}`
+    ? `${secCliente}${secResumo}${secEscopo}${secCondicoes}${secGarantias}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secObservacoes}${secConsideracoes}${secAceite}`
+    : `${secCliente}${secApresentacao}${secDiferenciais}${secComoFunciona}${secRegulamentacao}${secFornecedores}${secEntregas}${secEscopo}${secCondicoes}${secGarantias}${secObservacoes}${secConsideracoes}${secAceite}`
 
   const footerHtml = footerServico(numero, empresa)
   const headerHtml = headerInterno(numero, nomeEmpresa, logoUrl)
