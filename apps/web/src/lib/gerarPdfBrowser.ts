@@ -115,6 +115,9 @@ const CSS = `
   .capa-accent { width: 18mm; height: 1.5mm; background: #f2c23b !important; margin-bottom: 9mm; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .capa-prepared { font-size: 9.5px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.8); margin-bottom: 4mm; }
   .capa-cliente { font-size: 19px; line-height: 1.14; font-weight: 800; text-transform: uppercase; max-width: 102mm; margin-bottom: 12mm; color: #fff; }
+  /* Bairro/cidade do cliente logo abaixo do nome — referência de onde é a
+     instalação. A margem de 12mm do nome passa pra cá quando existe (inline). */
+  .capa-local { font-size: 10.5px; font-weight: 500; letter-spacing: 1.4px; color: rgba(255,255,255,0.72); max-width: 102mm; margin-bottom: 12mm; }
   .capa-meta { display: grid; grid-template-columns: repeat(3, auto); gap: 10mm; align-items: start; max-width: 105mm; }
   .capa-meta-label { font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.75); margin-bottom: 2mm; }
   .capa-meta-value { font-size: 10px; font-weight: 700; color: #fff; }
@@ -187,6 +190,27 @@ const CSS = `
   .pagamento-tipo { font-family: Calibri, Candara, sans-serif; font-size: 14px; font-weight: 600; color: #0E2040; margin-bottom: 8px; }
   .pagamento-linha { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f5f5f5; font-size: 14px; font-weight: 300; }
   .pagamento-linha:last-child { border-bottom: none; }
+
+  /* ─── DADOS DO CLIENTE ────────────────────────────────────────── */
+  /* flex, nunca grid: container CSS Grid ignora break-inside:avoid herdado e
+     fragmenta na borda do grid (mesma armadilha já corrigida no bloco de
+     assinatura). */
+  .cliente-box {
+    border: 1px solid #e8edf4; border-radius: 10px; padding: 16px 18px; margin: 0 0 18px;
+    background: #fbfcfe;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .cliente-nome {
+    font-family: Calibri, Candara, sans-serif;
+    font-size: 15px; font-weight: 600; color: #0E2040;
+    padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid #e8edf4;
+  }
+  .cliente-campos { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+  .cliente-campo { flex: 1 1 40%; min-width: 0; }
+  .cliente-campo.largo { flex: 1 1 100%; }
+  .cliente-campo p { margin: 0; }
+  .cliente-rot { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 2px; }
+  .cliente-val { font-size: 13px; font-weight: 600; color: #0E2040; word-break: break-word; }
 
   /* ─── ACEITE / ASSINATURA ─────────────────────────────────────── */
   .aceite-box { background: #f7f8fc; border-radius: 10px; padding: 20px; margin: 14px 0; }
@@ -297,6 +321,34 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
         ? 'Proposta de<br>Servi&ccedil;os'
         : 'Proposta<br>Comercial'
 
+  // Localização e endereço do cliente. Tudo opcional — cadastro antigo pode
+  // ter só o nome, e nesse caso as linhas simplesmente não saem.
+  const cidadeUf = [cli?.cidade, cli?.estado].filter(Boolean).join('/')
+  const localCliente = [cli?.bairro, cidadeUf].filter(Boolean).join(' &middot; ')
+  const enderecoCliente = [
+    [cli?.endereco, cli?.numero].filter(Boolean).join(', '),
+    cli?.complemento,
+  ].filter(Boolean).join(' &mdash; ')
+
+  // Só entram campos preenchidos: rótulo com valor vazio no PDF passa
+  // impressão de dado faltando.
+  const campoCliente = (rotulo: string, valor: any, largo = false) => valor
+    ? `<div class="cliente-campo${largo ? ' largo' : ''}">
+         <p class="cliente-rot">${rotulo}</p>
+         <p class="cliente-val">${valor}</p>
+       </div>`
+    : ''
+  const camposCliente = [
+    campoCliente('CPF / CNPJ', cli?.cpfCnpj),
+    campoCliente('Respons&aacute;vel', cli?.nomeResponsavel),
+    campoCliente('Telefone', cli?.telefone),
+    campoCliente('E-mail', cli?.email),
+    campoCliente('Endere&ccedil;o', enderecoCliente, true),
+    campoCliente('Bairro', cli?.bairro),
+    campoCliente('Cidade / UF', cidadeUf),
+    campoCliente('CEP', cli?.cep),
+  ].join('')
+
   const capaImg  = (data as any).capaImg as string | undefined
   const bgUrl    = capaImg
     ? `${window.location.origin}/assets/covers/${capaImg}.png`
@@ -322,7 +374,8 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
         <h1 class="capa-title">${tituloCapa}</h1>
         <div class="capa-accent"></div>
         <div class="capa-prepared">Preparado exclusivamente para</div>
-        <div class="capa-cliente">${cli?.nome ?? ''}</div>
+        <div class="capa-cliente" style="margin-bottom:${localCliente ? '3mm' : '12mm'}">${cli?.nome ?? ''}</div>
+        ${localCliente ? `<div class="capa-local">${localCliente}</div>` : ''}
         <div class="capa-meta">
           <div>
             <div class="capa-meta-label">Data</div>
@@ -356,6 +409,11 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
         <div class="kpi-card"><div class="kpi-label">Pot&ecirc;ncia Proposta</div><div class="kpi-value">${Number(dim?.potenciaFinalKwp ?? 0).toFixed(2)} <span class="kpi-unit">kWp</span></div></div>
         <div class="kpi-card kpi-card-green"><div class="kpi-label">Gera&ccedil;&atilde;o/M&ecirc;s Estimada</div><div class="kpi-value">${formatKwh(Number(dim?.geracaoAnualKwh ?? 0) / 12)}</div></div>
       </div>
+      ${camposCliente ? `
+      <div class="cliente-box">
+        <div class="cliente-nome">Dados do Cliente</div>
+        <div class="cliente-campos">${camposCliente}</div>
+      </div>` : ''}
       <div style="margin-top:4px">
         <div class="section-sub">O que estamos propondo</div>
         <p>Sistema fotovoltaico dimensionado para o seu perfil de consumo, com equipamentos, instala&ccedil;&atilde;o e projeto de engenharia inclusos &mdash; detalhado nas pr&oacute;ximas p&aacute;ginas.</p>

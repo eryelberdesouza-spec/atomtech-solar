@@ -135,6 +135,10 @@ const CSS_SERVICO = `
   .capa-accent { width: 18mm; height: 1.5mm; background: #f2c23b !important; margin-bottom: 9mm; border-radius: 99px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .capa-prepared { font-size: 9.5px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.8); margin-bottom: 4mm; }
   .capa-cliente { font-size: 19px; line-height: 1.14; font-weight: 800; text-transform: uppercase; max-width: 102mm; margin-bottom: 12mm; color: #fff; }
+  /* Bairro/cidade do cliente, logo abaixo do nome — dá referência de onde é
+     a obra sem precisar abrir a proposta. A margem inferior de 12mm que era
+     do nome passa pra cá quando esta linha existe (ver style inline). */
+  .capa-local { font-size: 10.5px; font-weight: 500; letter-spacing: 1.4px; color: rgba(255,255,255,0.72); max-width: 102mm; margin-bottom: 12mm; }
   .capa-meta { display: grid; grid-template-columns: repeat(3, auto); gap: 10mm; align-items: start; max-width: 105mm; }
   .capa-meta-label { font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.75); margin-bottom: 2mm; }
   .capa-meta-value { font-size: 11.5px; font-weight: 700; color: #fff; }
@@ -242,6 +246,26 @@ const CSS_SERVICO = `
   .parcelas-table td { padding: 9px 18px; font-size: 12.5px; color: #444; border-bottom: 1px solid #EEF2F7; }
   .parcelas-table td.valor { text-align: right; font-weight: 600; color: #0E2040; }
   .parcelas-table tr:last-child td { border-bottom: none; }
+
+  /* ─── DADOS DO CLIENTE ─────────────────────────────────────────── */
+  /* flex, nunca grid: container CSS Grid ignora break-inside:avoid herdado e
+     fragmenta na borda do grid (armadilha que custou várias rodadas neste
+     PDF — ver histórico do bloco de Aceite). */
+  .cliente-box {
+    border: 1px solid #E8EDF4; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px;
+    background: #FBFCFE;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .cliente-nome {
+    font-size: 15px; font-weight: 700; color: #0E2040;
+    padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid #E8EDF4;
+  }
+  .cliente-campos { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+  .cliente-campo { flex: 1 1 40%; min-width: 0; }
+  .cliente-campo.largo { flex: 1 1 100%; }
+  .cliente-campo p { margin: 0; }
+  .cliente-rot { color: #5F708C; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .cliente-val { font-size: 13px; font-weight: 600; color: #0E2040; word-break: break-word; }
 
   /* ─── ACEITE ───────────────────────────────────────────────────── */
   /* Histórico da investigação (rodadas 1-3, ver git log) — vão gigante como
@@ -403,6 +427,16 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
   const nomeEmpresa = empresa?.nome ?? 'Atom Tech'
   const logoUrl = empresa?.logoUrl ?? null
   const nomeCliente = cliente?.nome ?? proposta?.clienteNome ?? 'Cliente'
+
+  // Referência de localização do cliente. Tudo opcional: cadastro antigo pode
+  // não ter bairro nem cidade, e nesse caso a linha simplesmente não sai.
+  const cidadeUf = [cliente?.cidade, cliente?.estado].filter(Boolean).join('/')
+  const localCliente = [cliente?.bairro, cidadeUf].filter(Boolean).join(' · ')
+  // Endereço completo, usado no bloco de dados do cliente dentro da proposta.
+  const enderecoCliente = [
+    [cliente?.endereco, cliente?.numero].filter(Boolean).join(', '),
+    cliente?.complemento,
+  ].filter(Boolean).join(' — ')
   const tituloServico = proposta?.tituloServico ?? 'Proposta de Serviços'
   const numero = proposta?.numero ?? ''
   const dataEmissao = fmtDate(proposta?.dataEmissao)
@@ -443,7 +477,8 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
           <h1 class="capa-title">${tituloServico}</h1>
           <div class="capa-accent"></div>
           <div class="capa-prepared">Preparado exclusivamente para</div>
-          <div class="capa-cliente">${nomeCliente}</div>
+          <div class="capa-cliente" style="margin-bottom:${localCliente ? '3mm' : '12mm'}">${nomeCliente}</div>
+          ${localCliente ? `<div class="capa-local">${localCliente}</div>` : ''}
           <div class="capa-meta">
             <div>
               <div class="capa-meta-label">Data</div>
@@ -611,8 +646,30 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
     const resumoEscopo = txtEntregas
       ? renderListaLetras(txtEntregas)
       : '<p>Escopo detalhado a seguir.</p>'
+    // Só entram os campos preenchidos: cadastro antigo costuma ter só o nome,
+    // e rótulo com valor vazio no PDF passa impressão de dado faltando.
+    const campoCliente = (rotulo: string, valor: any, largo = false) => valor
+      ? `<div class="cliente-campo${largo ? ' largo' : ''}">
+           <p class="cliente-rot">${rotulo}</p>
+           <p class="cliente-val">${valor}</p>
+         </div>`
+      : ''
+    const camposCliente = [
+      campoCliente('CPF / CNPJ', cliente?.cpfCnpj),
+      campoCliente('Responsável', cliente?.nomeResponsavel),
+      campoCliente('Telefone', cliente?.telefone),
+      campoCliente('E-mail', cliente?.email),
+      campoCliente('Endereço', enderecoCliente, true),
+      campoCliente('Bairro', cliente?.bairro),
+      campoCliente('Cidade / UF', cidadeUf),
+      campoCliente('CEP', cliente?.cep),
+    ].join('')
+
     secResumo = sec('Resumo da Proposta', `
-      <div class="cond-card" style="margin-bottom:16px"><div class="cond-header-title">Cliente</div><p style="margin-top:4px;font-size:14px;font-weight:600;color:#0E2040">${nomeCliente}</p></div>
+      <div class="cliente-box">
+        <div class="cliente-nome">${nomeCliente}</div>
+        ${camposCliente ? `<div class="cliente-campos">${camposCliente}</div>` : ''}
+      </div>
       <div class="info-box"><p><strong>O que estamos propondo:</strong></p>${resumoEscopo}</div>
     `)
   }
