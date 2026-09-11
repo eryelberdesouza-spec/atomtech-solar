@@ -895,10 +895,14 @@ const dashboardRouter = router({
       .filter((p: any) => p.tipo === 'PAGAR')
       .reduce((sum: number, p: any) => sum + Number(p.valor), 0)
 
-    const vencendoHoje = parcelas.filter((p: any) => p.vencimento === hoje).length
-    const vencidos = parcelas.filter((p: any) => p.vencimento < hoje).length
+    // Mesma armadilha do titulo.list: vencimento vem como objeto Date, e
+    // comparar com string 'YYYY-MM-DD' dá sempre false — os três contadores
+    // abaixo viviam zerados no painel.
+    const venc = (p: any) => fmtDateISO(p.vencimento)
+    const vencendoHoje = parcelas.filter((p: any) => venc(p) === hoje).length
+    const vencidos = parcelas.filter((p: any) => venc(p) < hoje).length
     const em7dias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
-    const vencendo7Dias = parcelas.filter((p: any) => p.vencimento > hoje && p.vencimento <= em7dias).length
+    const vencendo7Dias = parcelas.filter((p: any) => venc(p) > hoje && venc(p) <= em7dias).length
 
     // Duplicatas suspeitas: mesmo tipo+descrição+valor+pessoa emitidos no mesmo dia
     // (ou dia seguinte). Janela curta de propósito — janelas maiores marcam despesas
@@ -1084,17 +1088,26 @@ const tituloRouter = router({
         ))
         .orderBy(asc(finParcela.vencimento))
 
-      // Filtra status (VENCIDA é computed: ABERTA + vencimento < hoje)
-      return rows.filter((r: any) => {
-        if (!input.status) return true
-        const isVencida = r.status === 'ABERTA' && r.vencimento < hoje
-        if (input.status === 'VENCIDA') return isVencida
-        if (input.status === 'ABERTA')  return r.status === 'ABERTA' && !isVencida
-        return r.status === input.status
-      }).map((r: any) => ({
-        ...r,
-        statusDisplay: r.status === 'ABERTA' && r.vencimento < hoje ? 'VENCIDA' : r.status,
-      }))
+      // vencimento chega do mysql2 como objeto Date (coluna DATE sem
+      // dateStrings — ver nota no CLAUDE.md). Comparar Date com a string
+      // 'YYYY-MM-DD' dá NaN, e NaN em comparação é SEMPRE false: o filtro
+      // "Vencidas" nunca achava nada, "Em Aberto" trazia junto as vencidas e
+      // o badge nunca exibia "Vencida". Normalizar pra string resolve os três
+      // de uma vez — e o cliente passa a receber 'YYYY-MM-DD' em vez de
+      // '...T00:00:00.000Z', que em UTC-3 era lido como o dia anterior.
+      return rows
+        .map((r: any) => ({ ...r, vencimento: fmtDateISO(r.vencimento) }))
+        .filter((r: any) => {
+          if (!input.status) return true
+          const isVencida = r.status === 'ABERTA' && r.vencimento < hoje
+          if (input.status === 'VENCIDA') return isVencida
+          if (input.status === 'ABERTA')  return r.status === 'ABERTA' && !isVencida
+          return r.status === input.status
+        })
+        .map((r: any) => ({
+          ...r,
+          statusDisplay: r.status === 'ABERTA' && r.vencimento < hoje ? 'VENCIDA' : r.status,
+        }))
     }),
 
   // Busca título completo com parcelas e pessoa (para comprovante PDF)
