@@ -1039,7 +1039,18 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   // Alerta de vencimentos — SEMPRE sem filtro de data, independente do que o
   // usuário selecionou nos filtros acima. Garante que atrasados antigos nunca
   // fiquem invisíveis mesmo com o padrão "últimos 5 dias" da lista.
-  const { data: alertaRows = [] } = (trpc as any).fin.titulo.list.useQuery({ tipo, status: 'ABERTA' })
+  // Duas consultas de propósito: "ABERTA" na API significa aberta E AINDA NÃO
+  // vencida — vencida é status próprio. Enquanto a comparação de datas na API
+  // estava quebrada, "ABERTA" devolvia as vencidas junto e este alerta
+  // funcionava por acidente; ao consertar a API, os atrasados sumiram daqui.
+  // Buscar as duas faixas explicitamente deixa a intenção clara e traz só o
+  // necessário (67 linhas em vez das 307 de uma consulta sem filtro).
+  const { data: alertaAbertas = [] } = (trpc as any).fin.titulo.list.useQuery({ tipo, status: 'ABERTA' })
+  const { data: alertaVencidas = [] } = (trpc as any).fin.titulo.list.useQuery({ tipo, status: 'VENCIDA' })
+  const alertaRows = useMemo(
+    () => [...(alertaVencidas as any[]), ...(alertaAbertas as any[])],
+    [alertaVencidas, alertaAbertas],
+  )
   const alerta = useMemo(() => {
     const hj = hoje()
     const em5dias = diasAPartirDeHoje(5)
