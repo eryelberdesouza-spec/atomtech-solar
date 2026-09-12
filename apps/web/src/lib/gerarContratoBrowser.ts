@@ -113,7 +113,14 @@ function dadosBancarios(e: any, parcela: any): string {
   return l.join(' - ')
 }
 
-function labelReferencia(ref: string, n: number): string {
+// "Entrada — assinatura do contrato" → "assinatura do contrato" (remove o
+// prefixo de ordinal antes do travessão, quando houver).
+function eventoSemPrefixo(desc: string): string {
+  const m = desc.match(/[—-]\s*(.+)$/)
+  return (m ? m[1] : desc).trim()
+}
+
+function labelReferencia(ref: string, descricaoEvento: string | undefined, n: number): string {
   const map: Record<string, string> = {
     assinatura_contrato:       'da data da última assinatura do contrato',
     entrega_equipamentos:      'da data de entrega dos equipamentos',
@@ -121,7 +128,15 @@ function labelReferencia(ref: string, n: number): string {
     vencimento_parcela_anterior: `do vencimento da ${n - 1}ª Parcela`,
     aprovacao_financiamento:   'da aprovação do financiamento',
   }
-  return map[ref] ?? ref
+  if (map[ref]) return map[ref]
+  // referenciaEvento é texto livre no banco — na prática guarda chaves
+  // internas (ex. "marco_1", usadas por outra lógica, como o financeiro),
+  // não uma frase pra exibir. O texto humano de verdade é descricaoEvento
+  // ("Entrada — assinatura do contrato", "2ª parcela — conclusão dos
+  // serviços") — usar esse como fonte da frase quando a chave não é
+  // reconhecida, removendo o prefixo de ordinal.
+  if (descricaoEvento) return `da data de ${eventoSemPrefixo(descricaoEvento)}`
+  return ref
 }
 
 function tipoPrazoLabel(tipo: string): string {
@@ -345,7 +360,8 @@ const CSS = `
 
 // ─── GERAÇÃO DO HTML ──────────────────────────────────────────────
 
-function buildHtml(dados: any, formaPagamento: string): string {
+function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boolean } = {}): string {
+  const autoPrint = opts.autoPrint !== false
   const { proposta, dimensionamento, equipamentos, precificacao, condicoesComerciais, empresa, cliente } = dados
 
   // formaPagamento passado como parâmetro direto — sem ambiguidade
@@ -441,7 +457,7 @@ function buildHtml(dados: any, formaPagamento: string): string {
     return parcelas.map((p: any) => {
       const banco = dadosBancarios(empresa, p)
       const prazoTxt = p.prazoDias
-        ? `a ser pago em até ${numeroComExtenso(p.prazoDias)} ${tipoPrazoLabel(p.tipoPrazo)} contado(s) ${labelReferencia(p.referenciaEvento, p.numeroParcela)}`
+        ? `a ser pago em até ${numeroComExtenso(p.prazoDias)} ${tipoPrazoLabel(p.tipoPrazo)} contado(s) ${labelReferencia(p.referenciaEvento, p.descricaoEvento, p.numeroParcela)}`
         : (p.descricaoEvento ?? '')
       const isEntrada = p.numeroParcela === 1
       const qualificacao = isEntrada ? ' a título de sinal/e a princípio de pagamento,' : ''
@@ -683,7 +699,7 @@ function buildHtml(dados: any, formaPagamento: string): string {
   <p class="secao-titulo">Dos Serviços Não Incluídos</p>
   <p class="clausula"><strong>CLÁUSULA 16ª</strong> — Não estão incluídos no presente instrumento os seguintes serviços:</p>
   <ol class="lista-clausula" type="I">
-    <li>Fornecimento de Geradores para o Sistema;</li>
+    <li>Fornecimento de gerador a combustão (gasolina ou diesel) para suprir a instalação da <strong>CONTRATANTE</strong> durante períodos de desenergização ou interrupção do fornecimento pela concessionária — o Gerador Fotovoltaico não substitui esse tipo de equipamento, pois depende da rede elétrica para operar em condições normais;</li>
     <li>A <strong>CONTRATADA</strong> considera que não existirão interferências com outros sistemas elétricos ou civis;</li>
     <li>Adequações técnicas no imóvel necessárias para o pleno funcionamento do sistema, tais como: aterramento, quadros de distribuição incompatíveis ou insuficientes para acréscimo de dispositivos de proteção, criação de infraestrutura para instalação de inversor em ambientes inadequados para o seu pleno funcionamento ou infraestrutura customizada, adequações em telhados (exceto substituição de telhas que por ventura se quebrem no trabalho de instalação), entre outros;</li>
     <li>A <strong>CONTRATADA</strong> considera a necessidade de obtenção de vistorias ou aprovações junto aos órgãos oficiais (inclusas na proposta);</li>
@@ -793,13 +809,27 @@ function buildHtml(dados: any, formaPagamento: string): string {
 </td></tr></tbody>
 </table>
 <script>
-  window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };
+  window.onload = function(){
+    setTimeout(function(){
+      // Sinaliza ao Chrome headless (geração no servidor) que o layout
+      // terminou — sem isso o servidor espera até 20s à toa por um flag que
+      // este documento nunca setava.
+      window.__PDF_READY__ = true;
+      ${autoPrint ? 'window.print();' : ''}
+    }, 400);
+  };
 </script>
 </body>
 </html>`
 }
 
-// ─── FUNÇÃO PÚBLICA ───────────────────────────────────────────────
+// ─── FUNÇÕES PÚBLICAS ──────────────────────────────────────────────
+
+// HTML puro, sem abrir janela nem disparar impressão — usado no caminho
+// server-side (geração no servidor + anexação da proposta em PDF único).
+export function gerarHtmlContrato(dados: any, formaPagamento: string = ''): string {
+  return buildHtml(dados, formaPagamento, { autoPrint: false })
+}
 
 export function abrirContratoNoNavegador(dados: any, formaPagamento: string = ''): void {
   const html = buildHtml(dados, formaPagamento)

@@ -201,3 +201,67 @@ export async function renderPdfComCapaSeparada(
 
   return Buffer.from(await merged.save())
 }
+
+// ─── CONTRATO + PROPOSTA ANEXADA (PDF ÚNICO) ──────────────────────────────
+// Junta o PDF do contrato com o PDF da proposta aceita, com uma página
+// divisória "ANEXO" entre os dois — mesmo padrão de minutas reais da
+// empresa, que reservam essa página pra indicar onde os anexos começam.
+
+export interface AnexoRenderSpec {
+  bodyHtml: string
+  capaHtml?: string | null
+  headerTemplate?: string
+  footerTemplate?: string
+}
+
+async function mergePdfBuffers(buffers: Buffer[]): Promise<Buffer> {
+  const merged = await PDFDocument.create()
+  for (const buf of buffers) {
+    const doc = await PDFDocument.load(buf)
+    const pages = await merged.copyPages(doc, doc.getPageIndices())
+    pages.forEach(p => merged.addPage(p))
+  }
+  return Buffer.from(await merged.save())
+}
+
+const ANEXO_DIVIDER_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @page { size: A4; margin: 0; }
+  body {
+    width: 210mm; height: 297mm; display: flex; align-items: center; justify-content: center;
+    font-family: Calibri, Arial, sans-serif;
+  }
+  h1 { font-size: 72pt; font-weight: 300; color: #1a2744; letter-spacing: 0.12em; }
+</style></head><body><h1>ANEXO</h1><script>window.onload = function(){ window.__PDF_READY__ = true; };</script></body></html>`
+
+// Renderiza uma "parte" no mesmo formato devolvido por gerarHTML/
+// gerarHtmlServico com { serverSide: true } — com capa separada quando
+// header/footer nativos estão presentes, ou documento único caso contrário.
+async function renderAnexo(anexo: AnexoRenderSpec, opts: RenderOpts): Promise<Buffer> {
+  const temHeaderFooter = Boolean(anexo.headerTemplate && anexo.footerTemplate)
+  if (anexo.capaHtml && temHeaderFooter) {
+    return renderPdfComCapaSeparada(anexo.capaHtml, anexo.bodyHtml, {
+      ...opts, headerTemplate: anexo.headerTemplate, footerTemplate: anexo.footerTemplate,
+    })
+  }
+  return renderPdf(anexo.bodyHtml, {
+    ...opts, ...(temHeaderFooter ? { headerTemplate: anexo.headerTemplate, footerTemplate: anexo.footerTemplate } : {}),
+  })
+}
+
+export async function renderPdfContratoComAnexo(
+  contratoHtml: string,
+  anexo: AnexoRenderSpec | null,
+  opts: RenderOpts,
+): Promise<Buffer> {
+  // Contrato usa o próprio truque de thead/tfoot repetido (sem header/footer
+  // nativo) — renderPdf simples, igual ao caminho antigo do PDF de proposta.
+  const contratoPdf = await renderPdf(contratoHtml, { origensPermitidas: opts.origensPermitidas })
+  if (!anexo) return contratoPdf
+
+  const [dividerPdf, anexoPdf] = await Promise.all([
+    renderPdf(ANEXO_DIVIDER_HTML, { origensPermitidas: opts.origensPermitidas }),
+    renderAnexo(anexo, { origensPermitidas: opts.origensPermitidas }),
+  ])
+  return mergePdfBuffers([contratoPdf, dividerPdf, anexoPdf])
+}

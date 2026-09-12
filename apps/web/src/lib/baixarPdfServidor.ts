@@ -47,3 +47,41 @@ export async function baixarPdfDoServidor(
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }
+
+// Contrato + proposta aceita anexada em um único PDF (página "ANEXO" entre os
+// dois). `anexo` é o mesmo formato devolvido por gerarHTML/gerarHtmlServico
+// com { serverSide: true } — omitir gera só o contrato, sem anexo.
+export async function baixarContratoDoServidor(
+  contratoHtml: string,
+  filename: string,
+  anexo?: { bodyHtml: string; capaHtml?: string | null; headerTemplate?: string; footerTemplate?: string } | null,
+): Promise<void> {
+  const token = localStorage.getItem('atomtech_token')
+
+  const resp = await fetch(`${API_BASE}/pdf/render-contrato`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ contratoHtml, filename, anexo: anexo ?? null }),
+  })
+
+  if (!resp.ok) {
+    let detalhe = `HTTP ${resp.status}`
+    try { detalhe = (await resp.json())?.error ?? detalhe } catch { /* corpo não-JSON */ }
+    throw new Error(detalhe)
+  }
+
+  const blob = await resp.blob()
+  if (blob.type !== 'application/pdf') throw new Error('Resposta não é um PDF')
+
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}

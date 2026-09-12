@@ -8,7 +8,7 @@ import { appRouter } from './routers'
 import { createContext, testConnection } from './routers/trpc'
 import { parseInter, parseSicoob } from './lib/extratoParser'
 import { parseOFX } from './lib/ofxParser'
-import { renderPdf, renderPdfComCapaSeparada, acharChromium } from './lib/pdfRenderer'
+import { renderPdf, renderPdfComCapaSeparada, renderPdfContratoComAnexo, acharChromium } from './lib/pdfRenderer'
 import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
 
 const app = express()
@@ -106,6 +106,50 @@ app.post('/pdf/render', async (req, res) => {
   } catch (e: any) {
     console.error('Erro ao gerar PDF:', e)
     res.status(500).json({ error: e?.message ?? 'Falha ao gerar PDF' })
+  }
+})
+
+// Contrato + proposta aceita anexada em um único PDF (página "ANEXO" divisória
+// entre os dois). O contrato ainda usa o truque de thead/tfoot (não migrou pro
+// header/footer nativo); a proposta anexada é renderizada como recebida do
+// front — mesmo formato de gerarHTML/gerarHtmlServico com serverSide:true.
+app.post('/pdf/render-contrato', async (req, res) => {
+  const authHeader = req.headers.authorization
+  let autenticado = false
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(authHeader.slice(7).split('.')[1], 'base64').toString('utf-8'),
+      )
+      autenticado = Boolean(payload.userId && payload.empresaId)
+    } catch { /* token inválido */ }
+  }
+  if (!autenticado) return res.status(401).json({ error: 'Não autenticado' })
+
+  const { contratoHtml, anexo, filename } = req.body ?? {}
+  if (typeof contratoHtml !== 'string' || !contratoHtml.includes('<html')) {
+    return res.status(400).json({ error: 'Campo "contratoHtml" ausente ou inválido' })
+  }
+  const anexoValido = anexo && typeof anexo.bodyHtml === 'string' && anexo.bodyHtml.includes('<html')
+    ? anexo
+    : null
+
+  const origensPermitidas = [
+    ...ALLOWED_ORIGINS,
+    ...(req.headers.origin ? [req.headers.origin] : []),
+    `${req.protocol}://${req.get('host')}`,
+  ]
+
+  try {
+    const pdf = await renderPdfContratoComAnexo(contratoHtml, anexoValido, { origensPermitidas })
+    const nome = String(filename ?? 'contrato.pdf').replace(/[^\w.\-]/g, '_')
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Length', String(pdf.length))
+    res.setHeader('Content-Disposition', `attachment; filename="${nome}"`)
+    res.send(pdf)
+  } catch (e: any) {
+    console.error('Erro ao gerar contrato:', e)
+    res.status(500).json({ error: e?.message ?? 'Falha ao gerar contrato' })
   }
 })
 

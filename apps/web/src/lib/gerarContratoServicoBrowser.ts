@@ -97,7 +97,14 @@ function dadosBancarios(e: any, parcela: any): string {
   return ls.join(' - ')
 }
 
-function labelReferencia(ref: string, n: number): string {
+// "Entrada — assinatura do contrato" → "assinatura do contrato" (remove o
+// prefixo de ordinal antes do travessão, quando houver).
+function eventoSemPrefixo(desc: string): string {
+  const m = desc.match(/[—-]\s*(.+)$/)
+  return (m ? m[1] : desc).trim()
+}
+
+function labelReferencia(ref: string, descricaoEvento: string | undefined, n: number): string {
   const map: Record<string, string> = {
     assinatura_contrato:          'da data da última assinatura do contrato',
     entrega_equipamentos:         'da data de entrega dos materiais',
@@ -105,7 +112,13 @@ function labelReferencia(ref: string, n: number): string {
     vencimento_parcela_anterior:  `do vencimento da ${n - 1}ª Parcela`,
     aprovacao_financiamento:      'da aprovação do financiamento',
   }
-  return map[ref] ?? ref
+  if (map[ref]) return map[ref]
+  // referenciaEvento é texto livre no banco — na prática guarda chaves
+  // internas (ex. "marco_1"), não uma frase pra exibir. descricaoEvento tem
+  // o texto humano de verdade ("Entrada — assinatura do contrato") — usar
+  // esse quando a chave não é reconhecida, removendo o prefixo de ordinal.
+  if (descricaoEvento) return `da data de ${eventoSemPrefixo(descricaoEvento)}`
+  return ref
 }
 
 function tipoPrazoLabel(tipo: string): string {
@@ -278,7 +291,7 @@ function buildHtml(dados: any): string {
     const rows = parcelas.map((p: any, idx: number) => {
       const n = p.numeroParcela ?? idx + 1
       const prazo = p.prazoDias != null
-        ? `${n === 1 ? '' : `${p.prazoDias} ${tipoPrazoLabel(p.tipoPrazo ?? 'corridos')} `}${p.referenciaEvento ? `após ${labelReferencia(p.referenciaEvento, n)}` : ''}`
+        ? `${n === 1 ? '' : `${p.prazoDias} ${tipoPrazoLabel(p.tipoPrazo ?? 'corridos')} `}${p.referenciaEvento ? `após ${labelReferencia(p.referenciaEvento, p.descricaoEvento, n)}` : ''}`
         : ''
       const banco = dadosBancarios(empresa, p)
       return `
@@ -486,12 +499,24 @@ function buildHtml(dados: any): string {
       </div><!-- fim doc-body -->
     </td></tr></tbody>
     </table>
+    <script>
+      // Sinaliza ao Chrome headless (geração no servidor) que o layout
+      // terminou — sem isso o servidor espera até 20s à toa por um flag que
+      // este documento nunca setava.
+      window.onload = function(){ window.__PDF_READY__ = true; };
+    </script>
     </body>
     </html>
   `
 }
 
-// ─── FUNÇÃO EXPORTADA ─────────────────────────────────────────────
+// ─── FUNÇÕES EXPORTADAS ────────────────────────────────────────────
+
+// HTML puro, sem abrir janela — usado no caminho server-side (geração no
+// servidor + anexação da proposta em PDF único).
+export function gerarHtmlContratoServico(dados: any): string {
+  return buildHtml(dados)
+}
 
 export function abrirContratoServicoNoNavegador(dados: any): void {
   const html = buildHtml(dados)

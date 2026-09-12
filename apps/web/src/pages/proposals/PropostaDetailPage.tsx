@@ -12,9 +12,9 @@ import {
 } from '../../components/ui'
 import { abrirPdfNoNavegador, gerarHTML } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador, gerarHtmlServico } from '../../lib/gerarPdfServicoBrowser'
-import { baixarPdfDoServidor } from '../../lib/baixarPdfServidor'
-import { abrirContratoNoNavegador } from '../../lib/gerarContratoBrowser'
-import { abrirContratoServicoNoNavegador } from '../../lib/gerarContratoServicoBrowser'
+import { baixarPdfDoServidor, baixarContratoDoServidor } from '../../lib/baixarPdfServidor'
+import { abrirContratoNoNavegador, gerarHtmlContrato } from '../../lib/gerarContratoBrowser'
+import { abrirContratoServicoNoNavegador, gerarHtmlContratoServico } from '../../lib/gerarContratoServicoBrowser'
 
 const TABS_SOLAR = [
   { id: 'dimensionamento', label: 'Dimensionamento' },
@@ -1457,6 +1457,7 @@ function PropostaDetailPageInner() {
   const [gerandoContrato, setGerandoContrato] = useState(false)
   const [showModalFormaPag, setShowModalFormaPag] = useState(false)
   const [formaPagContrato, setFormaPagContrato] = useState('padrao')
+  const [anexarProposta, setAnexarProposta] = useState(true)
   const [showClonar, setShowClonar]         = useState(false)
   const [showAltCliente, setShowAltCliente] = useState(false)
   const [showCapaModal, setShowCapaModal]   = useState(false)
@@ -1630,28 +1631,60 @@ function PropostaDetailPageInner() {
     setShowModalFormaPag(true)
   }
 
-  const handleGerarContratoComFormaPag = () => {
+  const handleGerarContratoComFormaPag = async () => {
     setShowModalFormaPag(false)
     setGerandoContrato(true)
     const isServicoProposta = (data as any)?.proposta?.tipoProposta === 'servico_geral'
     const formaSelecionada = formaPagContrato   // captura do estado do pai — sem ambiguidade
-    setTimeout(() => {
+    const numero = (data as any).proposta?.numero ?? 'contrato'
+    const dadosContrato = {
+      ...data,
+      empresa: { ...(data as any).empresa, ...empresa },
+      cliente: clienteData,
+    }
+
+    try {
+      // Contrato ainda não migrou pro header/footer nativo (usa thead/tfoot em
+      // tabela, como o PDF de proposta usava antes da rodada 7) — sempre passa
+      // pelo servidor pra sair vetorial, nunca rasterizado pelo diálogo de
+      // impressão do navegador.
+      const contratoHtml = isServicoProposta
+        ? gerarHtmlContratoServico(dadosContrato)
+        : gerarHtmlContrato(dadosContrato, formaSelecionada)
+
+      // Anexo: a proposta aceita, no mesmo formato serverSide usado pra baixar
+      // o PDF da proposta sozinha — colada depois de uma página "ANEXO".
+      let anexo: any = null
+      if (anexarProposta) {
+        const textos: Record<string, any> = {}
+        if (textosData) { textosData.forEach((t: any) => { textos[t.chave] = t }) }
+        const dadosPdf = { ...data, empresa: { ...(data as any).empresa, ...empresa }, textos, cliente: clienteData }
+        anexo = isServicoProposta
+          ? gerarHtmlServico(dadosPdf, { autoPrint: false, serverSide: true })
+          : gerarHTML(dadosPdf, { autoPrint: false, serverSide: true })
+      }
+
+      await baixarContratoDoServidor(contratoHtml, `CONTRATO-${numero}.pdf`, anexo)
+    } catch (e: any) {
+      // Fallback: se a API estiver fora do ar, volta ao fluxo de impressão —
+      // mas sem anexo (juntar dois PDFs exige o servidor).
+      console.error('Geração do contrato no servidor falhou, caindo para a impressão:', e)
+      if (anexarProposta) {
+        alert(
+          'Não foi possível gerar o contrato com o anexo no servidor (' + (e?.message ?? e) + '). ' +
+          'Vou abrir só o contrato, sem a proposta anexada, para você imprimir.',
+        )
+      }
       try {
-        const dadosContrato = {
-          ...data,
-          empresa: { ...(data as any).empresa, ...empresa },
-          cliente: clienteData,
-        }
-        if (isServicoProposta) {
-          abrirContratoServicoNoNavegador(dadosContrato)
-        } else {
-          abrirContratoNoNavegador(dadosContrato, formaSelecionada)
-        }
-      } catch (e) {
+        if (isServicoProposta) abrirContratoServicoNoNavegador(dadosContrato)
+        else abrirContratoNoNavegador(dadosContrato, formaSelecionada)
+      } catch (e2) {
         alert('Erro ao gerar contrato. Verifique se popups estão permitidos neste site.')
-        console.error(e)
-      } finally { setGerandoContrato(false) }
-    }, 100)
+        console.error(e2)
+      }
+    } finally {
+      setGerandoContrato(false)
+    }
   }
 
   const handleFormalizar = () => {
@@ -1966,6 +1999,8 @@ function PropostaDetailPageInner() {
         <ModalFormaPagamentoContrato
           value={formaPagContrato}
           onChange={setFormaPagContrato}
+          anexarProposta={anexarProposta}
+          onChangeAnexar={setAnexarProposta}
           onConfirm={handleGerarContratoComFormaPag}
           onClose={() => setShowModalFormaPag(false)}
         />
@@ -2003,10 +2038,12 @@ const OPCOES_FORMA_PAG_CONTRATO = [
 ]
 
 function ModalFormaPagamentoContrato({
-  value, onChange, onConfirm, onClose,
+  value, onChange, anexarProposta, onChangeAnexar, onConfirm, onClose,
 }: {
   value: string
   onChange: (v: string) => void
+  anexarProposta: boolean
+  onChangeAnexar: (v: boolean) => void
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -2076,6 +2113,30 @@ function ModalFormaPagamentoContrato({
             ✓ Selecionado: <strong>{op.icon} {op.label}</strong>
           </div>
         )}
+
+        <div
+          onClick={() => onChangeAnexar(!anexarProposta)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginTop: 14,
+            padding: '11px 14px', borderRadius: 10, cursor: 'pointer', userSelect: 'none',
+            border: `1px solid ${C.darkBorder}`, background: C.dark,
+          }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+            border: `2px solid ${anexarProposta ? C.accent : C.darkBorder}`,
+            background: anexarProposta ? C.accent : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {anexarProposta && <span style={{ color: '#fff', fontSize: 12, lineHeight: 1 }}>✓</span>}
+          </div>
+          <div>
+            <div style={{ color: C.text, fontWeight: 600, fontSize: 13.5 }}>📎 Anexar a proposta aceita</div>
+            <div style={{ color: C.textDim, fontSize: 11.5, lineHeight: 1.4 }}>
+              Gera um único PDF: o contrato seguido da proposta, com uma página "ANEXO" entre os dois.
+            </div>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
           <Btn size="sm" variant="ghost" onClick={onClose}>Cancelar</Btn>
