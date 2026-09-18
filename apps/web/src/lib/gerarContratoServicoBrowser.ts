@@ -142,8 +142,13 @@ function formaEDadosPagamento(empresa: any, p: any, fallback: string): string {
   const label = FORMAS_LABEL_CONTRATO[f] ?? f
   // parcelasForma = em quantas vezes o cliente dividiu junto à operadora do
   // cartão ou ao banco. É informação, não cronograma: a Atom recebe de uma vez.
+  // O parcelamento pode ser com ou sem juros — isso é do cliente com a
+  // operadora e não muda o valor contratado, por isso o contrato não divide
+  // o valor por N nem promete parcela "sem juros".
   const n = Number(p?.parcelasForma ?? 0)
-  const comParcelamento = n > 1 ? `${label}, em até ${n}x junto à operadora` : label
+  const comParcelamento = n > 1
+    ? `${label}, em até ${n}x junto à operadora (juros e encargos da operadora, se houver, por conta do CONTRATANTE)`
+    : label
   if (!FORMAS_COM_CONTA.has(f)) return comParcelamento
   return fallback && fallback !== '—' ? `${comParcelamento} — ${fallback}` : comParcelamento
 }

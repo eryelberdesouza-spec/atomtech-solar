@@ -494,7 +494,7 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
       // isso é informação e não gera prestações contra a CONTRATADA.
       const nParc = Number(p?.parcelasForma ?? 0)
       const meioLiquidacao = fech && p.formaPagamento
-        ? `a ser liquidado por meio de ${FORMAS_LABEL_CONTRATO[p.formaPagamento] ?? p.formaPagamento}${nParc > 1 ? `, parcelado em até ${numeroComExtenso(nParc)} vezes junto à operadora, sem que tal parcelamento constitua obrigação a prazo perante a <strong>CONTRATADA</strong>` : ''}`
+        ? `a ser liquidado por meio de ${FORMAS_LABEL_CONTRATO[p.formaPagamento] ?? p.formaPagamento}${nParc > 1 ? `, parcelado em até ${numeroComExtenso(nParc)} vezes junto à operadora, sem que tal parcelamento constitua obrigação a prazo perante a <strong>CONTRATADA</strong>, correndo por conta exclusiva do <strong>CONTRATANTE</strong> eventuais juros e encargos cobrados pela operadora, os quais não alteram o valor ora contratado` : ''}`
         : (isEntrada
             ? 'a ser liquidado por meio de transferência bancária/pix'
             : 'parcela esta, a ser liquidada por meio de transferência bancária/pix')

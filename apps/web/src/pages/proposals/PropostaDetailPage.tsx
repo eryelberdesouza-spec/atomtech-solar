@@ -672,8 +672,11 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
                   {FORMAS_RECEBIMENTO_UNICO_UI.has(p.forma)
                     // Cartão e financiamento: quem parcela é o cliente com a
                     // operadora/banco. A Atom recebe o valor cheio de uma vez,
-                    // então isso NÃO vira 12 cobranças mensais.
-                    ? `${p.numParcelas}x de ${formatCurrency(Number(p.valor || 0) / p.numParcelas)} para o cliente · a Atom recebe ${formatCurrency(Number(p.valor || 0))} de uma vez`
+                    // então isso NÃO vira 12 cobranças mensais. E o valor da
+                    // parcela do cliente NÃO é valor/N — depende de o
+                    // parcelamento ser com ou sem juros da operadora, o que não
+                    // passa pela Atom e não altera o valor contratado.
+                    ? `a Atom recebe ${formatCurrency(Number(p.valor || 0))} de uma vez · o cliente parcela em ${p.numParcelas}x junto à operadora (juros, se houver, por conta do cliente)`
                     : `${p.numParcelas}x de ${formatCurrency(Number(p.valor || 0) / p.numParcelas)} · demais parcelas a cada 30 dias`}
                 </span>
               )}
