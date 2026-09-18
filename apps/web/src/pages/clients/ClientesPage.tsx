@@ -25,6 +25,8 @@ const avatarColor = (nome: string) => AVATAR_COLORS[nome.charAt(0).toUpperCase()
 interface ClienteForm {
   tipoPessoa: 'fisica' | 'juridica'
   nome: string; razaoSocial: string; cpfCnpj: string; nomeResponsavel: string
+  responsavelCargo: string; responsavelCpf: string
+  responsavelEmail: string; responsavelTelefone: string
   telefone: string; email: string; cep: string; endereco: string; numero: string
   complemento: string; bairro: string; cidade: string; estado: string
   distribuidora: string; observacoes: string
@@ -32,7 +34,9 @@ interface ClienteForm {
 
 const FORM_VAZIO: ClienteForm = {
   tipoPessoa: 'fisica', nome: '', razaoSocial: '', cpfCnpj: '',
-  nomeResponsavel: '', telefone: '', email: '', cep: '', endereco: '',
+  nomeResponsavel: '', responsavelCargo: '', responsavelCpf: '',
+  responsavelEmail: '', responsavelTelefone: '',
+  telefone: '', email: '', cep: '', endereco: '',
   numero: '', complemento: '', bairro: '', cidade: '', estado: '',
   distribuidora: '', observacoes: '',
 }
@@ -124,8 +128,24 @@ function ClienteFormModal({ inicial, onSave, onClose, loading, erro, editandoId 
             <Input label="CPF / CNPJ" value={form.cpfCnpj} onChange={e => set('cpfCnpj', e.target.value)} placeholder="000.000.000-00" />
           </div>
           <Input label="Nome / Razão Social *" value={form.nome} onChange={e => set('nome', e.target.value.toUpperCase())} />
+          {/* Representante legal: é quem assina o contrato pela empresa, então
+              o preâmbulo precisa do nome, do cargo e do CPF. E-mail e telefone
+              aqui são os DELE — os campos abaixo seguem sendo os da empresa. */}
           {form.tipoPessoa === 'juridica' && (
-            <Input label="Nome do Responsável" value={form.nomeResponsavel} onChange={e => set('nomeResponsavel', e.target.value)} />
+            <div>
+              {sectionLabel('Representante Legal (assina o contrato)')}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
+                  <Input label="Nome do Responsável" value={form.nomeResponsavel} onChange={e => set('nomeResponsavel', e.target.value.toUpperCase())} />
+                  <Input label="Cargo" value={form.responsavelCargo} onChange={e => set('responsavelCargo', e.target.value)} placeholder="sócio-administrador" />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 14 }}>
+                  <Input label="CPF do Responsável" value={form.responsavelCpf} onChange={e => set('responsavelCpf', e.target.value)} placeholder="000.000.000-00" />
+                  <Input label="Telefone do Responsável" value={form.responsavelTelefone} onChange={e => set('responsavelTelefone', e.target.value)} placeholder="(61) 9xxxx-xxxx" />
+                  <Input label="E-mail do Responsável" type="email" value={form.responsavelEmail} onChange={e => set('responsavelEmail', e.target.value)} />
+                </div>
+              </div>
+            </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
             <Input label="Telefone *" value={form.telefone} onChange={e => set('telefone', e.target.value)} placeholder="(61) 9xxxx-xxxx" />
@@ -354,6 +374,10 @@ function clienteParaForm(c: any): ClienteForm {
     razaoSocial:     c.razaoSocial     ?? '',
     cpfCnpj:         c.cpfCnpj         ?? '',
     nomeResponsavel: c.nomeResponsavel ?? '',
+    responsavelCargo:    c.responsavelCargo    ?? '',
+    responsavelCpf:      c.responsavelCpf      ?? '',
+    responsavelEmail:    c.responsavelEmail    ?? '',
+    responsavelTelefone: c.responsavelTelefone ?? '',
     telefone:        c.telefone        ?? '',
     email:           c.email           ?? '',
     cep:             c.cep             ?? '',

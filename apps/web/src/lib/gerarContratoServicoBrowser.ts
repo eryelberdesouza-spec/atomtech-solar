@@ -3,6 +3,11 @@
 // Contrato de Prestação de Serviços — window.print()
 // ═══════════════════════════════════════════════════════════════════
 
+import {
+  fmtDoc, enderecoCliente, enderecoEmpresa,
+  qualificacaoContratante, qualificacaoContratada,
+} from './contratoPartes'
+
 // ─── HELPERS ──────────────────────────────────────────────────────
 
 const fmt = (v: number | string | null | undefined): string => {
@@ -58,25 +63,6 @@ function valorPorExtenso(n: number): string {
   const textoReais = partes.join(' e ') + (reais === 1 ? ' real' : ' reais')
   if (centavos > 0) return textoReais + ' e ' + menorQueMil(centavos) + (centavos === 1 ? ' centavo' : ' centavos')
   return textoReais
-}
-
-function enderecoCliente(c: any): string {
-  const p: string[] = []
-  if (c?.endereco) p.push(c.endereco + (c.numero ? ', ' + c.numero : ''))
-  if (c?.complemento) p.push(c.complemento)
-  if (c?.bairro) p.push(c.bairro)
-  if (c?.cidade && c?.estado) p.push(`${c.cidade}/${c.estado}`)
-  else if (c?.cidade) p.push(c.cidade)
-  if (c?.cep) p.push(`CEP ${c.cep}`)
-  return p.join(' – ') || '(endereço não informado)'
-}
-
-function enderecoEmpresa(e: any): string {
-  const p: string[] = []
-  if (e?.endereco) p.push(e.endereco)
-  if (e?.cidade && e?.estado) p.push(`${e.cidade}/${e.estado}`)
-  if (e?.cep) p.push(`CEP ${e.cep}`)
-  return p.join(', ')
 }
 
 function dadosBancarios(e: any, parcela: any): string {
@@ -162,13 +148,8 @@ function logoTag(logoUrl: string | null | undefined): string {
   return `<span style="font-size:16pt;font-weight:900;letter-spacing:-1px;">ATOMTECH</span>`
 }
 
-function fmtCnpj(v: string | null | undefined): string {
-  if (!v) return ''
-  const n = v.replace(/\D/g, '')
-  if (n.length === 14) return n.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
-  if (n.length === 11) return n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-  return v
-}
+// Mantido como nome local; a formatação em si vive em contratoPartes.ts.
+const fmtCnpj = fmtDoc
 
 // ─── CSS ──────────────────────────────────────────────────────────
 
@@ -411,12 +392,12 @@ function buildHtml(dados: any): string {
       <!-- PARTES -->
       <div class="secao-titulo">Cláusula 1ª — Das Partes</div>
       <div class="parte-bloco">
-        <strong>CONTRATADA:</strong> ${nomeEmpresa}${cnpjEmpresa ? `, inscrita no CNPJ sob nº ${cnpjEmpresa}` : ''}${endEmpresa ? `, com sede em ${endEmpresa}` : ''},
-        doravante denominada <strong>CONTRATADA</strong>.
+        <strong>CONTRATANTE:</strong> ${qualificacaoContratante(cliente)},
+        doravante denominado(a) <strong>CONTRATANTE</strong>.
       </div>
       <div class="parte-bloco">
-        <strong>CONTRATANTE:</strong> ${nomeCliente}${cpfCnpjCliente ? `, inscrito(a) no CPF/CNPJ sob nº ${cpfCnpjCliente}` : ''}${endCli ? `, residente/estabelecido(a) em ${endCli}` : ''},
-        doravante denominado(a) <strong>CONTRATANTE</strong>.
+        <strong>CONTRATADA:</strong> ${qualificacaoContratada(empresa)},
+        doravante denominada <strong>CONTRATADA</strong>.
       </div>
       <div class="clausula">
         As partes acima qualificadas têm, entre si, justo e contratado o presente instrumento, que se regerá pelas cláusulas e condições a seguir estipuladas.
@@ -508,19 +489,36 @@ function buildHtml(dados: any): string {
 
       <!-- Assinaturas -->
       <div class="assinaturas-bloco">
-        <div class="assinatura-wrapper">
-          <div class="assinatura-espaco"></div>
-          <div class="assinatura-linha">
-            ${nomeEmpresa}<br/>
-            <span style="font-size:9pt;">CONTRATADA</span>
+        <div style="margin-bottom:8mm;">
+          ${cliente?.tipoPessoa === 'juridica' ? `<p style="font-weight:700;font-size:9.5pt;margin-bottom:3mm;text-align:center;">
+            ${nomeCliente}<br/><small>CNPJ: ${cpfCnpjCliente}</small>
+          </p>` : ''}
+          <div class="assinatura-wrapper">
+            <div class="assinatura-espaco"></div>
+            <div class="assinatura-linha">
+              ${cliente?.tipoPessoa === 'juridica'
+                // Pela empresa quem assina é o representante legal.
+                ? `${cliente?.nomeResponsavel || '_______________________________'}<br/>
+                   <small>CPF: ${fmtDoc(cliente?.responsavelCpf) || '___.___.___-__'}</small>`
+                : `${nomeCliente}<br/><small>CPF: ${cpfCnpjCliente || '___.___.___-__'}</small>`}<br/>
+              <span style="font-size:9pt;">CONTRATANTE</span>
+            </div>
           </div>
         </div>
-        <div class="assinatura-wrapper">
-          <div class="assinatura-espaco"></div>
-          <div class="assinatura-linha">
-            ${nomeCliente}<br/>
-            <span style="font-size:9pt;">CONTRATANTE</span>
-          </div>
+        <div>
+          <p style="font-weight:700;font-size:9.5pt;margin-bottom:3mm;text-align:center;">
+            ${nomeEmpresa}<br/><small>CNPJ: ${cnpjEmpresa}</small>
+          </p>
+          ${[
+            { nome: empresa?.rep1Nome, cpf: empresa?.rep1Cpf },
+            { nome: empresa?.rep2Nome, cpf: empresa?.rep2Cpf },
+          ].filter(r => r.nome).map(r => `<div class="assinatura-wrapper">
+            <div class="assinatura-espaco"></div>
+            <div class="assinatura-linha">
+              ${r.nome}<br/><small>CPF: ${fmtDoc(r.cpf)}</small>
+            </div>
+          </div>`).join('\n')}
+          <div style="text-align:center;font-size:9pt;margin-top:2mm;">CONTRATADA</div>
         </div>
       </div>
 

@@ -90,6 +90,14 @@ export const cliente = mysqlTable('cliente', {
   razaoSocial: varchar('razao_social', { length: 200 }),
   cpfCnpj: varchar('cpf_cnpj', { length: 18 }),
   nomeResponsavel: varchar('nome_responsavel', { length: 200 }),
+  // Qualificação do representante legal — indispensável quando o cliente é PJ:
+  // quem assina o contrato pela empresa precisa estar identificado no preâmbulo
+  // (nome, cargo e CPF). E-mail e telefone aqui são os DO RESPONSÁVEL; os campos
+  // `email`/`telefone` abaixo seguem sendo os da empresa.
+  responsavelCargo: varchar('responsavel_cargo', { length: 100 }),
+  responsavelCpf: varchar('responsavel_cpf', { length: 18 }),
+  responsavelEmail: varchar('responsavel_email', { length: 150 }),
+  responsavelTelefone: varchar('responsavel_telefone', { length: 20 }),
   telefone: varchar('telefone', { length: 20 }),
   email: varchar('email', { length: 150 }),
   cep: varchar('cep', { length: 9 }),

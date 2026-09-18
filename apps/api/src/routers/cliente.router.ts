@@ -20,6 +20,11 @@ const clienteCreateSchema = z.object({
   razaoSocial:     ns(200),
   cpfCnpj:         ns(18),
   nomeResponsavel: ns(200),
+  // Do REPRESENTANTE LEGAL (PJ). `telefone`/`email` abaixo são os da empresa.
+  responsavelCargo:    ns(100),
+  responsavelCpf:      ns(18),
+  responsavelEmail:    ns(150),
+  responsavelTelefone: ns(20),
   telefone:        ns(20),
   email: z.string().email('E-mail inválido').max(150).nullable().optional().transform(v => v || undefined).or(z.literal('').transform(() => undefined)),
   cep:          ns(9),

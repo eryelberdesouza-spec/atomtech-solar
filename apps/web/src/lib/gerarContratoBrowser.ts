@@ -3,6 +3,11 @@
 // Contrato de Compra e Venda e Prestação de Serviços — Fotovoltaico
 // ═══════════════════════════════════════════════════════════════════
 
+import {
+  fmtDoc, enderecoCliente, enderecoEmpresa,
+  qualificacaoContratante, qualificacaoContratada,
+} from './contratoPartes'
+
 // ─── HELPERS ──────────────────────────────────────────────────────
 
 const fmt = (v: number | string | null | undefined): string => {
@@ -74,25 +79,6 @@ function valorPorExtenso(n: number): string {
     return textoReais + ' e ' + menorQueMil(centavos) + (centavos === 1 ? ' centavo' : ' centavos')
   }
   return textoReais
-}
-
-function enderecoCliente(c: any): string {
-  const p: string[] = []
-  if (c?.endereco) p.push(c.endereco + (c.numero ? ', ' + c.numero : ''))
-  if (c?.complemento) p.push(c.complemento)
-  if (c?.bairro) p.push(c.bairro)
-  if (c?.cidade && c?.estado) p.push(`${c.cidade}/${c.estado}`)
-  else if (c?.cidade) p.push(c.cidade)
-  if (c?.cep) p.push(`CEP ${c.cep}`)
-  return p.join(' – ') || '(endereço não informado)'
-}
-
-function enderecoEmpresa(e: any): string {
-  const p: string[] = []
-  if (e?.endereco) p.push(e.endereco)
-  if (e?.cidade && e?.estado) p.push(`${e.cidade}/${e.estado}`)
-  if (e?.cep) p.push(`CEP ${e.cep}`)
-  return p.join(', ')
 }
 
 function dadosBancarios(e: any, parcela: any): string {
@@ -434,17 +420,11 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
   const dataContrato = fmtDate(proposta?.dataValidade ?? proposta?.dataEmissao)
   const cidade       = empresa?.cidade ?? 'Brasília'
 
-  const contratanteDesc = cliTipoPessoa === 'juridica'
-    ? `<strong>${cliNome}</strong>, inscrita no CNPJ sob nº <strong>${cliCpf}</strong>, com sede em ${cliEnd}${cliEmail ? `, e-mail: ${cliEmail}` : ''}`
-    : `<strong>${cliNome}</strong>, ${cliCpf ? `portador(a) do CPF: <strong>${cliCpf}</strong>, ` : ''}residente e domiciliado(a) no ${cliEnd}${cliEmail ? `, e-mail: ${cliEmail}` : ''}`
+  // Qualificação das partes: definida em contratoPartes.ts e compartilhada com
+  // o contrato de serviço, para os dois saírem no mesmo padrão.
+  const contratanteDesc = qualificacaoContratante(cliente)
+  const contratadaDesc  = qualificacaoContratada(empresa)
 
-  const rep1Full = rep1Desc
-    ? `${rep1Nome}, ${rep1Desc}${rep1Cpf ? ` e CPF ${rep1Cpf}` : ''}`
-    : rep1Nome + (rep1Cpf ? `, CPF ${rep1Cpf}` : '')
-  const rep2Full = rep2Desc
-    ? `${rep2Nome}, ${rep2Desc}${rep2Cpf ? ` e CPF/MF nº ${rep2Cpf}` : ''}`
-    : rep2Nome + (rep2Cpf ? `, CPF ${rep2Cpf}` : '')
-  const repsText = hasRep2 ? `${rep1Full} e <strong>${rep2Full}</strong>` : rep1Full
 
   // ── CLÁUSULA 2 — PREÇO: renderiza conforme forma de pagamento ──
   function renderPagamento(): string {
@@ -551,7 +531,7 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
     <strong>CONTRATANTE:</strong> ${contratanteDesc}, denominado a partir deste momento como <strong>CONTRATANTE</strong>.
   </p>
   <p class="parte-bloco">
-    <strong>CONTRATADA:</strong> <strong>${empNome}</strong>${empEnd ? `, com sede no ${empEnd}` : ''}${empCnpj ? `, inscrita no CNPJ sob o nº <strong>${empCnpj}</strong>` : ''}${empIE ? `, e no Cadastro Estadual sob o nº ${empIE}` : ''}${empEmail ? `, e-mail: ${empEmail}` : ''}, neste ato representada pelo(s) senhor(es) <strong>${repsText}</strong>, denominada a partir deste momento como <strong>CONTRATADA</strong>;
+    <strong>CONTRATADA:</strong> ${contratadaDesc}, denominada a partir deste momento como <strong>CONTRATADA</strong>;
   </p>
   <p class="clausula">
     As partes acima identificadas, resolvem de comum acordo celebrar o presente instrumento de Contrato de Compra e Venda e Prestação de Serviços, mediante as cláusulas e condições seguintes:
@@ -808,11 +788,18 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
 
   <div class="assinaturas-bloco">
     <div style="margin-bottom:8mm;">
+      ${cliTipoPessoa === 'juridica' ? `<p style="font-weight:700;font-size:9.5pt;margin-bottom:3mm;text-align:center;">
+        ${cliNome}<br><small>CNPJ: ${fmtDoc(cliCpf)}</small>
+      </p>` : ''}
       <div class="assinatura-wrapper">
         <div class="assinatura-espaco"></div>
         <div class="assinatura-linha">
-          ${cliNome}<br>
-          <small>CPF: ${cliCpf || '___.___.___-__'}</small><br>
+          ${cliTipoPessoa === 'juridica'
+            // Quem assina pela empresa é o representante legal — o nome e o CPF
+            // dele é que vão sob a linha; a razão social e o CNPJ ficam acima.
+            ? `${cliente?.nomeResponsavel || '_______________________________'}<br>
+               <small>CPF: ${fmtDoc(cliente?.responsavelCpf) || '___.___.___-__'}</small>`
+            : `${cliNome}<br><small>CPF: ${fmtDoc(cliCpf) || '___.___.___-__'}</small>`}<br>
           <small>CONTRATANTE</small>
         </div>
       </div>

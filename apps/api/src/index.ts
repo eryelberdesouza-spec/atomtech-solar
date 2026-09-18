@@ -844,6 +844,38 @@ app.get('/run-migration-condicao-fechamento', async (_, res) => {
   }
 })
 
+// Qualificação do representante legal do cliente (essencial em contrato de PJ).
+app.get('/run-migration-cliente-responsavel', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cliente'
+          AND COLUMN_NAME IN ('responsavel_cargo','responsavel_cpf','responsavel_email','responsavel_telefone')`,
+    )
+    const existentes = cols.map((c: any) => c.COLUMN_NAME)
+    const criadas: string[] = []
+    const add = async (nome: string, ddl: string) => {
+      if (existentes.includes(nome)) return
+      await conn.execute(`ALTER TABLE cliente ADD COLUMN ${ddl}`)
+      criadas.push(`cliente.${nome}`)
+    }
+    await add('responsavel_cargo',    `responsavel_cargo VARCHAR(100) NULL AFTER nome_responsavel`)
+    await add('responsavel_cpf',      `responsavel_cpf VARCHAR(18) NULL AFTER responsavel_cargo`)
+    await add('responsavel_email',    `responsavel_email VARCHAR(150) NULL AFTER responsavel_cpf`)
+    await add('responsavel_telefone', `responsavel_telefone VARCHAR(20) NULL AFTER responsavel_email`)
+    await conn.end()
+    res.json({
+      ok: true,
+      criadas: criadas.length ? criadas : 'nada — já estava aplicada',
+      observacao: 'Campos opcionais; nenhum cliente existente é alterado. email/telefone continuam sendo os da empresa.',
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // Arquivamento de propostas, no lugar da exclusão definitiva.
 app.get('/run-migration-proposta-arquivamento', async (_, res) => {
   try {
