@@ -2266,6 +2266,20 @@ function PropostaDetailPageInner() {
 }
 
 // ─── MODAL: FORMA DE PAGAMENTO DO CONTRATO ───────────────────────────────────
+
+// Rótulo de uma parcela da condição de fechamento, do jeito que o contrato vai
+// descrevê-la: a forma combinada, o parcelamento junto ao terceiro quando houver
+// e o prazo. `descricaoEvento` é chave interna (ex. "fechamento_1_2"), não serve.
+function rotuloParcelaFechamento(p: any, i: number) {
+  const forma = FORMAS_FECHAMENTO.find(f => f.value === p.formaPagamento)?.label
+    ?? p.formaPagamento ?? `Parcela ${i + 1}`
+  const n = Number(p.parcelasForma ?? 0)
+  const vezes = n > 1 ? ` em até ${n}x junto à operadora` : ''
+  const dias = Number(p.prazoDias ?? 0)
+  const prazo = dias > 0 ? ` · ${dias} dias` : ' · na assinatura'
+  return `${forma}${vezes}${prazo}`
+}
+
 const OPCOES_FORMA_PAG_CONTRATO = [
   {
     value: 'padrao',
@@ -2344,7 +2358,7 @@ function ModalFormaPagamentoContrato({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {(fechamento.parcelas ?? []).map((p: any, i: number) => (
                 <div key={i} style={{ color: C.textMuted, fontSize: 12, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                  <span>{p.descricao || `Parcela ${i + 1}`}</span>
+                  <span>{rotuloParcelaFechamento(p, i)}</span>
                   <span style={{ color: C.text, fontWeight: 600, whiteSpace: 'nowrap' }}>
                     {formatCurrency(Number(p.valor || 0))}
                   </span>
