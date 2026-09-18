@@ -68,6 +68,17 @@ substitui** a linha anterior, não duplica. A tela mostra os últimos 12 meses p
 com link de download direto (`GET /relatorio-energia/historico/:id/download`) pros meses já
 gerados, sem precisar rodar o pipeline de novo.
 
+## Condição de fechamento — pagamento misto (2026-09-18)
+
+As `condicao_comercial` de uma proposta são as **opções ofertadas** ao cliente. Faltava registrar o que foi **efetivamente combinado** — e o contrato escolhia uma delas por heurística ("a parcelada com mais parcelas"), sem ninguém decidir. Apareceu o caso do cliente que fecha pagando parte no cartão e parte em PIX.
+
+- `condicao_comercial.de_fechamento` marca a condição efetiva (única por proposta; salvar substitui). Tipo `'misto'` quando há mais de uma forma. `parcela_pagamento.forma_pagamento` guarda a forma REAL da parcela e `grupo_forma` diz a que parte ela pertence (permite duas partes com a mesma forma). Migração: `GET /run-migration-condicao-fechamento`.
+- Nas condições OFERTADAS, `meiosPagamento` segue sendo "meios aceitos" e os dois campos novos ficam nulos — nada mudou no que já existia.
+- `proposta.salvarCondicaoFechamento` recebe partes `{forma, valor, numParcelas, prazoDias}`; parcelas seguintes de uma parte caem a cada 30 dias, e a divisão em centavos joga a sobra na última (1000/3 → 333,33 + 333,33 + 333,34).
+- **O PDF da proposta EXCLUI a de fechamento** (`!c.deFechamento` nos dois geradores): o PDF segue reproduzindo o que foi apresentado ao cliente mesmo depois de fechado. Contrato e importação no AGF usam a de fechamento quando existe.
+- **Armadilha achada ao testar**: a tabela do contrato repetia os dados bancários da Atom em TODAS as parcelas. Com forma única ninguém notava; com misto, as 12 parcelas de cartão apareciam com agência/conta/PIX, sugerindo depósito. Agora `FORMAS_COM_CONTA` limita conta bancária a pix/transferência/boleto. E `referenciaEvento` das parcelas de fechamento é chave interna (`fechamento_1_2`), não frase — montar "após da data de {desc}" com ela gerava "após da data de parcela 1/12".
+- **Limitação conhecida**: o modal "Gerar Contrato" tem as opções Cartão / Financiamento / PIX que **suprimem a tabela de parcelas**. Com pagamento misto só "Tabela de Parcelas" serve; as outras não foram ajustadas.
+
 ## PDFs de proposta (AGO) — geração no servidor desde 2026-07-26
 
 **Como funciona hoje**: o AGO monta o HTML da proposta no cliente e envia para `POST /pdf/render` na API; o Chrome headless (puppeteer-core) renderiza e devolve o PDF **vetorial** pronto, que o navegador só baixa (`PROP-<numero>.pdf`). Não passa mais pelo diálogo de impressão. Se a API falhar, o front cai sozinho no fluxo antigo de `window.print()`.
