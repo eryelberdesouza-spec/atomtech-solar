@@ -139,6 +139,20 @@ function labelReferencia(ref: string, descricaoEvento: string | undefined, n: nu
   return ref
 }
 
+// ── Pagamento de fechamento (misto) ────────────────────────────────────────
+const FORMAS_LABEL_CONTRATO: Record<string, string> = {
+  pix: 'PIX', dinheiro: 'dinheiro', cartao_credito: 'cartão de crédito',
+  cartao_debito: 'cartão de débito', transferencia: 'transferência bancária (TED)',
+  boleto: 'boleto bancário', financiamento: 'financiamento', cheque: 'cheque',
+}
+// Só estas caem na conta da empresa. Citar agência/conta numa parcela de
+// cartão daria a entender que ela seria depositada, o que não é o caso.
+const FORMAS_COM_CONTA = new Set(['pix', 'transferencia', 'boleto'])
+
+function ehParcelaDeFechamento(p: any): boolean {
+  return typeof p?.referenciaEvento === 'string' && p.referenciaEvento.startsWith('fechamento_')
+}
+
 function tipoPrazoLabel(tipo: string): string {
   return tipo === 'uteis' ? 'dias úteis' : 'dias corridos'
 }
@@ -460,17 +474,29 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
       return `<p class="clausula">O pagamento será realizado conforme condições acordadas entre as partes.</p>`
     }
     return parcelas.map((p: any) => {
+      const fech = ehParcelaDeFechamento(p)
       const banco = dadosBancarios(empresa, p)
-      const prazoTxt = p.prazoDias
-        ? `a ser pago em até ${numeroComExtenso(p.prazoDias)} ${tipoPrazoLabel(p.tipoPrazo)} contado(s) ${labelReferencia(p.referenciaEvento, p.descricaoEvento, p.numeroParcela)}`
-        : (p.descricaoEvento ?? '')
+      // Na parcela de fechamento, referenciaEvento é chave interna
+      // ('fechamento_1_2') e não vira frase — o prazo conta da assinatura.
+      const prazoTxt = fech
+        ? (Number(p.prazoDias) > 0
+            ? `a ser pago em até ${numeroComExtenso(p.prazoDias)} ${tipoPrazoLabel(p.tipoPrazo)} contado(s) da assinatura do contrato`
+            : 'a ser pago na assinatura do contrato')
+        : (p.prazoDias
+            ? `a ser pago em até ${numeroComExtenso(p.prazoDias)} ${tipoPrazoLabel(p.tipoPrazo)} contado(s) ${labelReferencia(p.referenciaEvento, p.descricaoEvento, p.numeroParcela)}`
+            : (p.descricaoEvento ?? ''))
       const isEntrada = p.numeroParcela === 1
-      const qualificacao = isEntrada ? ' a título de sinal/e a princípio de pagamento,' : ''
-      const meioLiquidacao = isEntrada
-        ? 'a ser liquidado por meio de transferência bancária/pix'
-        : 'parcela esta, a ser liquidada por meio de transferência bancária/pix'
-      const ouBoleto = isEntrada ? '' : ' ou boleto bancário'
-      return `<p class="clausula"><strong>${numeroOrdinalLabel(p.numeroParcela)}</strong> – Valor de: <strong>${fmt(p.valor)}</strong>${qualificacao} ${prazoTxt}, ${meioLiquidacao}${banco ? ` para a conta bancária da <strong>CONTRATADA</strong> mantida junto ao ${banco}` : ''}${ouBoleto}.</p>`
+      const qualificacao = isEntrada && !fech ? ' a título de sinal/e a princípio de pagamento,' : ''
+      // Com forma definida no fechamento, o contrato diz a forma REAL daquela
+      // parcela em vez do texto fixo de transferência/pix.
+      const meioLiquidacao = fech && p.formaPagamento
+        ? `a ser liquidado por meio de ${FORMAS_LABEL_CONTRATO[p.formaPagamento] ?? p.formaPagamento}`
+        : (isEntrada
+            ? 'a ser liquidado por meio de transferência bancária/pix'
+            : 'parcela esta, a ser liquidada por meio de transferência bancária/pix')
+      const mostraConta = fech ? FORMAS_COM_CONTA.has(p.formaPagamento) : true
+      const ouBoleto = fech ? '' : (isEntrada ? '' : ' ou boleto bancário')
+      return `<p class="clausula"><strong>${numeroOrdinalLabel(p.numeroParcela)}</strong> – Valor de: <strong>${fmt(p.valor)}</strong>${qualificacao} ${prazoTxt}, ${meioLiquidacao}${banco && mostraConta ? ` para a conta bancária da <strong>CONTRATADA</strong> mantida junto ao ${banco}` : ''}${ouBoleto}.</p>`
     }).join('\n')
   }
 

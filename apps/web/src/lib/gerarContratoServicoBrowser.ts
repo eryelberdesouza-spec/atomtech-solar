@@ -121,6 +121,29 @@ function labelReferencia(ref: string, descricaoEvento: string | undefined, n: nu
   return ref
 }
 
+// ── Pagamento de fechamento (misto) ────────────────────────────────────────
+const FORMAS_LABEL_CONTRATO: Record<string, string> = {
+  pix: 'PIX', dinheiro: 'Dinheiro', cartao_credito: 'Cartão de Crédito',
+  cartao_debito: 'Cartão de Débito', transferencia: 'Transferência (TED)',
+  boleto: 'Boleto', financiamento: 'Financiamento', cheque: 'Cheque',
+}
+// Só estas formas são pagas na conta da empresa. Cartão, dinheiro e cheque
+// exibindo agência/conta/PIX ficava enganoso no contrato — dava a entender
+// que aquela parcela seria depositada, quando não é.
+const FORMAS_COM_CONTA = new Set(['pix', 'transferencia', 'boleto'])
+
+function ehParcelaDeFechamento(p: any): boolean {
+  return typeof p?.referenciaEvento === 'string' && p.referenciaEvento.startsWith('fechamento_')
+}
+
+function formaEDadosPagamento(empresa: any, p: any, fallback: string): string {
+  const f = p?.formaPagamento
+  if (!f) return fallback
+  const label = FORMAS_LABEL_CONTRATO[f] ?? f
+  if (!FORMAS_COM_CONTA.has(f)) return label
+  return fallback && fallback !== '—' ? `${label} — ${fallback}` : label
+}
+
 function tipoPrazoLabel(tipo: string): string {
   return tipo === 'uteis' ? 'dias úteis' : 'dias corridos'
 }
@@ -293,10 +316,18 @@ function buildHtml(dados: any): string {
   if (parcelas.length > 0) {
     const rows = parcelas.map((p: any, idx: number) => {
       const n = p.numeroParcela ?? idx + 1
-      const prazo = p.prazoDias != null
-        ? `${n === 1 ? '' : `${p.prazoDias} ${tipoPrazoLabel(p.tipoPrazo ?? 'corridos')} `}${p.referenciaEvento ? `após ${labelReferencia(p.referenciaEvento, p.descricaoEvento, n)}` : ''}`
-        : ''
-      const banco = dadosBancarios(empresa, p)
+      // Parcela de fechamento tem referenciaEvento interna ('fechamento_1_2'),
+      // que não é frase — montar "após da data de ..." com ela gerava texto
+      // quebrado ("após da data de parcela 1/12"). Aqui o prazo é simples:
+      // conta da assinatura.
+      const prazo = ehParcelaDeFechamento(p)
+        ? (Number(p.prazoDias) > 0
+            ? `${p.prazoDias} ${tipoPrazoLabel(p.tipoPrazo ?? 'corridos')} após a assinatura`
+            : 'Na assinatura do contrato')
+        : (p.prazoDias != null
+            ? `${n === 1 ? '' : `${p.prazoDias} ${tipoPrazoLabel(p.tipoPrazo ?? 'corridos')} `}${p.referenciaEvento ? `após ${labelReferencia(p.referenciaEvento, p.descricaoEvento, n)}` : ''}`
+            : '')
+      const banco = formaEDadosPagamento(empresa, p, dadosBancarios(empresa, p))
       return `
         <tr>
           <td style="text-align:center;">${n}ª</td>
@@ -313,7 +344,7 @@ function buildHtml(dados: any): string {
             <th style="width:40px;">Parc.</th>
             <th style="width:90px;">Valor</th>
             <th>Condição / Prazo</th>
-            <th>Dados Bancários</th>
+            <th>Forma / Dados para pagamento</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
