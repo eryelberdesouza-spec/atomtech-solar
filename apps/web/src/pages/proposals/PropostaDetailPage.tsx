@@ -1884,7 +1884,13 @@ function PropostaDetailPageInner() {
     setShowModalFormaPag(false)
     setGerandoContrato(true)
     const isServicoProposta = (data as any)?.proposta?.tipoProposta === 'servico_geral'
-    const formaSelecionada = formaPagContrato   // captura do estado do pai — sem ambiguidade
+    // Quando existe condição de FECHAMENTO registrada, ela é a verdade do que foi
+    // negociado — inclusive pagamento misto. As opções "Cartão"/"Financiamento"/"PIX"
+    // do modal suprimem a tabela de parcelas e escreveriam uma forma única, o que
+    // contradiria o fechamento; por isso o modal nem as oferece nesse caso, e aqui o
+    // modo fica travado em 'padrao'.
+    const condFechamento = ((data as any)?.condicoesComerciais ?? []).find((c: any) => c.deFechamento)
+    const formaSelecionada = condFechamento ? 'padrao' : formaPagContrato
     const numero = (data as any).proposta?.numero ?? 'contrato'
     const dadosContrato = {
       ...data,
@@ -2246,6 +2252,7 @@ function PropostaDetailPageInner() {
       {/* ── MODAL: FORMA DE PAGAMENTO DO CONTRATO ───────────────── */}
       {showModalFormaPag && (
         <ModalFormaPagamentoContrato
+          fechamento={((data as any)?.condicoesComerciais ?? []).find((c: any) => c.deFechamento)}
           value={formaPagContrato}
           onChange={setFormaPagContrato}
           anexarProposta={anexarProposta}
@@ -2287,8 +2294,9 @@ const OPCOES_FORMA_PAG_CONTRATO = [
 ]
 
 function ModalFormaPagamentoContrato({
-  value, onChange, anexarProposta, onChangeAnexar, onConfirm, onClose,
+  fechamento, value, onChange, anexarProposta, onChangeAnexar, onConfirm, onClose,
 }: {
+  fechamento?: any
   value: string
   onChange: (v: string) => void
   anexarProposta: boolean
@@ -2316,10 +2324,49 @@ function ModalFormaPagamentoContrato({
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
         <p style={{ color: C.textDim, fontSize: 13, margin: '0 0 16px' }}>
-          Escolha como o pagamento será apresentado no contrato:
+          {fechamento
+            ? 'O pagamento negociado já está registrado no fechamento desta proposta — o contrato vai reproduzi-lo exatamente assim:'
+            : 'Escolha como o pagamento será apresentado no contrato:'}
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {fechamento && (
+          <div style={{
+            padding: '14px 16px', borderRadius: 10,
+            border: `2px solid ${C.success}`,
+            background: `${C.success}12`,
+          }}>
+            <div style={{ color: C.text, fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+              🤝 Pagamento negociado (fechamento)
+            </div>
+            <div style={{ color: C.text, fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}>
+              {fechamento.descricao || 'Condição de fechamento registrada.'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {(fechamento.parcelas ?? []).map((p: any, i: number) => (
+                <div key={i} style={{ color: C.textMuted, fontSize: 12, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <span>{p.descricao || `Parcela ${i + 1}`}</span>
+                  <span style={{ color: C.text, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {formatCurrency(Number(p.valor || 0))}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{
+              marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.darkBorder}`,
+              display: 'flex', justifyContent: 'space-between',
+              color: C.text, fontSize: 13, fontWeight: 700,
+            }}>
+              <span>Total</span>
+              <span>{formatCurrency(Number(fechamento.valorTotal || 0))}</span>
+            </div>
+            <div style={{ color: C.textDim, fontSize: 11.5, lineHeight: 1.4, marginTop: 10 }}>
+              Para alterar, feche esta janela e edite o bloco de fechamento na aba
+              <strong> Condições Comerciais</strong>.
+            </div>
+          </div>
+        )}
+
+        {!fechamento && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {OPCOES_FORMA_PAG_CONTRATO.map(o => {
             const sel = value === o.value
             return (
@@ -2351,9 +2398,9 @@ function ModalFormaPagamentoContrato({
               </div>
             )
           })}
-        </div>
+        </div>}
 
-        {op && (
+        {!fechamento && op && (
           <div style={{
             marginTop: 14, padding: '8px 12px', borderRadius: 8,
             background: `${C.accent}10`, border: `1px solid ${C.accent}30`,
