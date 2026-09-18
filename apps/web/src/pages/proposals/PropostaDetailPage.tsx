@@ -504,6 +504,11 @@ const FORMAS_FECHAMENTO: { value: string; label: string }[] = [
   { value: 'cheque',         label: 'Cheque' },
 ]
 
+// Nestas formas quem parcela é o cliente junto a um terceiro (operadora do
+// cartão, banco do financiamento) e a Atom recebe o valor cheio de uma vez —
+// o número de parcelas é informativo, não vira cronograma de cobrança.
+const FORMAS_RECEBIMENTO_UNICO_UI = new Set(['cartao_credito', 'cartao_debito', 'financiamento'])
+
 function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
   const utils = trpc.useUtils()
   const existente = (condicoes ?? []).find((c: any) => c.deFechamento)
@@ -539,7 +544,11 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
         }
         const atual = grupos.get(g)
         atual.valor += Number(p.valor || 0)
-        atual.numParcelas += 1
+        // Em cartão/financiamento existe UMA parcela e o parcelamento do
+        // cliente está em parcelasForma; nas demais, cada linha é uma parcela.
+        atual.numParcelas = Number(p.parcelasForma ?? 0) > 1
+          ? Number(p.parcelasForma)
+          : atual.numParcelas + 1
       }
       setPartes([...grupos.values()])
     } else if (ref > 0) {
@@ -590,8 +599,15 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
           {Object.values(
             (existente.parcelas ?? []).reduce((acc: any, p: any) => {
               const g = p.grupoForma ?? 0
-              acc[g] = acc[g] ?? { forma: p.formaPagamento, n: 0, valor: 0 }
-              acc[g].n += 1
+              acc[g] = acc[g] ?? { forma: p.formaPagamento, n: 0, valor: 0, viaTerceiro: false }
+              // Cartão/financiamento: uma linha só, com o parcelamento do
+              // cliente em parcelasForma.
+              if (Number(p.parcelasForma ?? 0) > 1) {
+                acc[g].n = Number(p.parcelasForma)
+                acc[g].viaTerceiro = true
+              } else {
+                acc[g].n += 1
+              }
               acc[g].valor += Number(p.valor || 0)
               return acc
             }, {}),
@@ -599,7 +615,11 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12.5 }}>
               <span style={{ color: C.text }}>
                 {FORMAS_FECHAMENTO.find(f => f.value === g.forma)?.label ?? g.forma}
-                {g.n > 1 && <span style={{ color: C.textDim }}> — {g.n}x</span>}
+                {g.n > 1 && (
+                  <span style={{ color: C.textDim }}>
+                    {' '}— {g.n}x{g.viaTerceiro ? ' (cliente)' : ''}
+                  </span>
+                )}
               </span>
               <span style={{ color: C.text, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(g.valor)}</span>
             </div>
@@ -649,7 +669,12 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
                 }}>✕</button>
               {p.numParcelas > 1 && (
                 <span style={{ gridColumn: '1 / -1', color: C.textDim, fontSize: 11, marginTop: -4 }}>
-                  {p.numParcelas}x de {formatCurrency(Number(p.valor || 0) / p.numParcelas)} · demais parcelas a cada 30 dias
+                  {FORMAS_RECEBIMENTO_UNICO_UI.has(p.forma)
+                    // Cartão e financiamento: quem parcela é o cliente com a
+                    // operadora/banco. A Atom recebe o valor cheio de uma vez,
+                    // então isso NÃO vira 12 cobranças mensais.
+                    ? `${p.numParcelas}x de ${formatCurrency(Number(p.valor || 0) / p.numParcelas)} para o cliente · a Atom recebe ${formatCurrency(Number(p.valor || 0))} de uma vez`
+                    : `${p.numParcelas}x de ${formatCurrency(Number(p.valor || 0) / p.numParcelas)} · demais parcelas a cada 30 dias`}
                 </span>
               )}
             </div>

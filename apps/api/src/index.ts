@@ -822,6 +822,16 @@ app.get('/run-migration-condicao-fechamento', async (_, res) => {
       )
       criadas.push('parcela_pagamento.grupo_forma')
     }
+    // Em cartão e financiamento a Atom recebe de UMA vez (operadora/banco
+    // creditam o valor cheio); o parcelamento é do cliente com o terceiro.
+    // Então grava-se uma parcela só e guarda-se aqui em quantas vezes o
+    // cliente dividiu — informação pro contrato, não cronograma de cobrança.
+    if (!(await existe('parcela_pagamento', 'parcelas_forma'))) {
+      await conn.execute(
+        `ALTER TABLE parcela_pagamento ADD COLUMN parcelas_forma INT NULL AFTER grupo_forma`,
+      )
+      criadas.push('parcela_pagamento.parcelas_forma')
+    }
 
     await conn.end()
     res.json({

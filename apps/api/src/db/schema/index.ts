@@ -420,6 +420,11 @@ export const parcelaPagamento = mysqlTable('parcela_pagamento', {
   // "PIX à vista" como blocos distintos, mesmo quando a forma se repete.
   formaPagamento: varchar('forma_pagamento', { length: 40 }),
   grupoForma: int('grupo_forma'),
+  // Em quantas vezes o CLIENTE dividiu junto ao terceiro (operadora do cartão,
+  // banco do financiamento). Nessas formas a Atom recebe o valor cheio de uma
+  // vez, então existe UMA parcela e este número é informativo — entra no
+  // contrato como "em até 12x", não vira cronograma de cobrança.
+  parcelasForma: int('parcelas_forma'),
 })
 
 // â”€â”€â”€ BLOCOS DA PROPOSTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

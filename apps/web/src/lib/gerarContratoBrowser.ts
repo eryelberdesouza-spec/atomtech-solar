@@ -489,8 +489,12 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
       const qualificacao = isEntrada && !fech ? ' a título de sinal/e a princípio de pagamento,' : ''
       // Com forma definida no fechamento, o contrato diz a forma REAL daquela
       // parcela em vez do texto fixo de transferência/pix.
+      // parcelasForma = em quantas vezes o cliente dividiu junto à operadora
+      // do cartão / banco do financiamento. A Atom recebe de uma vez, então
+      // isso é informação e não gera prestações contra a CONTRATADA.
+      const nParc = Number(p?.parcelasForma ?? 0)
       const meioLiquidacao = fech && p.formaPagamento
-        ? `a ser liquidado por meio de ${FORMAS_LABEL_CONTRATO[p.formaPagamento] ?? p.formaPagamento}`
+        ? `a ser liquidado por meio de ${FORMAS_LABEL_CONTRATO[p.formaPagamento] ?? p.formaPagamento}${nParc > 1 ? `, parcelado em até ${numeroComExtenso(nParc)} vezes junto à operadora, sem que tal parcelamento constitua obrigação a prazo perante a <strong>CONTRATADA</strong>` : ''}`
         : (isEntrada
             ? 'a ser liquidado por meio de transferência bancária/pix'
             : 'parcela esta, a ser liquidada por meio de transferência bancária/pix')

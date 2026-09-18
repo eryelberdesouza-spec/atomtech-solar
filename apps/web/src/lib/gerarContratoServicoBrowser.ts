@@ -140,8 +140,12 @@ function formaEDadosPagamento(empresa: any, p: any, fallback: string): string {
   const f = p?.formaPagamento
   if (!f) return fallback
   const label = FORMAS_LABEL_CONTRATO[f] ?? f
-  if (!FORMAS_COM_CONTA.has(f)) return label
-  return fallback && fallback !== '—' ? `${label} — ${fallback}` : label
+  // parcelasForma = em quantas vezes o cliente dividiu junto à operadora do
+  // cartão ou ao banco. É informação, não cronograma: a Atom recebe de uma vez.
+  const n = Number(p?.parcelasForma ?? 0)
+  const comParcelamento = n > 1 ? `${label}, em até ${n}x junto à operadora` : label
+  if (!FORMAS_COM_CONTA.has(f)) return comParcelamento
+  return fallback && fallback !== '—' ? `${comParcelamento} — ${fallback}` : comParcelamento
 }
 
 function tipoPrazoLabel(tipo: string): string {

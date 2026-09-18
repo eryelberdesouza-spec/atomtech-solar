@@ -51,6 +51,13 @@ export const FORMAS_PAGAMENTO: Record<string, string> = {
 function rotuloForma(f: string): string {
   return FORMAS_PAGAMENTO[f] ?? f
 }
+
+// Nestas formas quem parcela é o CLIENTE junto a um terceiro (operadora do
+// cartão, banco do financiamento) — a Atom recebe o valor cheio de uma vez.
+// Gerar N parcelas aqui produziria um cronograma de cobrança que não existe:
+// no contrato dava a entender que a Atom concede crédito próprio em N
+// prestações mensais, e no financeiro criava N recebíveis inexistentes.
+export const FORMAS_RECEBIMENTO_UNICO = new Set(['cartao_credito', 'cartao_debito', 'financiamento'])
 function fmtBRLServidor(v: number): string {
   return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
@@ -1893,6 +1900,11 @@ export const propostaRouter = router({
         .map(p => `${rotuloForma(p.forma)} ${fmtBRLServidor(p.valor)}${p.numParcelas > 1 ? ` em ${p.numParcelas}x` : ''}`)
         .join(' + ')
 
+      // Quantas linhas de cobrança cada parte gera de fato. Cartão e
+      // financiamento: uma só (a Atom recebe do terceiro de uma vez).
+      const linhasDe = (p: { forma: string; numParcelas: number }) =>
+        FORMAS_RECEBIMENTO_UNICO.has(p.forma) ? 1 : p.numParcelas
+
       const [condResult] = await ctx.db.insert(ccTable).values({
         propostaId: input.propostaId,
         // 'misto' só quando há mais de uma forma; com uma só, o tipo real
@@ -1909,18 +1921,22 @@ export const propostaRouter = router({
       let numero = 0
       for (let g = 0; g < input.partes.length; g++) {
         const parte = input.partes[g]
+        const nLinhas = linhasDe(parte)
+        const unico = FORMAS_RECEBIMENTO_UNICO.has(parte.forma)
         // Divide em centavos e joga a sobra na última parcela, pra soma das
         // parcelas bater exatamente com o valor da parte (1000/3 não fecha).
         const centavos = Math.round(parte.valor * 100)
-        const base = Math.floor(centavos / parte.numParcelas)
-        for (let i = 0; i < parte.numParcelas; i++) {
+        const base = Math.floor(centavos / nLinhas)
+        for (let i = 0; i < nLinhas; i++) {
           numero++
-          const cent = i === parte.numParcelas - 1
-            ? centavos - base * (parte.numParcelas - 1)
+          const cent = i === nLinhas - 1
+            ? centavos - base * (nLinhas - 1)
             : base
           const valorParcela = cent / 100
           const desc = parte.descricao?.trim()
-            || `${rotuloForma(parte.forma)}${parte.numParcelas > 1 ? ` — parcela ${i + 1}/${parte.numParcelas}` : ''}`
+            || (unico
+              ? `${rotuloForma(parte.forma)}${parte.numParcelas > 1 ? ` — em até ${parte.numParcelas}x` : ''}`
+              : `${rotuloForma(parte.forma)}${nLinhas > 1 ? ` — parcela ${i + 1}/${nLinhas}` : ''}`)
           await ctx.db.insert(ppTable).values({
             condicaoId: condId,
             numeroParcela: numero,
@@ -1938,6 +1954,10 @@ export const propostaRouter = router({
             dadosBancariosJson: null,
             formaPagamento: parte.forma,
             grupoForma: g,
+            // Só nas formas de recebimento único: quantas vezes o cliente
+            // dividiu com o terceiro. Nas demais é null (as parcelas reais
+            // já estão nas linhas).
+            parcelasForma: unico && parte.numParcelas > 1 ? parte.numParcelas : null,
           }).execute()
         }
       }
