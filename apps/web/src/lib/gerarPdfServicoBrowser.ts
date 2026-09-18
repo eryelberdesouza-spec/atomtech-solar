@@ -443,7 +443,12 @@ export function gerarHtmlServico(data: any, opts: { autoPrint?: boolean; serverS
   const dataValidade = proposta?.dataValidade ? fmtDate(proposta.dataValidade) : null
   const totalGeral = (itensServico ?? []).reduce((s: number, i: any) => s + Number(i.valorTotal), 0)
   const prazoExecucao = proposta?.prazoExecucao ?? null
-  const condsAtivas = (condicoesComerciais ?? []).filter((c: any) => c.ativa !== false)
+  // deFechamento fica FORA do PDF da proposta: ela representa o que foi
+  // combinado na formalização, não o que foi ofertado ao cliente. Assim o PDF
+  // continua reproduzindo a proposta como ela foi apresentada, mesmo depois de
+  // fechada — o pagamento efetivo aparece no contrato.
+  const condsAtivas = (condicoesComerciais ?? [])
+    .filter((c: any) => c.ativa !== false && !c.deFechamento)
 
   const H = (n: string) => headerInterno(n, nomeEmpresa, logoUrl)
   const F = (n: string) => footerServico(n, empresa)

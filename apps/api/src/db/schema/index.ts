@@ -388,11 +388,17 @@ export const analiseFinanceira = mysqlTable('analise_financeira', {
 export const condicaoComercial = mysqlTable('condicao_comercial', {
   id: int('id').primaryKey().autoincrement(),
   propostaId: int('proposta_id').notNull().references(() => proposta.id, { onDelete: 'cascade' }),
-  tipo: mysqlEnum('tipo', ['avista','parcelado_marcos','financiamento','cartao']).notNull(),
+  tipo: mysqlEnum('tipo', ['avista','parcelado_marcos','financiamento','cartao','misto']).notNull(),
   descricao: varchar('descricao', { length: 200 }),
   valorTotal: decimal('valor_total', { precision: 10, scale: 2 }).notNull(),
   ativa: boolean('ativa').default(true).notNull(),
   ordem: int('ordem').default(0).notNull(),
+  // Condição efetivamente contratada, montada na formalização — pode dividir o
+  // valor entre formas diferentes (ex.: parte no cartão, parte em PIX), cada
+  // uma com parcelamento próprio. Fica FORA do PDF da proposta: lá continuam
+  // aparecendo só as condições ofertadas, preservando o histórico do que foi
+  // apresentado ao cliente. Contrato e importação no AGF usam esta quando existe.
+  deFechamento: boolean('de_fechamento').default(false).notNull(),
 })
 
 export const parcelaPagamento = mysqlTable('parcela_pagamento', {
@@ -407,6 +413,13 @@ export const parcelaPagamento = mysqlTable('parcela_pagamento', {
   referenciaEvento: varchar('referencia_evento', { length: 100 }).notNull(),
   meiosPagamento: json('meios_pagamento').$type<string[]>().notNull(),
   dadosBancariosJson: json('dados_bancarios_json').$type<Record<string, string>>(),
+  // Nas condições OFERTADAS, meiosPagamento lista os meios ACEITOS e estes dois
+  // ficam nulos. Na condição de fechamento, formaPagamento é a forma
+  // EFETIVAMENTE combinada para esta parcela e grupoForma diz a que parte do
+  // pagamento ela pertence — é o grupo que permite exibir "Cartão em 12x" e
+  // "PIX à vista" como blocos distintos, mesmo quando a forma se repete.
+  formaPagamento: varchar('forma_pagamento', { length: 40 }),
+  grupoForma: int('grupo_forma'),
 })
 
 // â”€â”€â”€ BLOCOS DA PROPOSTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

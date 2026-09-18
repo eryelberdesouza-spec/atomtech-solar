@@ -539,7 +539,10 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
       ${tem('formas_pagamento') ? `
       <div style="margin-top:14px">
         <div class="section-sub">Formas de Pagamento</div>
-        ${(condicoes ?? []).map((c: any) => `
+        ${/* deFechamento fica FORA do PDF da proposta — é o que foi combinado na
+             formalização, não o que foi ofertado. O PDF segue reproduzindo a
+             proposta como foi apresentada; o pagamento efetivo vai no contrato. */
+          (condicoes ?? []).filter((c: any) => !c.deFechamento).map((c: any) => `
           <div class="pagamento-box">
             <div class="pagamento-tipo">${c.descricao || c.tipo}</div>
             ${(c.parcelas ?? []).map((p: any) => `

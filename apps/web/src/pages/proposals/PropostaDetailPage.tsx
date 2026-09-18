@@ -488,6 +488,223 @@ function TabPrecificacao({ prec, propostaId }: any) {
   )
 }
 
+// ─── PAGAMENTO DO FECHAMENTO (misto) ────────────────────────────────────────
+// Caso real que apareceu em 2026-09-18: o cliente fecha pagando parte no cartão
+// e parte em PIX. Na proposta apresentada isso não existe — são as opções
+// ofertadas; aqui se registra o que foi EFETIVAMENTE combinado, e é isso que o
+// contrato e a importação no AGF passam a usar.
+const FORMAS_FECHAMENTO: { value: string; label: string }[] = [
+  { value: 'pix',            label: 'PIX' },
+  { value: 'dinheiro',       label: 'Dinheiro' },
+  { value: 'cartao_credito', label: 'Cartão de Crédito' },
+  { value: 'cartao_debito',  label: 'Cartão de Débito' },
+  { value: 'transferencia',  label: 'Transferência (TED)' },
+  { value: 'boleto',         label: 'Boleto' },
+  { value: 'financiamento',  label: 'Financiamento' },
+  { value: 'cheque',         label: 'Cheque' },
+]
+
+function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
+  const utils = trpc.useUtils()
+  const existente = (condicoes ?? []).find((c: any) => c.deFechamento)
+
+  const [aberto, setAberto] = useState(false)
+  const [partes, setPartes] = useState<any[]>([
+    { forma: 'pix', valor: 0, numParcelas: 1, prazoDias: 0, tipoPrazo: 'corridos', descricao: '' },
+  ])
+
+  const salvar = (trpc as any).proposta.salvarCondicaoFechamento.useMutation({
+    onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setAberto(false) },
+    onError: (e: any) => alert('Erro ao salvar: ' + e.message),
+  })
+  const remover = (trpc as any).proposta.removerCondicaoFechamento.useMutation({
+    onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }),
+    onError: (e: any) => alert('Erro ao remover: ' + e.message),
+  })
+
+  const soma = partes.reduce((s, p) => s + Number(p.valor || 0), 0)
+  const ref = Number(valorReferencia ?? 0)
+  const diferenca = ref > 0 ? soma - ref : 0
+  const fecha = ref <= 0 || Math.abs(diferenca) < 0.01
+
+  // Ao abrir, parte das formas já registradas (se houver) pra permitir ajuste
+  // em vez de obrigar a redigitar tudo.
+  const abrirEdicao = () => {
+    if (existente?.parcelas?.length) {
+      const grupos = new Map<number, any>()
+      for (const p of existente.parcelas) {
+        const g = p.grupoForma ?? 0
+        if (!grupos.has(g)) {
+          grupos.set(g, { forma: p.formaPagamento ?? 'pix', valor: 0, numParcelas: 0, prazoDias: p.prazoDias ?? 0, tipoPrazo: p.tipoPrazo ?? 'corridos', descricao: '' })
+        }
+        const atual = grupos.get(g)
+        atual.valor += Number(p.valor || 0)
+        atual.numParcelas += 1
+      }
+      setPartes([...grupos.values()])
+    } else if (ref > 0) {
+      setPartes([{ forma: 'pix', valor: ref, numParcelas: 1, prazoDias: 0, tipoPrazo: 'corridos', descricao: '' }])
+    }
+    setAberto(true)
+  }
+
+  const inputSt: React.CSSProperties = {
+    width: '100%', padding: '8px 10px', borderRadius: 8, background: C.dark,
+    border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13,
+    outline: 'none', boxSizing: 'border-box',
+  }
+  const labelSt: React.CSSProperties = {
+    color: C.textDim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+    display: 'block', marginBottom: 5,
+  }
+
+  return (
+    <Card style={{ padding: '16px 20px', border: `1px solid ${C.green}45`, background: `${C.green}08` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <div>
+          <p style={{ color: C.green, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '0.07em' }}>
+            🤝 Pagamento do Fechamento
+          </p>
+          <p style={{ color: C.textDim, fontSize: 11.5, margin: '4px 0 0' }}>
+            Como o cliente vai pagar de fato — pode dividir entre formas (ex.: parte no cartão, parte em PIX).
+            Vale para o contrato e para o financeiro; não altera a proposta apresentada.
+          </p>
+        </div>
+        {!aberto && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn size="sm" variant="ghost" onClick={abrirEdicao}>
+              {existente ? '✏️ Editar' : '+ Definir'}
+            </Btn>
+            {existente && (
+              <Btn size="sm" variant="ghost"
+                onClick={() => { if (confirm('Remover o pagamento de fechamento? O contrato volta a usar as condições ofertadas.')) remover.mutate({ propostaId }) }}
+                style={{ color: C.danger, borderColor: `${C.danger}40` }}>✕</Btn>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Resumo do que já está combinado */}
+      {existente && !aberto && (
+        <div style={{ marginTop: 12, borderTop: `1px solid ${C.darkBorder}60`, paddingTop: 10 }}>
+          {Object.values(
+            (existente.parcelas ?? []).reduce((acc: any, p: any) => {
+              const g = p.grupoForma ?? 0
+              acc[g] = acc[g] ?? { forma: p.formaPagamento, n: 0, valor: 0 }
+              acc[g].n += 1
+              acc[g].valor += Number(p.valor || 0)
+              return acc
+            }, {}),
+          ).map((g: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12.5 }}>
+              <span style={{ color: C.text }}>
+                {FORMAS_FECHAMENTO.find(f => f.value === g.forma)?.label ?? g.forma}
+                {g.n > 1 && <span style={{ color: C.textDim }}> — {g.n}x</span>}
+              </span>
+              <span style={{ color: C.text, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(g.valor)}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.darkBorder}60`, marginTop: 6, paddingTop: 8 }}>
+            <span style={{ color: C.textMuted, fontSize: 12, fontWeight: 700 }}>Total</span>
+            <span style={{ color: C.green, fontSize: 14, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(existente.valorTotal)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Edição */}
+      {aberto && (
+        <div style={{ marginTop: 14 }}>
+          {partes.map((p, i) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 90px 110px 40px', gap: 10, alignItems: 'end', marginBottom: 10 }}>
+              <div>
+                <label style={labelSt}>Forma</label>
+                <select value={p.forma} style={inputSt}
+                  onChange={e => setPartes(ps => ps.map((x, j) => j === i ? { ...x, forma: e.target.value } : x))}>
+                  {FORMAS_FECHAMENTO.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelSt}>Valor (R$)</label>
+                <input type="number" min={0} step="0.01" value={p.valor} style={{ ...inputSt, color: C.solar, fontWeight: 700 }}
+                  onChange={e => setPartes(ps => ps.map((x, j) => j === i ? { ...x, valor: Number(e.target.value) } : x))} />
+              </div>
+              <div>
+                <label style={labelSt}>Parcelas</label>
+                <input type="number" min={1} max={60} value={p.numParcelas} style={inputSt}
+                  onChange={e => setPartes(ps => ps.map((x, j) => j === i ? { ...x, numParcelas: Math.max(1, Number(e.target.value)) } : x))} />
+              </div>
+              <div>
+                <label style={labelSt}>1º venc. (dias)</label>
+                <input type="number" min={0} value={p.prazoDias} style={inputSt}
+                  onChange={e => setPartes(ps => ps.map((x, j) => j === i ? { ...x, prazoDias: Number(e.target.value) } : x))} />
+              </div>
+              <button
+                onClick={() => setPartes(ps => ps.length > 1 ? ps.filter((_, j) => j !== i) : ps)}
+                disabled={partes.length === 1}
+                title={partes.length === 1 ? 'É preciso ao menos uma forma' : 'Remover esta forma'}
+                style={{
+                  padding: '8px 0', borderRadius: 8, border: `1px solid ${C.danger}40`,
+                  background: `${C.danger}10`, color: partes.length === 1 ? C.textDim : C.danger,
+                  cursor: partes.length === 1 ? 'default' : 'pointer', fontSize: 12,
+                }}>✕</button>
+              {p.numParcelas > 1 && (
+                <span style={{ gridColumn: '1 / -1', color: C.textDim, fontSize: 11, marginTop: -4 }}>
+                  {p.numParcelas}x de {formatCurrency(Number(p.valor || 0) / p.numParcelas)} · demais parcelas a cada 30 dias
+                </span>
+              )}
+            </div>
+          ))}
+
+          <Btn size="sm" variant="ghost"
+            onClick={() => setPartes(ps => [...ps, { forma: 'cartao_credito', valor: Math.max(0, ref - soma), numParcelas: 1, prazoDias: 0, tipoPrazo: 'corridos', descricao: '' }])}>
+            + Adicionar forma
+          </Btn>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.darkBorder}60`, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ fontSize: 12 }}>
+              <span style={{ color: C.textMuted }}>Soma: </span>
+              <span style={{ color: fecha ? C.green : C.danger, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(soma)}</span>
+              {ref > 0 && (
+                <span style={{ color: C.textDim, marginLeft: 8 }}>
+                  de {formatCurrency(ref)}
+                  {!fecha && (
+                    <strong style={{ color: C.danger, marginLeft: 6 }}>
+                      ({diferenca > 0 ? 'excede' : 'faltam'} {formatCurrency(Math.abs(diferenca))})
+                    </strong>
+                  )}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn variant="ghost" onClick={() => setAberto(false)}>Cancelar</Btn>
+              <Btn
+                disabled={salvar.isLoading || soma <= 0}
+                onClick={() => {
+                  // Só avisa; não bloqueia — desconto ou acréscimo no fechamento
+                  // é situação legítima e o usuário é quem sabe.
+                  if (!fecha && !confirm(`A soma (${formatCurrency(soma)}) não bate com o valor da proposta (${formatCurrency(ref)}). Gravar assim mesmo?`)) return
+                  salvar.mutate({
+                    propostaId,
+                    partes: partes.filter(p => Number(p.valor) > 0).map(p => ({
+                      forma: p.forma,
+                      valor: Number(p.valor),
+                      numParcelas: Number(p.numParcelas) || 1,
+                      prazoDias: Number(p.prazoDias) || 0,
+                      tipoPrazo: p.tipoPrazo,
+                      ...(p.descricao?.trim() ? { descricao: p.descricao.trim() } : {}),
+                    })),
+                  })
+                }}>
+                {salvar.isLoading ? '⏳ Salvando...' : '✔ Salvar'}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any) {
   const utils = trpc.useUtils()
   const updateCond = trpc.proposta.updateCondicoes.useMutation({
@@ -516,6 +733,9 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
     avista: '💰 À Vista', parcelado_marcos: '📋 Parcelado por Marcos',
     financiamento: '🏪 Financiamento Bancário', cartao: '💳 Cartão de Crédito',
   }
+
+  // Lista abaixo é só das condições OFERTADAS; a de fechamento tem bloco próprio.
+  const condicoesOfertadas: any[] = (condicoes ?? []).filter((c: any) => !c.deFechamento)
 
   const tiposDisponiveis = isServico
     ? [{ value: 'avista', label: '💰 À Vista' }, { value: 'parcelado_marcos', label: '📋 Parcelado por Marcos' }, { value: 'cartao', label: '💳 Cartão de Crédito' }]
@@ -559,6 +779,8 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <BlocoFechamento condicoes={condicoes} propostaId={propostaId} valorReferencia={valorReferencia} />
+
       {/* Botão + nova condição */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Btn size="sm" variant="ghost" onClick={() => { setShowAddForm(!showAddForm); setAddForm({ tipo: 'avista', descricao: '', valorTotal: valorReferencia ?? 0, numParcelas: 1 }) }}>
@@ -606,9 +828,11 @@ function TabPagamento({ condicoes, propostaId, isServico, valorReferencia }: any
         </Card>
       )}
 
-      {(!condicoes?.length && !showAddForm) && <EmptyState icon="💳" title="Nenhuma condição comercial. Clique em + Nova Condição." />}
+      {/* A condição de fechamento é editada no bloco acima — fora desta lista,
+          que é das condições OFERTADAS ao cliente. */}
+      {(!condicoesOfertadas.length && !showAddForm) && <EmptyState icon="💳" title="Nenhuma condição comercial. Clique em + Nova Condição." />}
 
-      {condicoes?.map((c: any, i: number) => {
+      {condicoesOfertadas.map((c: any, i: number) => {
         const isEditando = editandoId === c.id
         const podeEditar = c.tipo === 'avista' || c.tipo === 'parcelado_marcos'
         const totalPct   = formParcelas.reduce((s, p) => s + Number(p.percentualDoTotal), 0)

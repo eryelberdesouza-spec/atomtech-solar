@@ -36,6 +36,25 @@ import { BLOCOS_PADRAO, BLOCOS_SERVICO_PADRAO, BLOCOS_DIRETO_SOLAR, BLOCOS_DIRET
 
 // ─── GERADOR DE NÚMERO DA PROPOSTA ───────────────────────────────────────────
 
+// Formas aceitas no pagamento de fechamento. Chave curta no banco, rótulo
+// legível no contrato e nas telas — mantidas juntas pra não divergirem.
+export const FORMAS_PAGAMENTO: Record<string, string> = {
+  pix:            'PIX',
+  dinheiro:       'Dinheiro',
+  cartao_credito: 'Cartão de Crédito',
+  cartao_debito:  'Cartão de Débito',
+  transferencia:  'Transferência (TED)',
+  boleto:         'Boleto',
+  financiamento:  'Financiamento',
+  cheque:         'Cheque',
+}
+function rotuloForma(f: string): string {
+  return FORMAS_PAGAMENTO[f] ?? f
+}
+function fmtBRLServidor(v: number): string {
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 async function gerarNumeroProposta(db: any, empresaId: number): Promise<string> {
   const now = new Date()
   const ano = now.getFullYear()
@@ -1827,6 +1846,120 @@ export const propostaRouter = router({
       }
 
       return { ok: true, condId }
+    }),
+
+  // ─── CONDIÇÃO DE FECHAMENTO (pagamento misto) ─────────────────────────────
+  // Criada em 2026-09-18. Caso real: cliente fecha pagando parte no cartão (com
+  // parcelamento próprio) e parte em PIX. As condições OFERTADAS na proposta
+  // continuam intactas — esta é gravada à parte, marcada com deFechamento, e é
+  // ela que o contrato e a importação no AGF passam a usar.
+  //
+  // Cada "parte" vira um grupo de parcelas com forma e parcelamento próprios; a
+  // numeração das parcelas é contínua entre as partes, porque o AGF importa a
+  // condição inteira como uma sequência de contas a receber.
+  salvarCondicaoFechamento: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      partes: z.array(z.object({
+        forma: z.string().min(1).max(40),
+        valor: z.number().positive(),
+        numParcelas: z.number().int().min(1).max(60).default(1),
+        prazoDias: z.number().int().min(0).default(0),
+        tipoPrazo: z.enum(['uteis', 'corridos']).default('corridos'),
+        descricao: z.string().max(200).optional(),
+      })).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const valorTotal = input.partes.reduce((s, p) => s + p.valor, 0)
+      if (valorTotal <= 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O valor total do fechamento precisa ser maior que zero.' })
+      }
+
+      // Substitui a anterior: a condição de fechamento é única por proposta —
+      // redefinir o combinado sobrescreve, não acumula.
+      const anteriores = await ctx.db.select({ id: ccTable.id }).from(ccTable)
+        .where(and(eq(ccTable.propostaId, input.propostaId), eq(ccTable.deFechamento, true)))
+      for (const a of anteriores) {
+        await ctx.db.delete(ppTable).where(eq(ppTable.condicaoId, a.id!)).execute()
+        await ctx.db.delete(ccTable).where(eq(ccTable.id, a.id!)).execute()
+      }
+
+      const resumo = input.partes
+        .map(p => `${rotuloForma(p.forma)} ${fmtBRLServidor(p.valor)}${p.numParcelas > 1 ? ` em ${p.numParcelas}x` : ''}`)
+        .join(' + ')
+
+      const [condResult] = await ctx.db.insert(ccTable).values({
+        propostaId: input.propostaId,
+        // 'misto' só quando há mais de uma forma; com uma só, o tipo real
+        // descreve melhor o que foi contratado.
+        tipo: input.partes.length > 1 ? 'misto' : 'parcelado_marcos',
+        descricao: resumo.slice(0, 200),
+        valorTotal: String(valorTotal),
+        ativa: true,
+        ordem: 99,   // sempre por último entre as condições da proposta
+        deFechamento: true,
+      }).execute()
+      const condId = (condResult as { insertId: number }).insertId
+
+      let numero = 0
+      for (let g = 0; g < input.partes.length; g++) {
+        const parte = input.partes[g]
+        // Divide em centavos e joga a sobra na última parcela, pra soma das
+        // parcelas bater exatamente com o valor da parte (1000/3 não fecha).
+        const centavos = Math.round(parte.valor * 100)
+        const base = Math.floor(centavos / parte.numParcelas)
+        for (let i = 0; i < parte.numParcelas; i++) {
+          numero++
+          const cent = i === parte.numParcelas - 1
+            ? centavos - base * (parte.numParcelas - 1)
+            : base
+          const valorParcela = cent / 100
+          const desc = parte.descricao?.trim()
+            || `${rotuloForma(parte.forma)}${parte.numParcelas > 1 ? ` — parcela ${i + 1}/${parte.numParcelas}` : ''}`
+          await ctx.db.insert(ppTable).values({
+            condicaoId: condId,
+            numeroParcela: numero,
+            descricaoEvento: desc,
+            valor: String(valorParcela),
+            percentualDoTotal: String(Math.round((valorParcela / valorTotal) * 10000) / 100),
+            // Parcelas seguintes de uma mesma parte caem a cada 30 dias a
+            // partir do prazo informado — o padrão de cartão e carnê.
+            prazoDias: parte.prazoDias + i * 30,
+            tipoPrazo: parte.tipoPrazo,
+            referenciaEvento: `fechamento_${g + 1}_${i + 1}`,
+            // array direto (não JSON.stringify): a coluna é json() tipada como
+            // string[], e o drizzle serializa sozinho.
+            meiosPagamento: [parte.forma],
+            dadosBancariosJson: null,
+            formaPagamento: parte.forma,
+            grupoForma: g,
+          }).execute()
+        }
+      }
+
+      return { ok: true, condId, valorTotal, parcelas: numero }
+    }),
+
+  removerCondicaoFechamento: protectedProcedure
+    .input(z.object({ propostaId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const alvos = await ctx.db.select({ id: ccTable.id }).from(ccTable)
+        .where(and(eq(ccTable.propostaId, input.propostaId), eq(ccTable.deFechamento, true)))
+      for (const a of alvos) {
+        await ctx.db.delete(ppTable).where(eq(ppTable.condicaoId, a.id!)).execute()
+        await ctx.db.delete(ccTable).where(eq(ccTable.id, a.id!)).execute()
+      }
+      return { ok: true, removidas: alvos.length }
     }),
 
   // ─── EXCLUIR CONDIÇÃO COMERCIAL ───────────────────────────────────────────

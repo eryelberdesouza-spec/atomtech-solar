@@ -235,7 +235,10 @@ function buildHtml(dados: any): string {
 
   const condicoes: any[] = condicoesComerciais ?? []
   const ativas = condicoes.filter((c: any) => c.ativa !== false)
+  // Condição de fechamento (o que foi efetivamente combinado, podendo dividir
+  // o pagamento entre formas) tem prioridade sobre a heurística.
   const condicaoAtiva = (
+    condicoes.find((c: any) => c.deFechamento) ??
     [...ativas].sort((a: any, b: any) => (b.parcelas?.length ?? 0) - (a.parcelas?.length ?? 0))[0] ??
     condicoes[0]
   )

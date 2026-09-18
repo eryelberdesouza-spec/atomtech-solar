@@ -369,7 +369,12 @@ function buildHtml(dados: any, formaPagamento: string, opts: { autoPrint?: boole
 
   const condicoes: any[] = condicoesComerciais ?? []
   const ativas = condicoes.filter((c: any) => c.ativa)
+  // A condição de fechamento, quando existe, é o que foi EFETIVAMENTE
+  // combinado (inclusive pagamento dividido entre formas) e manda no contrato.
+  // Sem ela, cai na heurística de antes — que é só um palpite sobre qual das
+  // condições ofertadas o cliente escolheu.
   const condicaoAtiva = (
+    condicoes.find((c: any) => c.deFechamento) ??
     ativas.find((c: any) => c.tipo === 'parcelado_marcos' && (c.parcelas?.length ?? 0) > 1) ??
     [...ativas].sort((a: any, b: any) => (b.parcelas?.length ?? 0) - (a.parcelas?.length ?? 0))[0] ??
     condicoes[0]

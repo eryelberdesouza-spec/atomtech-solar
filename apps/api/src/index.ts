@@ -780,6 +780,60 @@ app.get('/run-migration-fin-pessoa-banco', async (_, res) => {
 // medir "fechamos no mês" pela data de emissão. Fica NULL no histórico já
 // aceito — de propósito: essa informação nunca foi gravada e inventá-la
 // (ex.: copiar a data de emissão) daria um número errado com cara de certo.
+// Pagamento misto na formalização: condição "de fechamento" que divide o valor
+// entre formas diferentes (ex.: parte no cartão em 12x, parte em PIX à vista).
+app.get('/run-migration-condicao-fechamento', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const criadas: string[] = []
+
+    const existe = async (tabela: string, coluna: string) => {
+      const [r]: any = await conn.execute(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [tabela, coluna],
+      )
+      return r.length > 0
+    }
+
+    // 'misto' é o tipo da condição de fechamento com mais de uma forma.
+    await conn.execute(
+      `ALTER TABLE condicao_comercial
+         MODIFY COLUMN tipo ENUM('avista','parcelado_marcos','financiamento','cartao','misto') NOT NULL`,
+    )
+    criadas.push("enum tipo +'misto'")
+
+    if (!(await existe('condicao_comercial', 'de_fechamento'))) {
+      await conn.execute(
+        `ALTER TABLE condicao_comercial ADD COLUMN de_fechamento TINYINT(1) NOT NULL DEFAULT 0 AFTER ordem`,
+      )
+      criadas.push('condicao_comercial.de_fechamento')
+    }
+    if (!(await existe('parcela_pagamento', 'forma_pagamento'))) {
+      await conn.execute(
+        `ALTER TABLE parcela_pagamento ADD COLUMN forma_pagamento VARCHAR(40) NULL AFTER meios_pagamento`,
+      )
+      criadas.push('parcela_pagamento.forma_pagamento')
+    }
+    if (!(await existe('parcela_pagamento', 'grupo_forma'))) {
+      await conn.execute(
+        `ALTER TABLE parcela_pagamento ADD COLUMN grupo_forma INT NULL AFTER forma_pagamento`,
+      )
+      criadas.push('parcela_pagamento.grupo_forma')
+    }
+
+    await conn.end()
+    res.json({
+      ok: true,
+      criadas: criadas.length ? criadas : 'nada — já estava aplicada',
+      observacao: 'Condições existentes ficam como ofertadas (de_fechamento = 0); nada muda no que já está no ar.',
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // Arquivamento de propostas, no lugar da exclusão definitiva.
 app.get('/run-migration-proposta-arquivamento', async (_, res) => {
   try {

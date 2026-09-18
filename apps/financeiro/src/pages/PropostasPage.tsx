@@ -80,10 +80,14 @@ function ModalImportar({
 
   const condicoesData: any[] = condicoes ?? []
 
-  // Seleciona automaticamente a primeira condição ao carregar
+  // Pré-seleciona a condição de FECHAMENTO quando existe — ela é o que foi
+  // efetivamente combinado com o cliente (podendo dividir o pagamento entre
+  // formas), enquanto as demais são só as opções que foram ofertadas. Sem ela,
+  // mantém o comportamento antigo de pegar a primeira.
   useEffect(() => {
     if (condicoesData.length > 0 && condicaoId === null) {
-      setCondicaoId(condicoesData[0].id)
+      const fechamento = condicoesData.find((c: any) => c.deFechamento)
+      setCondicaoId((fechamento ?? condicoesData[0]).id)
     }
   }, [condicoesData.length])
 
@@ -194,9 +198,18 @@ function ModalImportar({
                     background: condicaoId === c.id ? '#34D39912' : C.bg,
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.descricao || c.tipo}</span>
-                    <span style={{ fontSize: 11, color: C.textMuted }}>{c.parcelas?.length ?? 0} parcela(s)</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                      {c.deFechamento && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+                          background: '#34D39920', color: '#34D399', padding: '2px 6px',
+                          borderRadius: 4, marginRight: 6,
+                        }}>Fechamento</span>
+                      )}
+                      {c.descricao || c.tipo}
+                    </span>
+                    <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: 'nowrap' }}>{c.parcelas?.length ?? 0} parcela(s)</span>
                   </div>
                   {/* Preview das parcelas */}
                   {condicaoId === c.id && c.parcelas?.length > 0 && (
