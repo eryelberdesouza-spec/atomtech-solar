@@ -498,13 +498,113 @@ function ModalConciliar({
   const conciliarMut = (trpc as any).fin.extrato.conciliar.useMutation()
   const [contaId,   setContaId]   = useState(contaIdDefault ?? '')
   const [erroLocal, setErroLocal] = useState('')
+  // Candidatos de tipo divergente (extrato sugere Receber, lançamento é Pagar,
+  // ou vice-versa) exigem essa confirmação explícita antes de liberar o botão
+  // — a busca de candidatos ignora tipo de propósito (ver comentário em
+  // verificarPotenciais no backend), então cabe ao usuário decidir aqui.
+  const [confirmados, setConfirmados] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    if (conciliando) { setContaId(contaIdDefault ?? ''); setErroLocal('') }
+    if (conciliando) { setContaId(contaIdDefault ?? ''); setErroLocal(''); setConfirmados(new Set()) }
   }, [conciliando?.fingerprint]) // eslint-disable-line
 
   if (!conciliando) return null
   const sugestaoTipo = conciliando.tipo === 'C' ? 'RECEBER' : 'PAGAR'
+  const corSugestao  = sugestaoTipo === 'RECEBER' ? C.credit : C.debit
+
+  const mesmoTipo      = conciliando.matches.filter(m => m.tipo === sugestaoTipo)
+  const tipoDivergente = conciliando.matches.filter(m => m.tipo !== sugestaoTipo)
+
+  const handleConciliar = async (m: ConciliandoInfo['matches'][number], divergente: boolean) => {
+    setErroLocal('')
+    try {
+      await conciliarMut.mutateAsync({
+        parcelaId:      m.parcelaId,
+        fingerprint:    conciliando.fingerprint,
+        contaId:        contaId ? parseInt(contaId) : null,
+        dataPagamento:  conciliando.data,
+        formaPagamento: detectarFormaPag(conciliando.descricao),
+        tipoExtratoSugerido:      sugestaoTipo,
+        tipoDivergenteConfirmado: divergente,
+      })
+      onConciliado(conciliando.fingerprint)
+    } catch (e: any) {
+      setErroLocal(e.message || 'Erro ao conciliar')
+    }
+  }
+
+  const renderCard = (m: ConciliandoInfo['matches'][number], i: number, divergente: boolean) => {
+    const corCandidato = m.tipo === 'RECEBER' ? C.credit : C.debit
+    const confirmado   = confirmados.has(m.parcelaId)
+    const bloqueado    = divergente && !confirmado
+    return (
+      <div key={m.parcelaId} style={{
+        background: divergente ? '#EF444410' : '#D9770610',
+        borderRadius: 8, border: `1px solid ${divergente ? C.debit : '#D97706'}`,
+        padding: '12px 14px', marginBottom: 8,
+      }}>
+        {/* Extrato vs. lançamento lado a lado — é essa comparação que importa,
+            não o rótulo genérico "Lançamento Manual" de antes. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: corSugestao + '20', color: corSugestao }}>
+            Extrato: {sugestaoTipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'}
+          </span>
+          <span style={{ color: C.textDim, fontSize: 11 }}>×</span>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: corCandidato + '20', color: corCandidato }}>
+            Lançamento: {m.tipo === 'RECEBER' ? 'A Receber' : 'A Pagar'}
+          </span>
+          {conciliando.matches.length > 1 && (
+            <span style={{ fontSize: 10, color: C.textDim, marginLeft: 'auto' }}>Opção {i + 1}</span>
+          )}
+        </div>
+
+        <div style={{ fontSize: 13, color: C.text, marginBottom: 3 }}>{m.descricao}</div>
+        <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted }}>
+          <span>{fmtDataBR(String(m.vencimento).slice(0, 10))}</span>
+          <span style={{ fontWeight: 700 }}>{fmtBRLFull(Number(m.valor))}</span>
+          <span style={{
+            padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+            background: m.status === 'PAGA' ? C.emerald + '20' : '#60A5FA20',
+            color: m.status === 'PAGA' ? C.emerald : '#60A5FA',
+          }}>{m.status}</span>
+        </div>
+
+        {divergente && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, fontSize: 11, color: '#FCA5A5', lineHeight: 1.5, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={confirmado}
+              onChange={e => setConfirmados(prev => {
+                const n = new Set(prev)
+                if (e.target.checked) n.add(m.parcelaId); else n.delete(m.parcelaId)
+                return n
+              })}
+              style={{ marginTop: 2 }}
+            />
+            <span>
+              O extrato sugere <strong>{sugestaoTipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'}</strong>, mas este lançamento
+              é <strong>{m.tipo === 'RECEBER' ? 'A Receber' : 'A Pagar'}</strong> — tipos diferentes.
+              Confirmo que quero vincular mesmo assim.
+            </span>
+          </label>
+        )}
+
+        <button
+          onClick={() => handleConciliar(m, divergente)}
+          disabled={bloqueado}
+          title={bloqueado ? 'Confirme acima que quer vincular tipos diferentes' : undefined}
+          style={{
+            marginTop: 10, width: '100%', padding: '8px', borderRadius: 7, border: 'none',
+            background: bloqueado ? C.border : (divergente ? C.debit : '#D97706'),
+            color: bloqueado ? C.textDim : '#fff',
+            fontSize: 12, fontWeight: 700, cursor: bloqueado ? 'not-allowed' : 'pointer',
+          }}
+        >
+          ✓ Vincular a este lançamento
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -514,14 +614,15 @@ function ModalConciliar({
     }}>
       <div style={{
         background: C.bgCard, borderRadius: 16, border: `1px solid #D97706`,
-        padding: '24px', width: 520, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
+        padding: '24px', width: 560, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
       }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#FBBF24', marginBottom: 6 }}>
           ⇌ Conciliar Lançamento
         </div>
         <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 20, lineHeight: 1.6 }}>
-          O extrato bancário contém uma transação com o mesmo valor de um lançamento manual já existente.
-          Escolha como deseja tratar:
+          Encontramos lançamento(s) manual(is) com valor e data parecidos com esta transação do extrato.
+          Mostramos também os de tipo diferente (a pagar × a receber) pra não perder correspondências —
+          confira o tipo antes de vincular.
         </p>
 
         {erroLocal && <Alert type="danger" style={{ marginBottom: 14 }}>{erroLocal}</Alert>}
@@ -530,93 +631,58 @@ function ModalConciliar({
         <div style={{ background: C.bg, borderRadius: 8, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#60A5FA', textTransform: 'uppercase', marginBottom: 6 }}>Transação do Extrato</div>
           <div style={{ fontSize: 13, color: C.text, marginBottom: 3 }}>{conciliando.descricao}</div>
-          <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', fontSize: 11, color: C.textMuted }}>
             <span>{fmtDataBR(conciliando.data)}</span>
-            <span style={{ color: conciliando.tipo === 'C' ? C.credit : C.debit, fontWeight: 700 }}>
-              {fmtBRLFull(conciliando.valor)}
-            </span>
-            <span style={{ color: C.textMuted }}>
-              sugerido: {sugestaoTipo === 'RECEBER' ? 'Receber' : 'Pagar'}
+            <span style={{ color: corSugestao, fontWeight: 700 }}>{fmtBRLFull(conciliando.valor)}</span>
+            <span style={{ padding: '1px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, background: corSugestao + '20', color: corSugestao }}>
+              {sugestaoTipo === 'RECEBER' ? 'Recebimento' : 'Pagamento'}
             </span>
           </div>
         </div>
 
-        {/* Conta bancária usada na baixa */}
-        <div style={{ marginBottom: 12 }}>
+        {/* Conta bancária usada na baixa — uma só, vale pra qualquer candidato
+            vinculado abaixo (não há ambiguidade: é a conta do extrato importado) */}
+        <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>Conta bancária</label>
           <select value={contaId} onChange={e => setContaId(e.target.value)} style={selectStyle}>
             <option value="">— Selecione a conta —</option>
             {contas.map((c: any) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
+          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4 }}>
+            Usada em qualquer lançamento que você vincular abaixo.
+          </div>
         </div>
 
-        {/* Lançamentos manuais correspondentes */}
-        {conciliando.matches.map((m, i) => {
-          const tipoDivergente = m.tipo !== sugestaoTipo
-          return (
-            <div key={m.parcelaId} style={{
-              background: '#D9770610', borderRadius: 8, border: '1px solid #D97706',
-              padding: '12px 14px', marginBottom: 8,
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#D97706', textTransform: 'uppercase', marginBottom: 6 }}>
-                Lançamento Manual {conciliando.matches.length > 1 ? `#${i + 1}` : ''} · {m.tipo === 'RECEBER' ? 'A Receber' : 'A Pagar'}
-              </div>
-              {tipoDivergente && (
-                <div style={{ fontSize: 10.5, color: '#FBBF24', marginBottom: 6, lineHeight: 1.5 }}>
-                  ⚠ Este lançamento é do tipo <strong>{m.tipo === 'RECEBER' ? 'Receber' : 'Pagar'}</strong>, mas o extrato sugere <strong>{sugestaoTipo === 'RECEBER' ? 'Receber' : 'Pagar'}</strong>.
-                  Confira se a classificação de entrada/saída do extrato está correta antes de conciliar.
-                </div>
-              )}
-              <div style={{ fontSize: 13, color: C.text, marginBottom: 3 }}>{m.descricao}</div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted }}>
-                <span>{fmtDataBR(String(m.vencimento).slice(0, 10))}</span>
-                <span style={{ fontWeight: 700 }}>{fmtBRLFull(Number(m.valor))}</span>
-                <span style={{
-                  padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                  background: m.status === 'PAGA' ? C.emerald + '20' : '#60A5FA20',
-                  color: m.status === 'PAGA' ? C.emerald : '#60A5FA',
-                }}>{m.status}</span>
-              </div>
-              <button
-                onClick={async () => {
-                  setErroLocal('')
-                  try {
-                    await conciliarMut.mutateAsync({
-                      parcelaId:     m.parcelaId,
-                      fingerprint:   conciliando.fingerprint,
-                      contaId:       contaId ? parseInt(contaId) : null,
-                      dataPagamento: conciliando.data,
-                      formaPagamento: detectarFormaPag(conciliando.descricao),
-                    })
-                    onConciliado(conciliando.fingerprint)
-                  } catch (e: any) {
-                    setErroLocal(e.message || 'Erro ao conciliar')
-                  }
-                }}
-                style={{
-                  marginTop: 10, width: '100%', padding: '8px', borderRadius: 7,
-                  background: '#D97706', border: 'none', color: '#fff',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                ✓ Conciliar — marcar este como pago pelo extrato
-              </button>
+        {mesmoTipo.length > 0 && (
+          <>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.4 }}>
+              Mesmo tipo — recomendado
             </div>
-          )
-        })}
+            {mesmoTipo.map((m, i) => renderCard(m, i, false))}
+          </>
+        )}
+
+        {tipoDivergente.length > 0 && (
+          <>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: '#FCA5A5', textTransform: 'uppercase', margin: '14px 0 8px', letterSpacing: 0.4 }}>
+              Tipo diferente — confira antes
+            </div>
+            {tipoDivergente.map((m, i) => renderCard(m, i, true))}
+          </>
+        )}
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
           <button
             onClick={() => onCriarNovoMesmoAssim(conciliando.fingerprint)}
             style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMuted, fontSize: 12, cursor: 'pointer' }}
           >
-            + Criar novo lançamento separado
+            Nenhum destes — criar novo lançamento
           </button>
           <button
             onClick={onClose}
             style={{ padding: '8px 16px', borderRadius: 7, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMuted, fontSize: 12, cursor: 'pointer' }}
           >
-            Fechar
+            Decidir depois
           </button>
         </div>
       </div>

@@ -3004,6 +3004,15 @@ const extratoRouter = router({
         }).where(eq(finParcela.id, parcelaId))
       }
 
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'CREATE', entidade: 'fin_titulo', entidadeId: tituloId,
+        dadosDepois: {
+          origem: 'extrato_importacao_manual', tipo: input.tipo, descricao: input.descricao,
+          valor: input.valor, data: input.data, fingerprint: input.fingerprint ?? null,
+          salvarComo: input.salvarComo,
+        },
+      })
+
       return { ok: true, tituloId, pessoaId: pessoaIdFinal }
     }),
 
@@ -3090,6 +3099,15 @@ const extratoRouter = router({
           }).where(eq(finParcela.id, parcelaId))
         }
 
+        await registrarAuditoria(ctx.db, ctx, {
+          acao: 'CREATE', entidade: 'fin_titulo', entidadeId: tituloId,
+          dadosDepois: {
+            origem: 'extrato_importacao_lote_ofx', tipo: item.tipo, descricao: item.descricao,
+            valor: item.valor, data: item.data, fingerprint: item.fingerprint,
+            salvarComo: item.salvarComo,
+          },
+        })
+
         criados++
       }
 
@@ -3175,13 +3193,23 @@ const extratoRouter = router({
       contaId:        z.number().nullish(),
       dataPagamento:  z.string(),
       formaPagamento: z.string().nullish(),
+      // Extrato e lançamento manual tinham tipos diferentes (PAGAR/RECEBER) e o
+      // usuário confirmou explicitamente mesmo assim — registrado na auditoria
+      // pra ficar rastreável depois, já que a busca de candidatos ignora tipo
+      // de propósito (ver comentário em verificarPotenciais).
+      tipoExtratoSugerido:      z.enum(['PAGAR', 'RECEBER']).nullish(),
+      tipoDivergenteConfirmado: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
 
       // Valida propriedade
       const [parcela] = await ctx.db
-        .select({ id: finParcela.id, valor: finParcela.valor })
+        .select({
+          id: finParcela.id, valor: finParcela.valor, status: finParcela.status,
+          extratoFingerprint: finParcela.extratoFingerprint, tituloId: finTitulo.id,
+          tipo: finTitulo.tipo, descricao: finTitulo.descricao,
+        })
         .from(finParcela)
         .innerJoin(finTitulo, eq(finParcela.tituloId, finTitulo.id))
         .where(and(eq(finParcela.id, input.parcelaId), eq(finTitulo.empresaId, empId)))
@@ -3200,6 +3228,17 @@ const extratoRouter = router({
         multa:              '0.00',
         desconto:           '0.00',
       }).where(eq(finParcela.id, input.parcelaId))
+
+      await registrarAuditoria(ctx.db, ctx, {
+        acao: 'BAIXA', entidade: 'fin_parcela', entidadeId: input.parcelaId,
+        dadosAntes: { status: parcela.status, extratoFingerprint: parcela.extratoFingerprint },
+        dadosDepois: {
+          origem: 'extrato_conciliacao', status: 'PAGA', fingerprint: input.fingerprint,
+          tituloId: parcela.tituloId, tituloTipo: parcela.tipo, tituloDescricao: parcela.descricao,
+          tipoExtratoSugerido: input.tipoExtratoSugerido ?? null,
+          tipoDivergenteConfirmado: Boolean(input.tipoDivergenteConfirmado),
+        },
+      })
 
       return { ok: true }
     }),
