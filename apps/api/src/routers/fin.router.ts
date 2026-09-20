@@ -1200,11 +1200,25 @@ const tituloRouter = router({
       // Alerta de possível duplicata: mesmo tipo + valor + descrição (e pessoa,
       // se informada) nos últimos 60 dias. O front confirma e reenvia com
       // ignorarDuplicata=true se for intencional.
+      //
+      // Achado em 2026-09-20: o alerta compara por EMISSÃO (60 dias pra trás),
+      // mas a tela de Lançamentos filtra por VENCIMENTO da parcela (padrão:
+      // só os últimos 5 dias) — os dois podem divergir bastante (importação
+      // de extrato com vencimento retroativo, edição manual depois, parcela
+      // com vencimento em outro mês). Resultado: o alerta acha um título real
+      // que o usuário não consegue achar na lista com o filtro padrão, sem
+      // pista nenhuma do motivo. Corrigido incluindo vencimento/status/origem
+      // da PRIMEIRA parcela na mensagem, e uma dica explícita de onde olhar.
       if (!input.ignorarDuplicata) {
         const desde = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10)
         const [possivel] = await ctx.db
-          .select({ id: finTitulo.id, emissao: finTitulo.emissao, descricao: finTitulo.descricao })
+          .select({
+            id: finTitulo.id, emissao: finTitulo.emissao, descricao: finTitulo.descricao,
+            vencimento: finParcela.vencimento, status: finParcela.status,
+            extratoFingerprint: finParcela.extratoFingerprint,
+          })
           .from(finTitulo)
+          .innerJoin(finParcela, eq(finParcela.tituloId, finTitulo.id))
           .where(and(
             eq(finTitulo.empresaId, empId),
             eq(finTitulo.tipo, tituloData.tipo),
@@ -1214,12 +1228,16 @@ const tituloRouter = router({
             tituloData.pessoaId ? eq(finTitulo.pessoaId, tituloData.pessoaId) : undefined,
             gte(finTitulo.emissao, desde as any),
           ))
+          .orderBy(asc(finParcela.numero))
           .limit(1)
         if (possivel) {
-          const dataEx = String(possivel.emissao).slice(0, 10)
+          const paraBR = (iso: string) => iso.split('-').reverse().join('/')
+          const dataEmissao    = paraBR(fmtDateISO(possivel.emissao))
+          const dataVencimento = paraBR(fmtDateISO(possivel.vencimento))
+          const origemExtrato  = possivel.extratoFingerprint ? ' (veio de uma importação de extrato bancário)' : ''
           throw new TRPCError({
             code: 'CONFLICT',
-            message: `POSSIVEL_DUPLICATA|Já existe o título #${possivel.id} "${possivel.descricao}" com o mesmo valor, emitido em ${dataEx}. Confirme se este lançamento não é repetido.`,
+            message: `POSSIVEL_DUPLICATA|Já existe o título #${possivel.id} "${possivel.descricao}"${origemExtrato} com o mesmo valor, emitido em ${dataEmissao}, vencimento em ${dataVencimento} (status: ${possivel.status}). Se não aparecer na lista, amplie o filtro "Vencimento a partir de" até essa data. Confirme se este lançamento não é repetido.`,
           })
         }
       }
@@ -3455,7 +3473,7 @@ const auditoriaRouter = router({
     return arr.map(r => ({
       idA: r.idA, idB: r.idB, tipo: r.tipo,
       descricao: r.descricaoA, valor: r.valor,
-      data: String(r.emissaoA).slice(0, 10),
+      data: fmtDateISO(r.emissaoA),
       pessoaNome: r.pessoaNome ?? null,
       ignorado: r.ignoradoId != null,
     }))
