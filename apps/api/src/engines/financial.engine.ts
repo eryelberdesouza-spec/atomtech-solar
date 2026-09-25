@@ -225,10 +225,22 @@ export function calcularFinanceiro(input: FinancialInput): FinancialResult {
   const vpl = Number(saldoDescontado.toFixed(2))
 
   // TIR (Newton-Raphson)
+  // Achado em 2026-09-25: o Newton-Raphson diverge pra valores absurdos
+  // (bilhões de %) mesmo em fluxos de caixa nada exóticos — testado com
+  // vários pares investimento/economia anual plausíveis, alguns convergem
+  // bem (12-17% a.a.) e outros divergem catastroficamente sem nenhum aviso.
+  // Sem limite, isso estourava a coluna `tir` (decimal(8,6), cabe até
+  // ~99.999999 = 9999,9999% como fração) e quebrava a criação da proposta
+  // com "Out of range value for column 'tir'". Em vez de grudar no limite da
+  // coluna (armazenaria "9999,99%" como se fosse uma resposta válida), trata
+  // como falha de cálculo — mesmo padrão já usado pra NaN/Infinity — porque
+  // um TIR real de milhares por cento é tão inútil pra exibir quanto um
+  // valor claramente divergido.
   let tir = 0
   try {
     tir = calcularTIR(fluxosSimples)
-    if (!isFinite(tir) || isNaN(tir)) tir = 0
+    const TIR_LIMITE = 50   // 5000% a.a. — generoso, mas bem abaixo do que já é divergência
+    if (!isFinite(tir) || isNaN(tir) || Math.abs(tir) > TIR_LIMITE) tir = 0
   } catch {
     tir = 0
   }
