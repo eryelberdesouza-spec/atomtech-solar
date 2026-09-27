@@ -1934,6 +1934,27 @@ app.get('/run-migration-os-encerramento', async (_, res) => {
   }
 })
 
+// ── Migração: ordem_servico.status nunca teve 'pendencia' no ENUM real do
+//    banco, embora o schema Drizzle e o front (cor/rótulo) já assumissem que
+//    existia — por isso "Pendência" nunca foi alcançável (updateStatus dava
+//    "Data truncated for column 'status'"). Alarga o ENUM pra bater com o
+//    schema; nenhuma linha existente usa esse valor, então é só ampliação ──
+app.get('/run-migration-os-status-pendencia', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      ALTER TABLE ordem_servico
+        MODIFY COLUMN status ENUM('aberta','em_execucao','pendencia','concluida','cancelada')
+        NOT NULL DEFAULT 'aberta'
+    `)
+    await conn.end()
+    res.json({ ok: true, message: "ENUM de ordem_servico.status agora inclui 'pendencia'" })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: cliente_energia_solar (config técnica) + relatorio_energia_gerado
 //    (histórico mensal, com o .pptx em MEDIUMBLOB — fora do schema Drizzle, mesmo
 //    padrão de os_anexo) ─────────────────────────────────────────────────────

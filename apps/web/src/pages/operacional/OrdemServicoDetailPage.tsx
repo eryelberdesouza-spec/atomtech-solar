@@ -602,7 +602,7 @@ function AbaAgendamentos({ os, osId, onRefresh, onShowModal }: any) {
           <h3 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 700, margin: 0 }}>Agendamentos</h3>
           <p style={{ color: '#7488A8', fontSize: 12, margin: '3px 0 0' }}>{(os.agendamentos ?? []).length} agendamento(s) registrado(s)</p>
         </div>
-        {(os.status === 'aberta' || os.status === 'em_execucao') && (
+        {(os.status === 'aberta' || os.status === 'em_execucao' || os.status === 'pendencia') && (
           <button onClick={onShowModal} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #58A6FF60', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
             📅 + Novo Agendamento
           </button>
@@ -613,7 +613,7 @@ function AbaAgendamentos({ os, osId, onRefresh, onShowModal }: any) {
         <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: '40px', textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
           <div style={{ color: '#7488A8', fontSize: 13 }}>Nenhum agendamento ainda.</div>
-          {(os.status === 'aberta' || os.status === 'em_execucao') && (
+          {(os.status === 'aberta' || os.status === 'em_execucao' || os.status === 'pendencia') && (
             <button onClick={onShowModal} style={{ marginTop: 12, padding: '8px 20px', borderRadius: 8, border: '1px solid #58A6FF60', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
               + Criar primeiro agendamento
             </button>
@@ -1172,15 +1172,28 @@ export function OrdemServicoDetailPage() {
   const totalMarcos  = os.marcos?.length ?? 0
   const marcosFeitos = os.marcos?.filter((m: any) => Number(m.concluido) === 1).length ?? 0
   const progresso    = totalMarcos > 0 ? Math.round((marcosFeitos / totalMarcos) * 100) : 0
-  const FLUXO: Record<string, string> = { aberta: 'em_execucao', em_execucao: 'concluida' }
-  const proximoStatus = FLUXO[os.status]
-
-  const handleAvancarStatus = () => {
-    if (!proximoStatus) return
-    if (proximoStatus === 'concluida') { setShowModalEncerramento(true); return }
+  const handleIniciar = () => {
     if (!window.confirm('Iniciar execução desta OS?')) return
     setMudandoStatus(true)
-    updateStatusMut.mutate({ id: osId, status: proximoStatus })
+    updateStatusMut.mutate({ id: osId, status: 'em_execucao' })
+  }
+
+  // Concluir sempre passa pelo termo de encerramento (assinatura ou motivo) —
+  // disponível tanto de Em Execução quanto de Pendência.
+  const handleConcluir = () => setShowModalEncerramento(true)
+
+  // Pendência é um desvio no meio da execução (falta material, aguardando o
+  // cliente etc.) — só sai de em_execucao, e volta pra lá quando resolvida.
+  const handleMarcarPendencia = () => {
+    if (!window.confirm('Marcar esta OS como pendência?')) return
+    setMudandoStatus(true)
+    updateStatusMut.mutate({ id: osId, status: 'pendencia' })
+  }
+
+  const handleRetomar = () => {
+    if (!window.confirm('Retomar a execução desta OS?')) return
+    setMudandoStatus(true)
+    updateStatusMut.mutate({ id: osId, status: 'em_execucao' })
   }
 
   const handleCancelar = () => {
@@ -1218,34 +1231,52 @@ export function OrdemServicoDetailPage() {
             </div>
           </div>
 
-          {/* Pipeline de status — só desktop */}
-          {!isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {['aberta', 'em_execucao', 'concluida'].map((s, i) => {
-                const ativo = os.status === s
-                const passado = ['aberta', 'em_execucao', 'concluida'].indexOf(os.status) > i
-                const c = STATUS_COLOR[s]
-                return (
-                  <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {i > 0 && <div style={{ width: 20, height: 1, background: passado ? c : '#1E3050' }} />}
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: (ativo || passado) ? c : '#1E3050', boxShadow: ativo ? `0 0 8px ${c}` : 'none' }} />
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          {/* Pipeline de status — só desktop (pendência mapeia na posição de Em Execução, é um desvio dela) */}
+          {!isMobile && (() => {
+            const posicaoPipeline = os.status === 'pendencia' ? 'em_execucao' : os.status
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {['aberta', 'em_execucao', 'concluida'].map((s, i) => {
+                  const ativo = posicaoPipeline === s
+                  const passado = ['aberta', 'em_execucao', 'concluida'].indexOf(posicaoPipeline) > i
+                  const c = os.status === 'pendencia' && s === 'em_execucao' ? STATUS_COLOR.pendencia : STATUS_COLOR[s]
+                  return (
+                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {i > 0 && <div style={{ width: 20, height: 1, background: passado ? c : '#1E3050' }} />}
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: (ativo || passado) ? c : '#1E3050', boxShadow: ativo ? `0 0 8px ${c}` : 'none' }} />
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           {/* Ações */}
-          {(os.status === 'aberta' || os.status === 'em_execucao') && (
+          {(os.status === 'aberta' || os.status === 'em_execucao' || os.status === 'pendencia') && (
             <div style={{ display: 'flex', gap: isMobile ? 6 : 8, flexShrink: 0 }}>
               {!isMobile && (
                 <button onClick={() => { setAba('agendamentos'); setShowModalAg(true) }} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #58A6FF50', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   📅 Agendar
                 </button>
               )}
-              {proximoStatus && (
-                <button onClick={handleAvancarStatus} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: `1px solid ${cor}60`, background: cor + '18', color: cor, cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 700 }}>
-                  {mudandoStatus ? '⏳' : proximoStatus === 'em_execucao' ? (isMobile ? '▶' : '▶ Iniciar') : (isMobile ? '✔' : '✔ Concluir')}
+              {os.status === 'aberta' && (
+                <button onClick={handleIniciar} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: `1px solid ${cor}60`, background: cor + '18', color: cor, cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 700 }}>
+                  {mudandoStatus ? '⏳' : (isMobile ? '▶' : '▶ Iniciar')}
+                </button>
+              )}
+              {os.status === 'em_execucao' && (
+                <button onClick={handleMarcarPendencia} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: `1px solid ${STATUS_COLOR.pendencia}60`, background: STATUS_COLOR.pendencia + '18', color: STATUS_COLOR.pendencia, cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 700 }}>
+                  {isMobile ? '⏸' : '⏸ Pendência'}
+                </button>
+              )}
+              {os.status === 'pendencia' && (
+                <button onClick={handleRetomar} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: '1px solid #58A6FF60', background: '#58A6FF18', color: '#58A6FF', cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 700 }}>
+                  {isMobile ? '▶' : '▶ Retomar'}
+                </button>
+              )}
+              {(os.status === 'em_execucao' || os.status === 'pendencia') && (
+                <button onClick={handleConcluir} disabled={mudandoStatus} style={{ padding: isMobile ? '6px 12px' : '7px 14px', borderRadius: 8, border: `1px solid ${STATUS_COLOR.concluida}60`, background: STATUS_COLOR.concluida + '18', color: STATUS_COLOR.concluida, cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: 700 }}>
+                  {isMobile ? '✔' : '✔ Concluir'}
                 </button>
               )}
               {isAdmin && (
