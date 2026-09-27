@@ -1898,6 +1898,42 @@ app.get('/run-migration-os-anexo', async (_, res) => {
   }
 })
 
+// ── Migração: cria tabela os_encerramento (termo de encerramento de OS,
+//    assinado na tela do técnico ou registrado sem assinatura com motivo —
+//    mesmo padrão BLOB de os_anexo) ───────────────────────────────────────────
+app.get('/run-migration-os-encerramento', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_encerramento (
+        id                    INT AUTO_INCREMENT PRIMARY KEY,
+        ordem_servico_id      INT NOT NULL,
+        empresa_id            INT NOT NULL,
+        assinado              TINYINT NOT NULL DEFAULT 0,
+        assinatura_imagem     MEDIUMBLOB,
+        motivo_sem_assinatura VARCHAR(30),
+        observacao            TEXT,
+        nome_signatario       VARCHAR(150),
+        documento_pdf         MEDIUMBLOB NOT NULL,
+        usuario_id            INT NOT NULL,
+        usuario_nome          VARCHAR(150) NOT NULL,
+        created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_os_enc_os  (ordem_servico_id),
+        INDEX idx_os_enc_emp (empresa_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabela os_encerramento criada com sucesso' })
+  } catch (e: any) {
+    if (e.code === 'ER_TABLE_EXISTS_ERROR') {
+      res.json({ ok: true, message: 'Tabela já existia' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 // ── Migração: cliente_energia_solar (config técnica) + relatorio_energia_gerado
 //    (histórico mensal, com o .pptx em MEDIUMBLOB — fora do schema Drizzle, mesmo
 //    padrão de os_anexo) ─────────────────────────────────────────────────────
@@ -2169,6 +2205,46 @@ app.get('/os-anexo/:id', async (req, res) => {
     res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${encodeURIComponent(file.nome)}"`)
     res.setHeader('Cache-Control', 'private, max-age=3600')
     res.send(file.dados)
+  } catch (e: any) {
+    res.status(500).send('Erro: ' + e.message)
+  }
+})
+
+// ── Servir PDF do termo de encerramento de OS ─────────────────────────────────
+app.get('/os-encerramento/:id/pdf', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const rawToken = (req.headers.authorization ?? '').replace('Bearer ', '').trim()
+                  || (req.query.token as string ?? '')
+
+    let empresaId: number | undefined
+    try {
+      const payload = JSON.parse(Buffer.from(rawToken.split('.')[1], 'base64').toString('utf-8'))
+      empresaId = payload.empresaId
+    } catch { /* token inválido */ }
+    if (!empresaId) { res.status(401).send('Não autorizado'); return }
+
+    const mysql2 = await import('mysql2/promise')
+    const conn   = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    const [rows]: any = await conn.execute(
+      `SELECT os.numero AS os_numero, e.documento_pdf
+       FROM os_encerramento e
+       JOIN ordem_servico os ON os.id = e.ordem_servico_id
+       WHERE e.id = ? AND e.empresa_id = ? LIMIT 1`,
+      [id, empresaId],
+    )
+    await conn.end()
+
+    const row = (rows as any[])[0]
+    if (!row) { res.status(404).send('Documento não encontrado'); return }
+
+    const download = req.query.download === '1'
+    const nome = `Encerramento-${row.os_numero}.pdf`
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${encodeURIComponent(nome)}"`)
+    res.setHeader('Cache-Control', 'private, max-age=3600')
+    res.send(row.documento_pdf)
   } catch (e: any) {
     res.status(500).send('Erro: ' + e.message)
   }

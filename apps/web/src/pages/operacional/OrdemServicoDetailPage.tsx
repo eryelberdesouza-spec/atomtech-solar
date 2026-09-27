@@ -4,6 +4,8 @@ import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Btn, Spinner, C } from '../../components/ui'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { gerarHtmlEncerramento } from '../../lib/gerarDocumentoEncerramentoBrowser'
+import { gerarPdfBase64DoServidor } from '../../lib/baixarPdfServidor'
 
 const STATUS_COLOR: Record<string, string> = {
   aberta:      '#58A6FF',
@@ -152,6 +154,198 @@ function ModalMarco({ osId, onClose, onSuccess }: { osId: number; onClose: () =>
           <button type="submit" disabled={salvando} style={saveBtnStyle}>{salvando ? '⏳...' : '✦ Adicionar'}</button>
         </div>
       </form>
+    </div>
+  )
+}
+
+// ─── Canvas de assinatura (mouse + toque, sem lib externa) ────────────────────
+function SignatureCanvas({ onChange }: { onChange: (dataUrl: string | null) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawingRef = useRef(false)
+  const hasInkRef  = useRef(false)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    canvas.width  = rect.width * dpr
+    canvas.height = rect.height * dpr
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.scale(dpr, dpr)
+    ctx.lineWidth = 2.2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = '#0E2040'
+  }, [])
+
+  const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const ctx = e.currentTarget.getContext('2d')
+    if (!ctx) return
+    drawingRef.current = true
+    const { x, y } = point(e)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return
+    const ctx = e.currentTarget.getContext('2d')
+    if (!ctx) return
+    const { x, y } = point(e)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+    hasInkRef.current = true
+  }
+  const end = () => {
+    if (!drawingRef.current) return
+    drawingRef.current = false
+    if (hasInkRef.current && canvasRef.current) onChange(canvasRef.current.toDataURL('image/png'))
+  }
+
+  const limpar = () => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+    hasInkRef.current = false
+    onChange(null)
+  }
+
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        onPointerDown={start}
+        onPointerMove={move}
+        onPointerUp={end}
+        onPointerLeave={end}
+        style={{ width: '100%', height: 160, background: '#fff', borderRadius: 8, border: '1px solid #1E3050', touchAction: 'none', cursor: 'crosshair' }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+        <span style={{ fontSize: 10, color: '#7488A8' }}>Assine com o dedo ou o mouse</span>
+        <button type="button" onClick={limpar} style={{ ...microBtnStyle, color: '#7488A8', borderColor: '#1E3050' }}>Limpar</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modal: Encerrar OS (assinatura ou motivo) ────────────────────────────────
+const MOTIVO_OPCOES = [
+  { value: 'cliente_ausente', label: 'Cliente ausente no momento' },
+  { value: 'cliente_recusou', label: 'Cliente se recusou a assinar' },
+  { value: 'outro',           label: 'Outro motivo' },
+]
+
+function ModalEncerramento({ os, osId, onClose, onSuccess }: { os: any; osId: number; onClose: () => void; onSuccess: () => void }) {
+  const [modo, setModo] = useState<'assinar' | 'sem_assinatura'>('assinar')
+  const [assinaturaDataUrl, setAssinaturaDataUrl] = useState<string | null>(null)
+  const [nomeSignatario, setNomeSignatario] = useState(os.clienteNome ?? '')
+  const [motivo, setMotivo] = useState('cliente_ausente')
+  const [observacao, setObservacao] = useState('')
+  const [processando, setProcessando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const criarEncerramentoMut = (trpc as any).os.encerramento.criar.useMutation()
+  const updateStatusMut      = (trpc as any).os.updateStatus.useMutation()
+
+  const handleConfirmar = async () => {
+    setErro('')
+    if (modo === 'assinar' && !assinaturaDataUrl) return setErro('Colete a assinatura no quadro acima.')
+    if (modo === 'sem_assinatura' && !observacao.trim()) return setErro('Descreva rapidamente o que houve (obrigatório sem assinatura).')
+
+    setProcessando(true)
+    try {
+      const dataConclusao = new Date().toISOString().slice(0, 10)
+      const html = gerarHtmlEncerramento({
+        osNumero: os.numero,
+        clienteNome: os.clienteNome ?? '—',
+        tecnicoResponsavel: os.tecnicoResponsavel,
+        tituloServico: os.tituloServico ?? os.titulo,
+        resumoServico: os.resumoServico,
+        dataConclusao,
+        assinado: modo === 'assinar',
+        assinaturaImagemDataUrl: assinaturaDataUrl ?? undefined,
+        nomeSignatario: nomeSignatario || undefined,
+        motivoSemAssinatura: modo === 'sem_assinatura' ? motivo : undefined,
+        observacao: observacao || undefined,
+      })
+      const pdfBase64 = await gerarPdfBase64DoServidor(html, `Encerramento-${os.numero}.pdf`)
+      const assinaturaBase64 = assinaturaDataUrl ? assinaturaDataUrl.split(',')[1] : undefined
+
+      await criarEncerramentoMut.mutateAsync({
+        ordemServicoId: osId,
+        assinado: modo === 'assinar',
+        assinaturaImagemBase64: assinaturaBase64,
+        motivoSemAssinatura: modo === 'sem_assinatura' ? (motivo as any) : undefined,
+        observacao: observacao || undefined,
+        nomeSignatario: nomeSignatario || undefined,
+        documentoPdfBase64: pdfBase64,
+      })
+      await updateStatusMut.mutateAsync({ id: osId, status: 'concluida' })
+      onSuccess()
+      onClose()
+    } catch (e: any) {
+      setErro(e.message || 'Erro ao encerrar a OS')
+    } finally {
+      setProcessando(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: '#00000088', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={e => e.target === e.currentTarget && !processando && onClose()}>
+      <div style={{ background: '#131F30', border: '1px solid #1E3050', borderRadius: 14, padding: 24, width: 480, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <h3 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0 }}>✔ Encerrar OS {os.numero}</h3>
+        <p style={{ color: '#7488A8', fontSize: 12, margin: 0 }}>Gera o termo de encerramento e conclui a OS.</p>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => setModo('assinar')} style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: `1px solid ${modo === 'assinar' ? '#3EBB7A' : '#1E3050'}`, background: modo === 'assinar' ? '#3EBB7A18' : 'transparent', color: modo === 'assinar' ? '#3EBB7A' : '#7488A8', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            ✍ Cliente assina agora
+          </button>
+          <button type="button" onClick={() => setModo('sem_assinatura')} style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: `1px solid ${modo === 'sem_assinatura' ? '#D9822B' : '#1E3050'}`, background: modo === 'sem_assinatura' ? '#D9822B18' : 'transparent', color: modo === 'sem_assinatura' ? '#D9822B' : '#7488A8', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            ⚠ Sem assinatura
+          </button>
+        </div>
+
+        {modo === 'assinar' ? (
+          <>
+            <div>
+              <label style={labelStyle}>Nome de quem assina</label>
+              <input value={nomeSignatario} onChange={e => setNomeSignatario(e.target.value)} placeholder="Nome do cliente ou responsável" style={inputStyle} />
+            </div>
+            <SignatureCanvas onChange={setAssinaturaDataUrl} />
+          </>
+        ) : (
+          <>
+            <div>
+              <label style={labelStyle}>Motivo *</label>
+              <select value={motivo} onChange={e => setMotivo(e.target.value)} style={inputStyle}>
+                {MOTIVO_OPCOES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Observação *</label>
+              <textarea value={observacao} onChange={e => setObservacao(e.target.value)} rows={3} placeholder="Descreva o que houve" style={{ ...inputStyle, resize: 'vertical' }} />
+            </div>
+          </>
+        )}
+
+        {erro && (
+          <div style={{ background: '#F8514912', border: '1px solid #F8514940', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#F85149' }}>{erro}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" onClick={onClose} disabled={processando} style={cancelBtnStyle}>Cancelar</button>
+          <button type="button" onClick={handleConfirmar} disabled={processando} style={saveBtnStyle}>
+            {processando ? '⏳ Gerando documento...' : '✔ Confirmar e concluir OS'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -878,6 +1072,67 @@ function AbaAnexos({ osId, osStatus }: { osId: number; osStatus: string }) {
   )
 }
 
+// ─── Aba: Encerramento ─────────────────────────────────────────────────────────
+function AbaEncerramento({ osId, osNumero }: { osId: number; osNumero: string }) {
+  const { data: enc, isLoading } = (trpc as any).os.encerramento.get.useQuery(
+    { ordemServicoId: osId },
+    { staleTime: 30_000 },
+  )
+
+  if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}><Spinner /></div>
+
+  if (!enc) {
+    return (
+      <div style={{ background: '#111D2E', border: '1px dashed #1E3050', borderRadius: 12, padding: '40px', textAlign: 'center' }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+        <div style={{ color: '#7488A8', fontSize: 13 }}>Ainda não há termo de encerramento.</div>
+        <div style={{ color: '#2A3F55', fontSize: 12, marginTop: 4 }}>Ele é gerado ao concluir a OS.</div>
+      </div>
+    )
+  }
+
+  const downloadUrl = `${API_BASE}/os-encerramento/${enc.id}/pdf?token=${encodeURIComponent(getToken())}&download=1`
+
+  return (
+    <div>
+      <h3 style={{ color: '#C8D8EC', fontSize: 14, fontWeight: 700, margin: '0 0 12px' }}>📄 Encerramento</h3>
+      <div style={{
+        background: '#111D2E', border: `1px solid ${enc.assinado ? '#3EBB7A40' : '#D9822B40'}`,
+        borderLeft: `3px solid ${enc.assinado ? '#3EBB7A' : '#D9822B'}`, borderRadius: 10, padding: '16px 18px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+            background: (enc.assinado ? '#3EBB7A' : '#D9822B') + '18',
+            color: enc.assinado ? '#3EBB7A' : '#D9822B',
+          }}>
+            {enc.assinado ? '✍ Assinado' : '⚠ Sem assinatura'}
+          </span>
+          <span style={{ fontSize: 11, color: '#7488A8' }}>{formatDate(enc.createdAt)}</span>
+        </div>
+        {enc.assinado ? (
+          <InfoRow label="Assinado por" value={enc.nomeSignatario} />
+        ) : (
+          <>
+            <InfoRow label="Motivo" value={MOTIVO_LABEL_UI[enc.motivoSemAssinatura] ?? enc.motivoSemAssinatura} />
+            <InfoRow label="Observação" value={enc.observacao} />
+          </>
+        )}
+        <InfoRow label="Registrado por" value={enc.usuarioNome} />
+        <a href={downloadUrl} download={`Encerramento-${osNumero}.pdf`} style={{ display: 'inline-block', marginTop: 10, padding: '7px 14px', borderRadius: 8, border: '1px solid #1E3050', background: '#0C1828', color: '#9FB0C9', fontSize: 12, textDecoration: 'none' }}>
+          ⬇ Baixar termo (PDF)
+        </a>
+      </div>
+    </div>
+  )
+}
+
+const MOTIVO_LABEL_UI: Record<string, string> = {
+  cliente_ausente: 'Cliente ausente no momento',
+  cliente_recusou: 'Cliente se recusou a assinar',
+  outro: 'Outro motivo',
+}
+
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export function OrdemServicoDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -892,10 +1147,11 @@ export function OrdemServicoDetailPage() {
 
   const { data: os, isLoading } = (trpc as any).os.byId.useQuery({ id: osId }, { enabled: !!osId, staleTime: 0 })
 
-  const [aba, setAba] = useState<'geral' | 'agendamentos' | 'diario' | 'anexos'>('geral')
-  const [showModalAg, setShowModalAg]       = useState(false)
-  const [showModalMarco, setShowModalMarco] = useState(false)
-  const [mudandoStatus, setMudandoStatus]   = useState(false)
+  const [aba, setAba] = useState<'geral' | 'agendamentos' | 'diario' | 'anexos' | 'encerramento'>('geral')
+  const [showModalAg, setShowModalAg]               = useState(false)
+  const [showModalMarco, setShowModalMarco]         = useState(false)
+  const [showModalEncerramento, setShowModalEncerramento] = useState(false)
+  const [mudandoStatus, setMudandoStatus]           = useState(false)
 
   const updateStatusMut = (trpc as any).os.updateStatus.useMutation({
     onSuccess: () => utils.os.byId.invalidate({ id: osId }),
@@ -921,8 +1177,8 @@ export function OrdemServicoDetailPage() {
 
   const handleAvancarStatus = () => {
     if (!proximoStatus) return
-    const labels: Record<string, string> = { em_execucao: 'Iniciar execução desta OS?', concluida: 'Marcar esta OS como concluída?' }
-    if (!window.confirm(labels[proximoStatus])) return
+    if (proximoStatus === 'concluida') { setShowModalEncerramento(true); return }
+    if (!window.confirm('Iniciar execução desta OS?')) return
     setMudandoStatus(true)
     updateStatusMut.mutate({ id: osId, status: proximoStatus })
   }
@@ -938,6 +1194,7 @@ export function OrdemServicoDetailPage() {
     { id: 'agendamentos', label: `📅 Agendamentos${os.agendamentos?.length ? ` (${os.agendamentos.length})` : ''}` },
     { id: 'diario',       label: `📓 Diário de Campo${os.notas?.length ? ` (${os.notas.length})` : ''}` },
     { id: 'anexos',       label: `📎 Anexos${(anexos as any[]).length ? ` (${(anexos as any[]).length})` : ''}` },
+    { id: 'encerramento', label: '📄 Encerramento' },
   ]
 
   return (
@@ -1026,11 +1283,13 @@ export function OrdemServicoDetailPage() {
         {aba === 'agendamentos' && <AbaAgendamentos os={os} osId={osId} onRefresh={refresh} onShowModal={() => setShowModalAg(true)} />}
         {aba === 'diario'       && <AbaDiarioCampo os={os} osId={osId} onRefresh={refresh} />}
         {aba === 'anexos'       && <AbaAnexos osId={osId} osStatus={os.status} />}
+        {aba === 'encerramento' && <AbaEncerramento osId={osId} osNumero={os.numero} />}
       </div>
 
       {/* Modais */}
-      {showModalAg    && <ModalAgendamento osId={osId} onClose={() => setShowModalAg(false)}    onSuccess={refresh} />}
-      {showModalMarco && <ModalMarco       osId={osId} onClose={() => setShowModalMarco(false)} onSuccess={refresh} />}
+      {showModalAg          && <ModalAgendamento  osId={osId} onClose={() => setShowModalAg(false)}          onSuccess={refresh} />}
+      {showModalMarco       && <ModalMarco        osId={osId} onClose={() => setShowModalMarco(false)}       onSuccess={refresh} />}
+      {showModalEncerramento && <ModalEncerramento os={os} osId={osId} onClose={() => setShowModalEncerramento(false)} onSuccess={() => { utils.os.encerramento.get.invalidate({ ordemServicoId: osId }); refresh() }} />}
     </div>
   )
 }

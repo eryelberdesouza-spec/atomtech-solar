@@ -434,6 +434,19 @@ export const osRouter = router({
       )
       if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
 
+      // Concluir exige ter passado pela etapa de encerramento (assinatura ou
+      // motivo registrado) — ver encerramento.criar, chamado pelo front antes
+      // desta mutation quando o próximo status é 'concluida'.
+      if (input.status === 'concluida') {
+        const [enc]: any = await pool.execute(
+          `SELECT id FROM os_encerramento WHERE ordem_servico_id = ? AND empresa_id = ? LIMIT 1`,
+          [input.id, ctx.usuario.empresaId],
+        )
+        if (!(enc as any[]).length) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Registre o encerramento (assinatura ou motivo) antes de concluir a OS.' })
+        }
+      }
+
       const hoje = new Date().toISOString().slice(0, 10)
       let extra = ''
       const extraParams: any[] = []
@@ -752,6 +765,74 @@ export const osRouter = router({
         if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Anexo não encontrado' })
         await pool.execute(`DELETE FROM os_anexo WHERE id = ?`, [input.id])
         return { ok: true }
+      }),
+  }),
+
+  // ── Encerramento (termo assinado ou registrado sem assinatura) ────
+  encerramento: router({
+    get: protectedProcedure
+      .input(z.object({ ordemServicoId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [rows]: any = await pool.execute(
+          `SELECT id, assinado, motivo_sem_assinatura AS motivoSemAssinatura,
+                  observacao, nome_signatario AS nomeSignatario,
+                  usuario_nome AS usuarioNome, created_at AS createdAt
+           FROM os_encerramento
+           WHERE ordem_servico_id = ? AND empresa_id = ?
+           ORDER BY created_at DESC LIMIT 1`,
+          [input.ordemServicoId, ctx.usuario.empresaId],
+        )
+        const row = (rows as any[])[0]
+        if (!row) return null
+        return { ...row, assinado: Number(row.assinado) === 1 }
+      }),
+
+    criar: protectedProcedure
+      .input(z.object({
+        ordemServicoId:         z.number().int().positive(),
+        assinado:               z.boolean(),
+        assinaturaImagemBase64: z.string().optional(), // PNG base64, sem prefixo data:
+        motivoSemAssinatura:    z.enum(['cliente_ausente', 'cliente_recusou', 'outro']).optional(),
+        observacao:             z.string().max(2000).optional(),
+        nomeSignatario:         z.string().max(150).optional(),
+        documentoPdfBase64:     z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.assinado && !input.assinaturaImagemBase64) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Assinatura não capturada.' })
+        }
+        if (!input.assinado && !input.motivoSemAssinatura) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Informe o motivo para não haver assinatura.' })
+        }
+        if (!input.assinado && !input.observacao?.trim()) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Observação obrigatória quando não há assinatura.' })
+        }
+
+        const pool = getRawPool()
+        const [check]: any = await pool.execute(
+          `SELECT id FROM ordem_servico WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.ordemServicoId, ctx.usuario.empresaId],
+        )
+        if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
+
+        const assinaturaBuf = input.assinaturaImagemBase64
+          ? Buffer.from(input.assinaturaImagemBase64, 'base64')
+          : null
+        const pdfBuf = Buffer.from(input.documentoPdfBase64, 'base64')
+
+        const [ins]: any = await pool.execute(
+          `INSERT INTO os_encerramento
+             (ordem_servico_id, empresa_id, assinado, assinatura_imagem, motivo_sem_assinatura,
+              observacao, nome_signatario, documento_pdf, usuario_id, usuario_nome)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            input.ordemServicoId, ctx.usuario.empresaId, input.assinado ? 1 : 0,
+            assinaturaBuf, input.motivoSemAssinatura ?? null, input.observacao ?? null,
+            input.nomeSignatario ?? null, pdfBuf, ctx.usuario.id, ctx.usuario.nome,
+          ],
+        )
+        return { ok: true, id: (ins as any).insertId }
       }),
   }),
 
