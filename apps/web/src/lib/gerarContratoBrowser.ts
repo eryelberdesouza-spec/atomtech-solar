@@ -170,6 +170,8 @@ const LABEL_TIPO_EQUIPAMENTO: Record<string, string> = {
   otimizador: 'otimizador de potência',
   estrutura: 'estrutura de fixação',
   cabo: 'cabo',
+  bateria: 'bateria',
+  wallbox: 'carregador veicular (wallbox)',
   outros: 'item',
 }
 
@@ -184,7 +186,9 @@ function descricaoItemEquipamento(eq: any): string {
   }
   const partes = [label, eq.fabricante]
   if (eq?.modelo) partes.push(`modelo ${eq.modelo}`)
-  if (eq?.potenciaWp) partes.push(`de ${eq.potenciaWp}W`)
+  // Bateria se especifica pela energia armazenada, não pela potência.
+  if (Number(eq?.capacidadeKwh) > 0) partes.push(`de ${Number(eq.capacidadeKwh)} kWh`)
+  else if (eq?.potenciaWp) partes.push(`de ${eq.potenciaWp}W`)
   return `${qtd} x ${partes.join(' ')}`
 }
 

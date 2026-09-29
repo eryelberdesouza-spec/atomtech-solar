@@ -844,6 +844,42 @@ app.get('/run-migration-condicao-fechamento', async (_, res) => {
   }
 })
 
+// Sistemas híbridos/off-grid: baterias, wallbox e demais itens do kit.
+app.get('/run-migration-equipamento-bateria', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const criadas: string[] = []
+
+    await conn.execute(
+      `ALTER TABLE equipamento_proposta
+         MODIFY COLUMN tipo ENUM('modulo','inversor','microinversor','otimizador',
+                                 'estrutura','cabo','bateria','wallbox','outros') NOT NULL`,
+    )
+    criadas.push("enum tipo +'bateria' +'wallbox'")
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'equipamento_proposta'
+          AND COLUMN_NAME = 'capacidade_kwh'`,
+    )
+    if (!cols.length) {
+      await conn.execute(
+        `ALTER TABLE equipamento_proposta ADD COLUMN capacidade_kwh DECIMAL(8,2) NULL AFTER potencia_wp`,
+      )
+      criadas.push('equipamento_proposta.capacidade_kwh')
+    }
+    await conn.end()
+    res.json({
+      ok: true,
+      criadas,
+      observacao: 'tipo_sistema (on_grid/off_grid/hibrido) já existia em dimensionamento; nada a migrar lá.',
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // Qualificação do representante legal do cliente (essencial em contrato de PJ).
 app.get('/run-migration-cliente-responsavel', async (_, res) => {
   try {

@@ -8,7 +8,7 @@ import {
 } from '../../lib/utils'
 import {
   Btn, Badge, Card, Tabs, Spinner, Toggle,
-  EmptyState, PageWrapper, C, Input,
+  EmptyState, PageWrapper, C, Input, Select,
 } from '../../components/ui'
 import { abrirPdfNoNavegador, gerarHTML } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador, gerarHtmlServico } from '../../lib/gerarPdfServicoBrowser'
@@ -58,6 +58,188 @@ function KpiCard({ label, value, color, icon, large }: { label: string; value: s
   )
 }
 
+const TIPO_SISTEMA_OPTIONS = [
+  { value: 'on_grid',  label: 'On-Grid (conectado à rede)' },
+  { value: 'hibrido',  label: 'Híbrido (rede + baterias)'  },
+  { value: 'off_grid', label: 'Off-Grid (isolado)'         },
+]
+
+// Módulo e inversor têm campos próprios em Parâmetros Técnicos porque alimentam
+// o cálculo de geração. Estes são descritivos: entram na lista técnica do PDF e
+// na composição do kit no contrato, sem mexer no dimensionamento nem no preço.
+const TIPOS_ITEM_KIT = [
+  { value: 'bateria',    label: '🔋 Bateria'                  },
+  { value: 'wallbox',    label: '🔌 Carregador veicular (wallbox)' },
+  { value: 'otimizador', label: '⚙️ Otimizador de potência'   },
+  { value: 'estrutura',  label: '🔩 Estrutura de fixação'     },
+  { value: 'cabo',       label: '🧵 Cabeamento'               },
+  { value: 'outros',     label: '📦 Outro item'               },
+]
+const LABEL_ITEM_KIT: Record<string, string> = {
+  modulo: 'Módulos', inversor: 'Inversor', microinversor: 'Microinversor',
+  otimizador: 'Otimizador de potência', estrutura: 'Estrutura de fixação',
+  cabo: 'Cabeamento', bateria: 'Bateria', wallbox: 'Carregador veicular (wallbox)',
+  outros: 'Item adicional',
+}
+const ITEM_VAZIO = { tipo: 'bateria', fabricante: '', modelo: '', quantidade: 1, potenciaWp: 0, capacidadeKwh: 0, garantiaAnos: 0 }
+
+function ItensAdicionaisKit({ equips, propostaId, tipoSistema }: any) {
+  const utils = trpc.useUtils()
+  const [form, setForm] = useState<any>(ITEM_VAZIO)
+  const [aberto, setAberto] = useState(false)
+  const [editandoId, setEditandoId] = useState<number | null>(null)
+
+  const onOk = () => {
+    utils.proposta.byId.invalidate({ id: propostaId })
+    setAberto(false); setEditandoId(null); setForm(ITEM_VAZIO)
+  }
+  const onErr = (e: any) => alert('Erro: ' + e.message)
+  const adicionar = (trpc as any).proposta.adicionarEquipamento.useMutation({ onSuccess: onOk, onError: onErr })
+  const atualizar = (trpc as any).proposta.atualizarEquipamento.useMutation({ onSuccess: onOk, onError: onErr })
+  const remover   = (trpc as any).proposta.removerEquipamento.useMutation({
+    onSuccess: () => utils.proposta.byId.invalidate({ id: propostaId }), onError: onErr,
+  })
+
+  const estruturais = ['modulo', 'inversor', 'microinversor']
+  const adicionais = (equips ?? []).filter((e: any) => !estruturais.includes(e.tipo))
+  const temBateria = adicionais.some((e: any) => e.tipo === 'bateria')
+  const precisaBateria = tipoSistema === 'hibrido' || tipoSistema === 'off_grid'
+
+  const ehBateria = form.tipo === 'bateria'
+  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
+
+  const abrirEdicao = (it: any) => {
+    setForm({
+      tipo: it.tipo, fabricante: it.fabricante ?? '', modelo: it.modelo ?? '',
+      quantidade: it.quantidade ?? 1,
+      potenciaWp: it.potenciaWp ?? 0,
+      capacidadeKwh: Number(it.capacidadeKwh ?? 0),
+      garantiaAnos: it.garantiaAnos ?? 0,
+    })
+    setEditandoId(it.id); setAberto(true)
+  }
+
+  const salvar = () => {
+    const base = {
+      fabricante: form.fabricante || undefined,
+      modelo: form.modelo || undefined,
+      quantidade: Number(form.quantidade) || 1,
+      potenciaWp: !ehBateria && Number(form.potenciaWp) > 0 ? Math.round(Number(form.potenciaWp) * 1000) : undefined,
+      capacidadeKwh: ehBateria && Number(form.capacidadeKwh) > 0 ? Number(form.capacidadeKwh) : undefined,
+      garantiaAnos: Number(form.garantiaAnos) > 0 ? Number(form.garantiaAnos) : undefined,
+    }
+    if (editandoId) atualizar.mutate({ id: editandoId, propostaId, ...base })
+    else adicionar.mutate({ propostaId, tipo: form.tipo, ...base })
+  }
+
+  const especificacao = (it: any) =>
+    Number(it.capacidadeKwh) > 0 ? `${Number(it.capacidadeKwh)} kWh`
+      : it.potenciaWp ? `${(it.potenciaWp / 1000).toFixed(1)} kW` : '—'
+
+  return (
+    <Card style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14 }}>🧩</span>
+          <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Itens adicionais do kit</p>
+        </div>
+        {!aberto && (
+          <Btn size="sm" variant="ghost" onClick={() => { setForm(ITEM_VAZIO); setEditandoId(null); setAberto(true) }}>
+            + Adicionar item
+          </Btn>
+        )}
+      </div>
+
+      {precisaBateria && !temBateria && (
+        <div style={{
+          background: `${C.solar}10`, border: `1px solid ${C.solar}35`, borderRadius: 10,
+          padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 15 }}>🔋</span>
+          <p style={{ color: C.textDim, fontSize: 12, margin: 0 }}>
+            Sistema <strong>{tipoSistema === 'hibrido' ? 'híbrido' : 'off-grid'}</strong> sem bateria cadastrada.
+            Se o fornecimento inclui o banco de baterias, adicione o item; se ficar para depois, pode seguir sem ele.
+          </p>
+        </div>
+      )}
+
+      {adicionais.length === 0 && !aberto && (
+        <p style={{ color: C.textDim, fontSize: 12, margin: 0 }}>
+          Nenhum item além de módulos e inversor. Use <strong>+ Adicionar item</strong> para incluir
+          bateria, wallbox, estrutura ou qualquer outro componente do fornecimento.
+        </p>
+      )}
+
+      {adicionais.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: aberto ? 14 : 0 }}>
+          {adicionais.map((it: any) => (
+            <div key={it.id} style={{
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+              padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`,
+            }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 2px' }}>
+                  {LABEL_ITEM_KIT[it.tipo] ?? it.tipo}
+                </p>
+                <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                  {[it.fabricante, it.modelo].filter(Boolean).join(' — ') || 'Sem fabricante/modelo'}
+                </p>
+              </div>
+              <Pill color={C.accent}>{it.quantidade}x</Pill>
+              <Pill color={C.green}>{especificacao(it)}</Pill>
+              <Pill color={C.textMuted}>{it.garantiaAnos ? `${it.garantiaAnos} anos` : 'sem garantia'}</Pill>
+              <Btn size="sm" variant="ghost" onClick={() => abrirEdicao(it)}>✏️</Btn>
+              <Btn size="sm" variant="ghost"
+                onClick={() => { if (confirm(`Remover ${LABEL_ITEM_KIT[it.tipo] ?? it.tipo} do kit?`)) remover.mutate({ id: it.id, propostaId }) }}>
+                🗑
+              </Btn>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {aberto && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 12, borderTop: `1px solid ${C.darkBorder}60` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Select label="Tipo de item" value={form.tipo}
+              onChange={(e: any) => set('tipo', e.target.value)}
+              options={TIPOS_ITEM_KIT} disabled={Boolean(editandoId)} />
+            <Input label="Quantidade" type="number" value={form.quantidade}
+              onChange={e => set('quantidade', Number(e.target.value))} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Input label="Fabricante" value={form.fabricante}
+              onChange={e => set('fabricante', e.target.value)} placeholder="Ex: BYD" />
+            <Input label="Modelo" value={form.modelo}
+              onChange={e => set('modelo', e.target.value)} placeholder="Ex: Battery-Box Premium HVS 10.2" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {ehBateria ? (
+              <Input label="Capacidade (kWh)" type="number" value={form.capacidadeKwh}
+                onChange={e => set('capacidadeKwh', Number(e.target.value))} placeholder="10.2" />
+            ) : (
+              <Input label="Potência (kW)" type="number" value={form.potenciaWp}
+                onChange={e => set('potenciaWp', Number(e.target.value))} placeholder="7.4" />
+            )}
+            <Input label="Garantia (anos)" type="number" value={form.garantiaAnos}
+              onChange={e => set('garantiaAnos', Number(e.target.value))} placeholder="10" />
+          </div>
+          <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+            Este item entra na lista de equipamentos do PDF e na composição do kit no contrato.
+            O custo continua sendo lançado na aba <strong>Precificação</strong>.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => { setAberto(false); setEditandoId(null); setForm(ITEM_VAZIO) }}>Cancelar</Btn>
+            <Btn onClick={salvar} disabled={adicionar.isLoading || atualizar.isLoading}>
+              {adicionar.isLoading || atualizar.isLoading ? '⏳ Salvando...' : editandoId ? '✔ Salvar alterações' : '✔ Adicionar ao kit'}
+            </Btn>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
   const utils = trpc.useUtils()
   const isMobile = useIsMobile()
@@ -81,6 +263,7 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
     fabricanteInversor:   inversor?.fabricante ?? '',
     modeloInversor:       inversor?.modelo ?? '',
     potenciaInversorWp:   (inversor?.potenciaWp ?? 0) / 1000,  // armazenado em Wp, exibido em kW
+    tipoSistema:          dim?.tipoSistema ?? 'on_grid',
   })
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
@@ -97,6 +280,7 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
       fabricanteInversor:   inv?.fabricante ?? '',
       modeloInversor:       inv?.modelo ?? '',
       potenciaInversorWp:   (inv?.potenciaWp ?? 0) / 1000,  // armazenado em Wp, exibido em kW
+      tipoSistema:          dim?.tipoSistema ?? 'on_grid',
     })
   }, [dim, equips])
 
@@ -108,6 +292,9 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
   // só a quantidade de módulos deixava a potência, geração e economia com os
   // valores antigos, porque nada disso era recalculado).
   const potenciaFinalPreviewKwp = (Number(form.quantidadeModulos) * Number(form.potenciaModuloWp)) / 1000
+
+  const equipsPrincipais = (equips ?? []).filter((e: any) =>
+    ['modulo', 'inversor', 'microinversor'].includes(e.tipo))
 
   const kpisPrincipais = [
     { label: 'Potência Final',    value: formatKwp(dim.potenciaFinalKwp),            color: C.solar,  icon: '⚡', large: true },
@@ -178,6 +365,19 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
               </div>
               <Input label="Qtd. Módulos" type="number" value={form.quantidadeModulos} onChange={e => set('quantidadeModulos', Number(e.target.value))} />
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Select label="Tipo de Sistema" value={form.tipoSistema}
+                onChange={(e: any) => set('tipoSistema', e.target.value)}
+                options={TIPO_SISTEMA_OPTIONS} />
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                {form.tipoSistema !== 'on_grid' && (
+                  <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.4 }}>
+                    Arranjo com banco de baterias — inclua a bateria em
+                    <strong> Itens adicionais do kit</strong>, logo abaixo.
+                  </p>
+                )}
+              </div>
+            </div>
             <p style={{ color: C.textMuted, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', margin: '4px 0 0' }}>Módulos</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 12 }}>
               <Input label="Fabricante" value={form.fabricanteModulo} onChange={e => set('fabricanteModulo', e.target.value)} placeholder="Ex: JA Solar" />
@@ -201,12 +401,13 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
         )}
       </Card>
 
-      {/* Equipamentos */}
-      {equips?.length > 0 && !editando && (
+      {/* Equipamentos principais — os demais itens do kit têm card próprio,
+          logo abaixo, onde também são adicionados e removidos. */}
+      {equipsPrincipais.length > 0 && !editando && (
         <Card style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <span style={{ fontSize: 14 }}>🔧</span>
-            <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Equipamentos</p>
+            <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Equipamentos principais</p>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
@@ -217,7 +418,7 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
               </tr>
             </thead>
             <tbody>
-              {equips.map((eq: any) => {
+              {equipsPrincipais.map((eq: any) => {
                 const isModulo = eq.tipo === 'modulo'
                 const isMicro  = eq.tipo === 'microinversor'
                 return (
@@ -250,6 +451,10 @@ function TabDimensionamento({ dim, equips, propostaId, abrirEmEdicao }: any) {
             </tbody>
           </table>
         </Card>
+      )}
+
+      {!editando && (
+        <ItensAdicionaisKit equips={equips} propostaId={propostaId} tipoSistema={dim.tipoSistema ?? 'on_grid'} />
       )}
     </div>
   )
