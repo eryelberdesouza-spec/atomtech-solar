@@ -27,6 +27,28 @@ const formatDate = (s: any): string => {
   } catch { return String(s) }
 }
 
+// Antes a tabela rotulava tudo que não fosse módulo como "Inversor(es)" — com
+// bateria e wallbox no kit isso passou a mentir.
+const LABEL_EQUIP_PDF: Record<string, string> = {
+  modulo: 'M&oacute;dulos Fotovoltaicos',
+  inversor: 'Inversor(es)',
+  microinversor: 'Microinversor(es)',
+  otimizador: 'Otimizador(es) de Pot&ecirc;ncia',
+  estrutura: 'Estrutura de Fixa&ccedil;&atilde;o',
+  cabo: 'Cabeamento',
+  bateria: 'Bateria(s)',
+  wallbox: 'Carregador Veicular (Wallbox)',
+  outros: 'Item Adicional',
+}
+
+// Módulo em Wp, bateria em kWh, o resto em kW.
+function especificacaoEquipPdf(eq: any): string {
+  if (Number(eq?.capacidadeKwh) > 0) return `${Number(eq.capacidadeKwh)} kWh`
+  if (!eq?.potenciaWp) return '&mdash;'
+  if (eq.tipo === 'modulo') return `${eq.potenciaWp} Wp`
+  return `${(eq.potenciaWp / 1000).toFixed(1)} kW`
+}
+
 function renderTexto(txt: string | undefined | null): string {
   if (!txt) return ''
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -449,10 +471,10 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
           <thead><tr><th>Item</th><th>Fabricante / Modelo</th><th style="text-align:center">Qtd.</th><th>Pot&ecirc;ncia</th><th>Garantia</th></tr></thead>
           <tbody>
             ${equips.map((eq: any) => `<tr>
-              <td>${eq.tipo === 'modulo' ? 'M&oacute;dulos Fotovoltaicos' : eq.tipo === 'microinversor' ? 'Microinversor(es)' : 'Inversor(es)'}</td>
+              <td>${LABEL_EQUIP_PDF[eq.tipo] ?? 'Item'}</td>
               <td style="color:#555">${[eq.fabricante, eq.modelo].filter(Boolean).join(' &mdash; ') || 'A confirmar'}</td>
               <td style="text-align:center;font-weight:700;color:#F5A623">${eq.quantidade}</td>
-              <td>${eq.potenciaWp ? (eq.tipo === 'modulo' ? `${eq.potenciaWp} Wp` : `${(eq.potenciaWp/1000).toFixed(1)} kW`) : '&mdash;'}</td>
+              <td>${especificacaoEquipPdf(eq)}</td>
               <td>${eq.garantiaAnos ? `${eq.garantiaAnos} anos` : '&mdash;'}</td>
             </tr>`).join('')}
           </tbody>

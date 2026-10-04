@@ -133,6 +133,13 @@ const TOPOLOGIA_OPTIONS = [
   { value: 'tradicional',   label: 'Tradicional (String)'        },
   { value: 'otimizador',    label: 'Otimizador de Potência'       },
 ]
+// Off-grid e híbrido são os arranjos que comportam banco de baterias; a
+// bateria em si entra como item do kit na aba Dimensionamento da proposta.
+const TIPO_SISTEMA_OPTIONS = [
+  { value: 'on_grid',  label: 'On-Grid (conectado à rede)' },
+  { value: 'hibrido',  label: 'Híbrido (rede + baterias)'  },
+  { value: 'off_grid', label: 'Off-Grid (isolado)'         },
+]
 const TELHADO_OPTIONS = [
   { value: 'ceramico',     label: 'Cerâmico'              },
   { value: 'fibrocimento', label: 'Fibrocimento'           },
@@ -157,7 +164,7 @@ const MARCOES_PADRAO = [
 const FORM_INICIAL = {
   clienteId: '', dataEmissao: hoje, dataValidade: validade,
   modoCalculo: 'kwh', potenciaKwpManual: 0, consumoMensalKwh: 0,
-  sobredimensionamento: 50, topologia: 'microinversor', tipoTelhado: 'ceramico',
+  sobredimensionamento: 50, topologia: 'microinversor', tipoSistema: 'on_grid', tipoTelhado: 'ceramico',
   desvioAzimutal: 0, inclinacaoGraus: 20,
   fabricanteModulo: '', modeloModulo: '', potenciaModuloWp: 620, quantidadeModulosManual: 0,
   fabricanteInversor: '', modeloInversor: '', potenciaInversorKw: 0,
@@ -329,6 +336,7 @@ export function NovaPropostaPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
               <Select label="Topologia"       options={TOPOLOGIA_OPTIONS} value={form.topologia}   onChange={(e: any) => set('topologia',   e.target.value)} />
+              <Select label="Tipo de Sistema" options={TIPO_SISTEMA_OPTIONS} value={form.tipoSistema} onChange={(e: any) => set('tipoSistema', e.target.value)} />
               <Select label="Tipo de Telhado" options={TELHADO_OPTIONS}   value={form.tipoTelhado} onChange={(e: any) => set('tipoTelhado', e.target.value)} />
               <Input label="Desvio Azimutal (°)" type="number" value={form.desvioAzimutal}  onChange={(e: any) => set('desvioAzimutal',  Number(e.target.value))} suffix="°" />
               <Input label="Inclinação (°)"       type="number" value={form.inclinacaoGraus} onChange={(e: any) => set('inclinacaoGraus', Number(e.target.value))} suffix="°" />

@@ -519,6 +519,7 @@ export const propostaRouter = router({
         dataEmissao: z.string(),
         dataValidade: z.string().optional(),
         topologia: z.enum(['tradicional', 'microinversor', 'otimizador']).default('microinversor'),
+        tipoSistema: z.enum(['on_grid', 'off_grid', 'hibrido']).default('on_grid'),
         tipoTelhado: z.enum(['carport', 'ceramico', 'fibrocimento', 'laje', 'shingle', 'metalico', 'zipado', 'solo']).default('ceramico'),
         desvioAzimutal: z.number().default(0),
         inclinacaoGraus: z.number().default(20),
@@ -693,7 +694,7 @@ export const propostaRouter = router({
         desvioAzimutal: input.desvioAzimutal,
         inclinacaoGraus: input.inclinacaoGraus,
         topologia: input.topologia,
-        tipoSistema: 'on_grid',
+        tipoSistema: input.tipoSistema,
         potenciaRecomendadaKwp: String(sizingResult.potenciaRecomendadaKwp),
         potenciaFinalKwp: String(sizingResult.potenciaFinalKwp),
         quantidadeModulos,
@@ -845,6 +846,110 @@ export const propostaRouter = router({
   // motor de dimensionamento (sizing.engine), e a análise financeira é
   // recalculada com o investimento já existente (a precificação não muda
   // aqui — só quando o usuário edita a aba Precificação).
+  // ── ITENS ADICIONAIS DO KIT ────────────────────────────────────────────
+  // Módulo e inversor têm campos próprios em updateDimensionamento porque
+  // alimentam o cálculo de geração. Os demais (bateria, wallbox, estrutura,
+  // cabo…) são DESCRITIVOS: compõem a lista técnica do PDF e do contrato,
+  // sem entrar no dimensionamento nem na precificação — o custo continua
+  // sendo lançado na aba Precificação.
+  adicionarEquipamento: protectedProcedure
+    .input(z.object({
+      propostaId: z.number().int().positive(),
+      tipo: z.enum(['bateria', 'wallbox', 'otimizador', 'estrutura', 'cabo', 'outros']),
+      fabricante: z.string().max(100).optional(),
+      modelo: z.string().max(200).optional(),
+      quantidade: z.number().int().positive().default(1),
+      potenciaWp: z.number().int().optional(),
+      capacidadeKwh: z.number().optional(),
+      garantiaAnos: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select().from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const existentes = await ctx.db.select().from(equipamentoProposta)
+        .where(eq(equipamentoProposta.propostaId, input.propostaId))
+      const ordem = existentes.reduce((m: number, e: any) => Math.max(m, e.ordem ?? 0), 0) + 1
+
+      await ctx.db.insert(equipamentoProposta).values({
+        propostaId: input.propostaId,
+        tipo: input.tipo,
+        fabricante: input.fabricante || undefined,
+        modelo: input.modelo || undefined,
+        quantidade: input.quantidade,
+        potenciaWp: input.potenciaWp ?? undefined,
+        capacidadeKwh: input.capacidadeKwh != null ? String(input.capacidadeKwh) : undefined,
+        garantiaAnos: input.garantiaAnos ?? undefined,
+        ordem,
+      }).execute()
+      return { ok: true }
+    }),
+
+  atualizarEquipamento: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      propostaId: z.number().int().positive(),
+      fabricante: z.string().max(100).optional(),
+      modelo: z.string().max(200).optional(),
+      quantidade: z.number().int().positive().optional(),
+      potenciaWp: z.number().int().optional(),
+      capacidadeKwh: z.number().optional(),
+      garantiaAnos: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select().from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      const updates: any = {}
+      if (input.fabricante !== undefined) updates.fabricante = input.fabricante || null
+      if (input.modelo !== undefined) updates.modelo = input.modelo || null
+      if (input.quantidade !== undefined) updates.quantidade = input.quantidade
+      if (input.potenciaWp !== undefined) updates.potenciaWp = input.potenciaWp
+      if (input.capacidadeKwh !== undefined) updates.capacidadeKwh = String(input.capacidadeKwh)
+      if (input.garantiaAnos !== undefined) updates.garantiaAnos = input.garantiaAnos
+      if (Object.keys(updates).length) {
+        await ctx.db.update(equipamentoProposta).set(updates)
+          .where(and(
+            eq(equipamentoProposta.id, input.id),
+            eq(equipamentoProposta.propostaId, input.propostaId),
+          )).execute()
+      }
+      return { ok: true }
+    }),
+
+  removerEquipamento: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      propostaId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [prop] = await ctx.db.select().from(proposta)
+        .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
+        .limit(1)
+      if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      // Módulo e inversor são estruturais (o dimensionamento depende deles);
+      // só itens adicionais podem ser removidos por aqui.
+      const [equip] = await ctx.db.select().from(equipamentoProposta)
+        .where(eq(equipamentoProposta.id, input.id)).limit(1)
+      if (!equip || equip.propostaId !== input.propostaId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Item não encontrado' })
+      }
+      if (['modulo', 'inversor', 'microinversor'].includes(equip.tipo)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Módulo e inversor são editados em Parâmetros Técnicos, não podem ser removidos aqui.',
+        })
+      }
+      await ctx.db.delete(equipamentoProposta)
+        .where(eq(equipamentoProposta.id, input.id)).execute()
+      return { ok: true }
+    }),
+
   updateDimensionamento: protectedProcedure
     .input(z.object({
       propostaId: z.number().int().positive(),
@@ -858,6 +963,7 @@ export const propostaRouter = router({
       quantidadeInversores: z.number().int().positive().optional(),
       desvioAzimutal: z.number().optional(),
       inclinacaoGraus: z.number().optional(),
+      tipoSistema: z.enum(['on_grid', 'off_grid', 'hibrido']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { propostaId } = input
@@ -937,6 +1043,9 @@ export const propostaRouter = router({
       await ctx.db.update(dimTable).set({
         potenciaFinalKwp:      String(potenciaFinalKwp),
         quantidadeModulos:     quantidadeModulosFinal,
+        // Não afeta o cálculo de geração — é caracterização do arranjo
+        // (on-grid / off-grid / híbrido), que define se cabe bateria no kit.
+        ...(input.tipoSistema !== undefined ? { tipoSistema: input.tipoSistema } : {}),
         desvioAzimutal:        desvioAzimutalFinal,
         inclinacaoGraus:       inclinacaoGrausFinal,
         areaEstimadaM2:        String(areaEstimadaM2),

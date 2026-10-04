@@ -332,10 +332,13 @@ export const dimensionamento = mysqlTable('dimensionamento', {
 export const equipamentoProposta = mysqlTable('equipamento_proposta', {
   id: int('id').primaryKey().autoincrement(),
   propostaId: int('proposta_id').notNull().references(() => proposta.id, { onDelete: 'cascade' }),
-  tipo: mysqlEnum('tipo', ['modulo','inversor','microinversor','otimizador','estrutura','cabo','outros']).notNull(),
+  tipo: mysqlEnum('tipo', ['modulo','inversor','microinversor','otimizador','estrutura','cabo','bateria','wallbox','outros']).notNull(),
   fabricante: varchar('fabricante', { length: 100 }),
   modelo: varchar('modelo', { length: 200 }),
   potenciaWp: int('potencia_wp'),
+  // Bateria se mede em energia armazenada (kWh), não em potência — por isso
+  // campo próprio em vez de reaproveitar potenciaWp, que é W/Wp em todo o resto.
+  capacidadeKwh: decimal('capacidade_kwh', { precision: 8, scale: 2 }),
   quantidade: int('quantidade').notNull(),
   precoUnitario: decimal('preco_unitario', { precision: 10, scale: 2 }),
   precoTotal: decimal('preco_total', { precision: 10, scale: 2 }),
