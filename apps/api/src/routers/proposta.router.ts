@@ -1867,6 +1867,8 @@ export const propostaRouter = router({
   salvarCondicaoFechamento: protectedProcedure
     .input(z.object({
       propostaId: z.number().int().positive(),
+      desconto: z.number().min(0).default(0),
+      mostrarDesconto: z.boolean().default(true),
       partes: z.array(z.object({
         forma: z.string().min(1).max(40),
         valor: z.number().positive(),
@@ -1881,6 +1883,11 @@ export const propostaRouter = router({
         .where(and(eq(proposta.id, input.propostaId), eq(proposta.empresaId, ctx.usuario.empresaId)))
         .limit(1)
       if (!prop) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposta não encontrada' })
+
+      // Valor ofertado no momento do fechamento — snapshot, nunca sobrescrito.
+      const [prec] = await ctx.db.select({ precoFinal: precTable.precoFinal }).from(precTable)
+        .where(eq(precTable.propostaId, input.propostaId)).limit(1)
+      const valorOriginal = prec ? Number(prec.precoFinal) : null
 
       const valorTotal = input.partes.reduce((s, p) => s + p.valor, 0)
       if (valorTotal <= 0) {
@@ -1915,6 +1922,9 @@ export const propostaRouter = router({
         ativa: true,
         ordem: 99,   // sempre por último entre as condições da proposta
         deFechamento: true,
+        valorOriginal: valorOriginal !== null ? String(valorOriginal) : null,
+        desconto: String(input.desconto),
+        mostrarDesconto: input.mostrarDesconto,
       }).execute()
       const condId = (condResult as { insertId: number }).insertId
 

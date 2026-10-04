@@ -1955,6 +1955,30 @@ app.get('/run-migration-os-status-pendencia', async (_, res) => {
   }
 })
 
+// ── Migração: desconto no fechamento da proposta — condicao_comercial ganha
+//    valor_original (snapshot do valor ofertado), desconto e mostrar_desconto,
+//    pra dar desconto na hora de fechar sem sobrescrever o valor inicial ───────
+app.get('/run-migration-condicao-desconto', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      ALTER TABLE condicao_comercial
+        ADD COLUMN valor_original DECIMAL(10,2) NULL AFTER de_fechamento,
+        ADD COLUMN desconto DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER valor_original,
+        ADD COLUMN mostrar_desconto TINYINT(1) NOT NULL DEFAULT 1 AFTER desconto
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Colunas de desconto adicionadas a condicao_comercial' })
+  } catch (e: any) {
+    if (e.code === 'ER_DUP_FIELDNAME') {
+      res.json({ ok: true, message: 'Colunas já existiam' })
+    } else {
+      res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+})
+
 // ── Migração: cliente_energia_solar (config técnica) + relatorio_energia_gerado
 //    (histórico mensal, com o .pptx em MEDIUMBLOB — fora do schema Drizzle, mesmo
 //    padrão de os_anexo) ─────────────────────────────────────────────────────

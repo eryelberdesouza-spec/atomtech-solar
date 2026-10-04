@@ -407,6 +407,16 @@ export const condicaoComercial = mysqlTable('condicao_comercial', {
   // aparecendo só as condições ofertadas, preservando o histórico do que foi
   // apresentado ao cliente. Contrato e importação no AGF usam esta quando existe.
   deFechamento: boolean('de_fechamento').default(false).notNull(),
+  // Desconto concedido no fechamento (2026-10-04) — só preenchido na condição
+  // de deFechamento=true. valorOriginal guarda o valor ofertado (precoFinal) no
+  // momento do fechamento, intocado; valorTotal = valorOriginal - desconto.
+  // Não mexe em precificacao/analiseFinanceira (isso recalcularia TIR/payback
+  // e mudaria o PDF ofertado) — o desconto é só do fechamento pra frente.
+  valorOriginal: decimal('valor_original', { precision: 10, scale: 2 }),
+  desconto: decimal('desconto', { precision: 10, scale: 2 }).default('0').notNull(),
+  // Controla se o desconto aparece no resumo interno da proposta (AGO) —
+  // nunca aparece no contrato, que só mostra o valor final.
+  mostrarDesconto: boolean('mostrar_desconto').default(true).notNull(),
 })
 
 export const parcelaPagamento = mysqlTable('parcela_pagamento', {

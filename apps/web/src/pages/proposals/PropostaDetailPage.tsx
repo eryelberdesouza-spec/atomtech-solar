@@ -517,6 +517,8 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
   const [partes, setPartes] = useState<any[]>([
     { forma: 'pix', valor: 0, numParcelas: 1, prazoDias: 0, tipoPrazo: 'corridos', descricao: '' },
   ])
+  const [desconto, setDesconto] = useState(0)
+  const [mostrarDesconto, setMostrarDesconto] = useState(true)
 
   const salvar = (trpc as any).proposta.salvarCondicaoFechamento.useMutation({
     onSuccess: () => { utils.proposta.byId.invalidate({ id: propostaId }); setAberto(false) },
@@ -529,12 +531,17 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
 
   const soma = partes.reduce((s, p) => s + Number(p.valor || 0), 0)
   const ref = Number(valorReferencia ?? 0)
-  const diferenca = ref > 0 ? soma - ref : 0
+  // Alvo é o valor ofertado JÁ com o desconto abatido — o desconto não
+  // reescreve o valor inicial, só desloca o alvo que as partes têm que somar.
+  const refComDesconto = Math.max(0, ref - desconto)
+  const diferenca = ref > 0 ? soma - refComDesconto : 0
   const fecha = ref <= 0 || Math.abs(diferenca) < 0.01
 
   // Ao abrir, parte das formas já registradas (se houver) pra permitir ajuste
   // em vez de obrigar a redigitar tudo.
   const abrirEdicao = () => {
+    setDesconto(Number(existente?.desconto ?? 0))
+    setMostrarDesconto(existente ? Number(existente.mostrarDesconto) !== 0 : true)
     if (existente?.parcelas?.length) {
       const grupos = new Map<number, any>()
       for (const p of existente.parcelas) {
@@ -624,6 +631,18 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
               <span style={{ color: C.text, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(g.valor)}</span>
             </div>
           ))}
+          {Number(existente.mostrarDesconto) !== 0 && Number(existente.desconto) > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12.5, marginTop: 4 }}>
+                <span style={{ color: C.textDim }}>Valor ofertado</span>
+                <span style={{ color: C.textMuted, fontFamily: 'monospace' }}>{formatCurrency(existente.valorOriginal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 12.5 }}>
+                <span style={{ color: C.textDim }}>Desconto concedido</span>
+                <span style={{ color: C.danger, fontFamily: 'monospace' }}>− {formatCurrency(existente.desconto)}</span>
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px solid ${C.darkBorder}60`, marginTop: 6, paddingTop: 8 }}>
             <span style={{ color: C.textMuted, fontSize: 12, fontWeight: 700 }}>Total</span>
             <span style={{ color: C.green, fontSize: 14, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(existente.valorTotal)}</span>
@@ -634,6 +653,45 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
       {/* Edição */}
       {aberto && (
         <div style={{ marginTop: 14 }}>
+          {ref > 0 && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'end',
+              marginBottom: 14, padding: '12px 14px', borderRadius: 10,
+              background: C.dark, border: `1px solid ${C.darkBorder}`,
+            }}>
+              <div>
+                <label style={labelSt}>Desconto (R$) — opcional</label>
+                <input type="number" min={0} step="0.01" value={desconto} style={inputSt}
+                  onChange={e => setDesconto(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div style={{ fontSize: 12.5, paddingBottom: 9 }}>
+                <span style={{ color: C.textDim }}>Ofertado </span>
+                <span style={{ color: C.textMuted, fontFamily: 'monospace' }}>{formatCurrency(ref)}</span>
+                {desconto > 0 && <>
+                  <span style={{ color: C.textDim }}> → a fechar </span>
+                  <span style={{ color: C.solar, fontWeight: 700, fontFamily: 'monospace' }}>{formatCurrency(refComDesconto)}</span>
+                </>}
+              </div>
+              {desconto > 0 && (
+                <div
+                  onClick={() => setMostrarDesconto(v => !v)}
+                  style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 2 }}
+                >
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                    border: `2px solid ${mostrarDesconto ? C.accent : C.darkBorder}`,
+                    background: mostrarDesconto ? C.accent : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {mostrarDesconto && <span style={{ color: '#fff', fontSize: 11, lineHeight: 1 }}>✓</span>}
+                  </div>
+                  <span style={{ color: C.textDim, fontSize: 11.5 }}>
+                    Mostrar o desconto no resumo desta proposta (o contrato sempre mostra só o valor final)
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           {partes.map((p, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 90px 110px 40px', gap: 10, alignItems: 'end', marginBottom: 10 }}>
               <div>
@@ -684,7 +742,7 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
           ))}
 
           <Btn size="sm" variant="ghost"
-            onClick={() => setPartes(ps => [...ps, { forma: 'cartao_credito', valor: Math.max(0, ref - soma), numParcelas: 1, prazoDias: 0, tipoPrazo: 'corridos', descricao: '' }])}>
+            onClick={() => setPartes(ps => [...ps, { forma: 'cartao_credito', valor: Math.max(0, refComDesconto - soma), numParcelas: 1, prazoDias: 0, tipoPrazo: 'corridos', descricao: '' }])}>
             + Adicionar forma
           </Btn>
 
@@ -694,7 +752,7 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
               <span style={{ color: fecha ? C.green : C.danger, fontWeight: 800, fontFamily: 'monospace' }}>{formatCurrency(soma)}</span>
               {ref > 0 && (
                 <span style={{ color: C.textDim, marginLeft: 8 }}>
-                  de {formatCurrency(ref)}
+                  de {formatCurrency(refComDesconto)}
                   {!fecha && (
                     <strong style={{ color: C.danger, marginLeft: 6 }}>
                       ({diferenca > 0 ? 'excede' : 'faltam'} {formatCurrency(Math.abs(diferenca))})
@@ -708,11 +766,13 @@ function BlocoFechamento({ condicoes, propostaId, valorReferencia }: any) {
               <Btn
                 disabled={salvar.isLoading || soma <= 0}
                 onClick={() => {
-                  // Só avisa; não bloqueia — desconto ou acréscimo no fechamento
-                  // é situação legítima e o usuário é quem sabe.
-                  if (!fecha && !confirm(`A soma (${formatCurrency(soma)}) não bate com o valor da proposta (${formatCurrency(ref)}). Gravar assim mesmo?`)) return
+                  // Só avisa; não bloqueia — desconto ou acréscimo além do
+                  // combinado é situação legítima e o usuário é quem sabe.
+                  if (!fecha && !confirm(`A soma (${formatCurrency(soma)}) não bate com o valor a fechar (${formatCurrency(refComDesconto)}). Gravar assim mesmo?`)) return
                   salvar.mutate({
                     propostaId,
+                    desconto,
+                    mostrarDesconto,
                     partes: partes.filter(p => Number(p.valor) > 0).map(p => ({
                       forma: p.forma,
                       valor: Number(p.valor),
