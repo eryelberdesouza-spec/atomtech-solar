@@ -90,6 +90,37 @@ As `condicao_comercial` de uma proposta são as **opções ofertadas** ao client
 - Híbrido/off-grid sem bateria cadastrada gera **aviso, não bloqueio**: "sistema preparado, bateria depois" é caso real.
 - **Armadilha corrigida junto**: a tabela de equipamentos do PDF rotulava como "Inversor(es)" **tudo** que não fosse módulo — uma bateria sairia na proposta como inversor. Agora há mapa de rótulos (`LABEL_EQUIP_PDF`) e a especificação sai em Wp (módulo), kWh (bateria) ou kW (demais). Ao acrescentar tipo de equipamento, conferir SEMPRE os três lugares: tela, `gerarPdfBrowser.ts` e `LABEL_TIPO_EQUIPAMENTO` do contrato.
 
+## ⚠️ EM ABERTO — retomar aqui (2026-10-06, fim do dia, PC escritório)
+
+**O bot de WhatsApp está FORA DO AR e o re-pareamento ficou pela metade.** Clientes escrevem no número da Atom e ninguém responde desde ~05/10 14:35 UTC.
+
+Sequência do que já foi tentado hoje, para não repetir:
+1. `POST /api/sessions/default/start` (restart simples) → continuou `FAILED`.
+2. `railway redeploy --service courteous-celebration` → container subiu limpo, **webhook do n8n se reconfigurou sozinho** (não precisa refazer à mão), mas a sessão voltou a `FAILED` com `Error: Connection Failure` logo após `logging in...`. **Diferente de agosto/2026: lá o redeploy resolveu; aqui NÃO resolveu.**
+3. Usuário confirmou no celular: **nenhum aparelho conectado** na lista do WhatsApp — o WhatsApp derrubou o pareamento do lado dele. Credencial salva estava morta, logo o `logout` não destruiu nada útil.
+4. `logout` + `start` → sessão foi para `SCAN_QR_CODE`. **Escanear falhou** com "não é possível conectar o dispositivo" no celular; no log do WAHA: `QR refs attempts ended / QR code has not been scanned yet`.
+
+**LIÇÃO: não adianta mandar PNG do QR pelo chat.** O WAHA rotaciona o QR a cada ~20s; quando o usuário abre a imagem, aquele código já morreu. O caminho certo é o **dashboard do WAHA** (`<WAHA_URL>/dashboard`, login `admin` + `WAHA_DASHBOARD_PASSWORD` nas vars do serviço `courteous-celebration`), que mostra o QR ao vivo renovando sozinho.
+
+**PRÓXIMO PASSO**: no dashboard, a linha do worker WAHA vem **desconectada** — é preciso clicar no lápis e informar a `WAHA_API_KEY` (o dashboard é só o cliente; não herda a key do servidor). Só depois a sessão aparece e o QR ao vivo fica disponível. Se com QR ao vivo ainda falhar, as suspeitas seguintes são: versão do WhatsApp no celular desatualizada, relógio do celular fora de hora, e por fim versão do WAHA (`2026.9.2`, engine NOWEB) velha para o protocolo atual.
+
+**Enquanto a sessão não voltar**, `WHATSAPP_ALERTAS_ATIVO` continua `false` — alertas de OS não saem (e nem adiantaria, o envio usa o mesmo WAHA).
+
+### Limpezas pendentes (minhas, desta sessão)
+- Planilha **Leads**: apagar a linha de teste "Teste Interno" / `556198050301`. Entrou porque o filtro novo do n8n foi ao ar com um bug (ver abaixo) e o fluxo rodou inteiro.
+- Proposta **AT-2026-10292** ("TESTE DE ASSINATURA ELETRÔNICA — NÃO FATURAR", cliente ATOM TECH): arquivar. Criada só para validar a ZapSign.
+- n8n → Settings → n8n API: revogar as chaves **"Claude - ajuste bot OS"** (expira 05/11) e **"Claude — protecao bot"** (não chegou a ser usada).
+
+## Bot WhatsApp — filtro de números internos (2026-10-06)
+
+Nó **"É número interno?"** (IF, typeVersion 1) inserido entre o `Webhook` e o `É áudio?` no workflow `25veqbanGSjjhYVR`. Descarta mensagens de/para os telefones da equipe, para que os alertas de OS enviados pelo AGO (mesmo número do bot) não façam o n8n tratar resposta de colega como lead.
+
+- `true` (interno) → **sem saída**, fluxo morre ali. `false` → segue para `É áudio?`, exatamente como antes.
+- Lista comparada pelos **últimos 8 dígitos** — número BR pode chegar sem o nono dígito.
+- **Armadilha que custou um teste sujo**: a expressão foi escrita com `\D` dentro de camadas de escape (bash → node → JSON) e chegou ao n8n como `/D/g`, que remove a letra "D" em vez de não-dígitos. O filtro não pegava nada e o fluxo rodou inteiro, registrando lead de teste. **Usar `[^0-9]` em vez de `\D`** em expressão n8n gerada por script.
+- Verificado nos dois ramos: execução 4785 parou no filtro (só Webhook, Responder OK, filtro); a 4784 — ainda com o bug — provou que número externo percorre o fluxo completo.
+- Editar via API (`PUT /api/v1/workflows/{id}`) com `settings` só `{executionOrder}`; `binaryMode` faz o PUT retornar 400. Depois, `POST /deactivate` + `/activate`.
+
 ## Assinatura eletrônica de contrato — ZapSign (2026-10-06, em produção)
 
 Opção "✍️ Enviar para assinatura (ZapSign)" no modal **Gerar Contrato**. O PDF é baixado primeiro e o envio vem **depois**, de propósito: se a ZapSign falhar, o contrato já está na mão do usuário.
