@@ -658,6 +658,11 @@ export const ordemServico = mysqlTable('ordem_servico', {
   titulo:              varchar('titulo', { length: 200 }),
   descricao:           text('descricao'),
   tecnicoResponsavel:  varchar('tecnico_responsavel', { length: 100 }),
+  // O nome acima é texto livre e continua valendo (há técnico terceirizado que
+  // não é usuário do sistema). Quando o técnico É usuário, este vínculo guarda
+  // quem é — é daqui que sai o telefone para o alerta de WhatsApp.
+  tecnicoResponsavelId: int('tecnico_responsavel_id'),
+  criadoPor:           int('criado_por'),
   // Resumo do serviço a ser realizado — orientação rápida pro técnico em campo
   resumoServico:       text('resumo_servico'),
   // Endereço/link/coordenadas do local do serviço — facilita o deslocamento da equipe

@@ -10,6 +10,7 @@ import { parseInter, parseSicoob } from './lib/extratoParser'
 import { parseOFX } from './lib/ofxParser'
 import { renderPdf, renderPdfComCapaSeparada, renderPdfContratoComAnexo, acharChromium } from './lib/pdfRenderer'
 import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
+import { notificarOsEmBackground } from './services/osNotificacao'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -1904,6 +1905,79 @@ app.get('/run-migration-os-resumo-localizacao', async (_, res) => {
   }
 })
 
+// ── Migração: alertas de OS por WhatsApp ─────────────────────────────────────
+// Precisa saber QUEM avisar: o técnico responsável era só um nome em texto
+// livre e a OS não registrava o autor. Agora há vínculo opcional com usuário
+// (quem não é usuário do sistema continua valendo como texto).
+app.get('/run-migration-os-notificacao', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const criadas: string[] = []
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ordem_servico'
+          AND COLUMN_NAME IN ('tecnico_responsavel_id','criado_por')`,
+    )
+    const existentes = cols.map((c: any) => c.COLUMN_NAME)
+    if (!existentes.includes('tecnico_responsavel_id')) {
+      await conn.execute(
+        `ALTER TABLE ordem_servico ADD COLUMN tecnico_responsavel_id INT NULL AFTER tecnico_responsavel`,
+      )
+      criadas.push('ordem_servico.tecnico_responsavel_id')
+    }
+    if (!existentes.includes('criado_por')) {
+      await conn.execute(`ALTER TABLE ordem_servico ADD COLUMN criado_por INT NULL`)
+      criadas.push('ordem_servico.criado_por')
+    }
+
+    // Log do que foi disparado — sem isso não há como depurar "não chegou
+    // mensagem" nem provar o que foi enviado.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_notificacao (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        ordem_servico_id INT NOT NULL,
+        empresa_id      INT NOT NULL,
+        evento          VARCHAR(40) NOT NULL,
+        mensagem        TEXT NOT NULL,
+        destinatarios   JSON NULL,
+        canal           VARCHAR(20) NOT NULL DEFAULT 'whatsapp',
+        status          ENUM('enviada','parcial','falhou','sem_destinatario','desativado') NOT NULL,
+        erro            TEXT NULL,
+        criado_por      INT NULL,
+        criado_em       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_os_notif_os  (ordem_servico_id),
+        INDEX idx_os_notif_emp (empresa_id),
+        INDEX idx_os_notif_dt  (criado_em)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `)
+    criadas.push('tabela os_notificacao (ou já existia)')
+
+    // Vincula o técnico ao usuário quando o nome bate exatamente — o resto
+    // continua como texto e passa a ser escolhido na tela.
+    const [r]: any = await conn.execute(`
+      UPDATE ordem_servico o
+        JOIN usuario u ON u.empresa_id = o.empresa_id
+                      AND u.ativo = 1
+                      AND LOWER(TRIM(u.nome)) = LOWER(TRIM(o.tecnico_responsavel))
+         SET o.tecnico_responsavel_id = u.id
+       WHERE o.tecnico_responsavel_id IS NULL
+         AND o.tecnico_responsavel IS NOT NULL
+         AND o.tecnico_responsavel <> ''
+    `)
+    await conn.end()
+    res.json({
+      ok: true,
+      criadas,
+      tecnicosVinculadosPorNome: r?.affectedRows ?? 0,
+      observacao: 'Nenhuma OS perde dados: tecnico_responsavel (texto) continua intacto.',
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: cria tabela os_anexo ───────────────────────────────────────────
 app.get('/run-migration-os-anexo', async (_, res) => {
   try {
@@ -2195,9 +2269,13 @@ app.post('/os/:osId/anexo', uploadAnexo.single('arquivo'), async (req, res) => {
     if (!token) { res.status(401).json({ ok: false, error: 'Não autorizado' }); return }
 
     let empresaId: number | undefined
+    let autorId = 0
+    let autorNome = ''
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf-8'))
       empresaId = payload.empresaId
+      autorId = payload.userId ?? 0
+      autorNome = payload.nome ?? ''
     } catch { /* token inválido */ }
     if (!empresaId) { res.status(401).json({ ok: false, error: 'Token inválido' }); return }
 
@@ -2246,6 +2324,15 @@ app.post('/os/:osId/anexo', uploadAnexo.single('arquivo'), async (req, res) => {
     const [idRow]: any = await conn.execute('SELECT LAST_INSERT_ID() AS id')
     const id = (idRow as any[])[0]?.id
     await conn.end()
+
+    // Alerta à equipe — exatamente o caso "Fulano incluiu uma foto na OS X".
+    // Em background: a resposta do upload não espera o WhatsApp.
+    const ehImagem = tipoMime.startsWith('image/')
+    notificarOsEmBackground(
+      { usuarioId: autorId, usuarioNome: autorNome, empresaId },
+      osId, 'anexo',
+      `incluiu ${ehImagem ? 'uma foto' : 'um anexo'} (${nomeFinal})`,
+    )
 
     res.json({ ok: true, id, nome: nomeFinal, tipoMime, tamanho: dados.length })
   } catch (e: any) {
