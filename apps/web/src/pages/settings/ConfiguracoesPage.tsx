@@ -105,6 +105,7 @@ function AbaEmpresa() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Input label="Representante 1 — Nome" value={val('rep1Nome')} onChange={e => set('rep1Nome', e.target.value)} placeholder="Paulo Henrique Ramos da Silva" />
           <Input label="Representante 1 — CPF" value={val('rep1Cpf')} onChange={e => set('rep1Cpf', e.target.value)} placeholder="031.363.751-22" />
+          <Input label="Representante 1 — E-mail (assinatura)" value={val('rep1Email')} onChange={e => set('rep1Email', e.target.value)} placeholder="paulohenrique@atomtech.tec.br" />
           <div style={{ gridColumn: 'span 2' }}>
             <textarea
               value={val('rep1Descricao')}
@@ -116,6 +117,7 @@ function AbaEmpresa() {
           </div>
           <Input label="Representante 2 — Nome" value={val('rep2Nome')} onChange={e => set('rep2Nome', e.target.value)} placeholder="Eryelber Correia de Souza" />
           <Input label="Representante 2 — CPF" value={val('rep2Cpf')} onChange={e => set('rep2Cpf', e.target.value)} placeholder="597.148.321-87" />
+          <Input label="Representante 2 — E-mail (assinatura)" value={val('rep2Email')} onChange={e => set('rep2Email', e.target.value)} placeholder="eryelber@atomtech.tec.br" />
           <div style={{ gridColumn: 'span 2' }}>
             <textarea
               value={val('rep2Descricao')}
