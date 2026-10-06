@@ -43,9 +43,12 @@ export const empresa = mysqlTable('empresa', {
   rep1Nome: varchar('rep1_nome', { length: 200 }),
   rep1Cpf: varchar('rep1_cpf', { length: 30 }),
   rep1Descricao: text('rep1_descricao'),
+  // E-mail dos representantes: usado para convidá-los a assinar na ZapSign.
+  rep1Email: varchar('rep1_email', { length: 150 }),
   rep2Nome: varchar('rep2_nome', { length: 200 }),
   rep2Cpf: varchar('rep2_cpf', { length: 30 }),
   rep2Descricao: text('rep2_descricao'),
+  rep2Email: varchar('rep2_email', { length: 150 }),
   bloquearDupNome: boolean('bloquear_dup_nome').default(true).notNull(),
   bloquearDupEmpresa: boolean('bloquear_dup_empresa').default(true).notNull(),
   bloquearDupCpfCnpj: boolean('bloquear_dup_cpf_cnpj').default(true).notNull(),

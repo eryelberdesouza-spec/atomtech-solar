@@ -12,7 +12,7 @@ import {
 } from '../../components/ui'
 import { abrirPdfNoNavegador, gerarHTML } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador, gerarHtmlServico } from '../../lib/gerarPdfServicoBrowser'
-import { baixarPdfDoServidor, baixarContratoDoServidor } from '../../lib/baixarPdfServidor'
+import { baixarPdfDoServidor, baixarContratoDoServidor, enviarContratoParaAssinatura } from '../../lib/baixarPdfServidor'
 import { abrirContratoNoNavegador, gerarHtmlContrato } from '../../lib/gerarContratoBrowser'
 import { abrirContratoServicoNoNavegador, gerarHtmlContratoServico } from '../../lib/gerarContratoServicoBrowser'
 
@@ -1975,6 +1975,7 @@ function PropostaDetailPageInner() {
   const [showModalFormaPag, setShowModalFormaPag] = useState(false)
   const [formaPagContrato, setFormaPagContrato] = useState('padrao')
   const [anexarProposta, setAnexarProposta] = useState(true)
+  const [enviarAssinatura, setEnviarAssinatura] = useState(false)
   const [showClonar, setShowClonar]         = useState(false)
   const [showAltCliente, setShowAltCliente] = useState(false)
   const [showCapaModal, setShowCapaModal]   = useState(false)
@@ -2188,6 +2189,28 @@ function PropostaDetailPageInner() {
       }
 
       await baixarContratoDoServidor(contratoHtml, `CONTRATO-${numero}.pdf`, anexo)
+
+      // Assinatura é opcional e vem DEPOIS do download: se a ZapSign falhar,
+      // o contrato já está na mão do usuário.
+      if (enviarAssinatura) {
+        try {
+          const r = await enviarContratoParaAssinatura(
+            propostaId, contratoHtml, `Contrato ${numero}`, anexo,
+          )
+          await utils.proposta.assinaturaContrato.invalidate({ propostaId })
+          alert(
+            `Contrato enviado para assinatura.\n\n` +
+            r.signatarios.map(s => `• ${s.nome}${s.email ? ` (${s.email})` : ''}`).join('\n') +
+            (r.avisos?.length ? `\n\n⚠ ${r.avisos.join('\n')}` : '') +
+            `\n\nOs links de assinatura ficam na aba da proposta.`,
+          )
+        } catch (e: any) {
+          alert(
+            'O PDF do contrato foi gerado normalmente, mas o envio para assinatura falhou:\n\n' +
+            (e?.message ?? e),
+          )
+        }
+      }
     } catch (e: any) {
       // Fallback: se a API estiver fora do ar, volta ao fluxo de impressão —
       // mas sem anexo (juntar dois PDFs exige o servidor).
@@ -2447,6 +2470,7 @@ function PropostaDetailPageInner() {
 
       {/* ── CONTEÚDO ────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 14px' : '22px 24px' }}>
+        <CardAssinatura propostaId={propostaId} />
         {isServico ? (
           <>
             {tab === 'itens'    && <TabItensServico itens={itensServico ?? []} propostaId={propostaId} tituloServico={proposta.tituloServico} />}
@@ -2525,11 +2549,90 @@ function PropostaDetailPageInner() {
           onChange={setFormaPagContrato}
           anexarProposta={anexarProposta}
           onChangeAnexar={setAnexarProposta}
+          enviarAssinatura={enviarAssinatura}
+          onChangeAssinatura={setEnviarAssinatura}
           onConfirm={handleGerarContratoComFormaPag}
           onClose={() => setShowModalFormaPag(false)}
         />
       )}
     </div>
+  )
+}
+
+// ─── ASSINATURA ELETRÔNICA (ZapSign) ─────────────────────────────────────────
+// Só aparece depois que o contrato foi enviado — proposta sem envio não
+// mostra card nenhum, para não poluir a tela de quem não usa.
+const STATUS_ASSINATURA: Record<string, { label: string; cor: string }> = {
+  pending:  { label: 'Aguardando assinaturas', cor: '#F5A623' },
+  signed:   { label: 'Assinado por todos',     cor: '#66BB6A' },
+  refused:  { label: 'Recusado',               cor: '#EF4444' },
+  canceled: { label: 'Cancelado',              cor: '#EF4444' },
+}
+
+function CardAssinatura({ propostaId }: { propostaId: number }) {
+  const utils = trpc.useUtils()
+  const { data, isLoading } = (trpc as any).proposta.assinaturaContrato.useQuery(
+    { propostaId, atualizar: false },
+  )
+  const [atualizando, setAtualizando] = useState(false)
+
+  if (isLoading || !data) return null
+
+  const st = STATUS_ASSINATURA[String(data.status)] ?? { label: String(data.status), cor: C.textMuted }
+  const signatarios: any[] = Array.isArray(data.signatarios) ? data.signatarios : []
+
+  const atualizar = async () => {
+    setAtualizando(true)
+    try {
+      await utils.proposta.assinaturaContrato.fetch({ propostaId, atualizar: true })
+      await utils.proposta.assinaturaContrato.invalidate({ propostaId })
+    } finally { setAtualizando(false) }
+  }
+
+  return (
+    <Card style={{ padding: '16px 20px', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14 }}>✍️</span>
+          <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Assinatura do contrato</p>
+          <Pill color={st.cor}>{st.label}</Pill>
+        </div>
+        <Btn size="sm" variant="ghost" onClick={atualizar} disabled={atualizando}>
+          {atualizando ? '⏳ Atualizando...' : '↻ Atualizar status'}
+        </Btn>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {signatarios.map((s: any, i: number) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`,
+          }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 2px' }}>{s.nome}</p>
+              <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>{s.email || 'sem e-mail'}</p>
+            </div>
+            <Pill color={s.status === 'signed' ? C.green : C.textMuted}>
+              {s.status === 'signed' ? '✔ assinou' : 'pendente'}
+            </Pill>
+            {s.signUrl && (
+              <Btn size="sm" variant="ghost"
+                onClick={() => {
+                  navigator.clipboard?.writeText(s.signUrl)
+                    .then(() => alert(`Link de assinatura de ${s.nome} copiado.`))
+                    .catch(() => window.prompt('Copie o link de assinatura:', s.signUrl))
+                }}>
+                ⧉ Copiar link
+              </Btn>
+            )}
+          </div>
+        ))}
+      </div>
+      <p style={{ color: C.textDim, fontSize: 11, margin: '10px 0 0' }}>
+        Documento criado na ZapSign em {formatDate(String(data.criadoEm).slice(0, 10))}.
+        O status não muda sozinho — use “Atualizar status”.
+      </p>
+    </Card>
   )
 }
 
@@ -2576,13 +2679,16 @@ const OPCOES_FORMA_PAG_CONTRATO = [
 ]
 
 function ModalFormaPagamentoContrato({
-  fechamento, value, onChange, anexarProposta, onChangeAnexar, onConfirm, onClose,
+  fechamento, value, onChange, anexarProposta, onChangeAnexar,
+  enviarAssinatura, onChangeAssinatura, onConfirm, onClose,
 }: {
   fechamento?: any
   value: string
   onChange: (v: string) => void
   anexarProposta: boolean
   onChangeAnexar: (v: boolean) => void
+  enviarAssinatura: boolean
+  onChangeAssinatura: (v: boolean) => void
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -2691,6 +2797,32 @@ function ModalFormaPagamentoContrato({
             ✓ Selecionado: <strong>{op.icon} {op.label}</strong>
           </div>
         )}
+
+        <div
+          onClick={() => onChangeAssinatura(!enviarAssinatura)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginTop: 14,
+            padding: '11px 14px', borderRadius: 10, cursor: 'pointer', userSelect: 'none',
+            border: `1px solid ${enviarAssinatura ? C.accent : C.darkBorder}`,
+            background: enviarAssinatura ? `${C.accent}10` : C.dark,
+          }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+            border: `2px solid ${enviarAssinatura ? C.accent : C.darkBorder}`,
+            background: enviarAssinatura ? C.accent : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {enviarAssinatura && <span style={{ color: '#fff', fontSize: 12, lineHeight: 1 }}>✓</span>}
+          </div>
+          <div>
+            <div style={{ color: C.text, fontWeight: 600, fontSize: 13.5 }}>✍️ Enviar para assinatura (ZapSign)</div>
+            <div style={{ color: C.textDim, fontSize: 11.5, lineHeight: 1.4 }}>
+              Além de baixar o PDF, cria o documento na ZapSign para o cliente e os dois sócios
+              assinarem. A ZapSign manda o e-mail e os links ficam aqui na proposta.
+            </div>
+          </div>
+        </div>
 
         <div
           onClick={() => onChangeAnexar(!anexarProposta)}

@@ -117,3 +117,40 @@ export async function baixarContratoDoServidor(
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }
+
+/**
+ * Envia o contrato para assinatura eletrônica (ZapSign).
+ *
+ * Usa o MESMO HTML que gera o PDF baixado — o documento assinado é idêntico
+ * ao que a equipe já confere hoje. O servidor é quem renderiza, converte em
+ * base64 e fala com a ZapSign; o token nunca chega ao navegador.
+ */
+export async function enviarContratoParaAssinatura(
+  propostaId: number,
+  contratoHtml: string,
+  nomeDocumento: string,
+  anexo?: { bodyHtml: string; capaHtml?: string | null; headerTemplate?: string; footerTemplate?: string } | null,
+): Promise<{
+  token: string
+  status: string
+  signatarios: { nome: string; email: string | null; signUrl: string | null; status: string | null }[]
+  avisos?: string[]
+}> {
+  const token = localStorage.getItem('atomtech_token')
+
+  const resp = await fetch(`${API_BASE}/contrato/enviar-assinatura`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ propostaId, contratoHtml, nomeDocumento, anexo: anexo ?? null }),
+  })
+
+  if (!resp.ok) {
+    let detalhe = `HTTP ${resp.status}`
+    try { detalhe = (await resp.json())?.error ?? detalhe } catch { /* corpo não-JSON */ }
+    throw new Error(detalhe)
+  }
+  return resp.json()
+}

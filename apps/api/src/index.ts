@@ -154,6 +154,116 @@ app.post('/pdf/render-contrato', async (req, res) => {
   }
 })
 
+// ── Contrato → assinatura eletrônica (ZapSign) ───────────────────────────────
+// Reaproveita exatamente o mesmo pipeline do contrato já validado: o front
+// manda o HTML, aqui vira PDF vetorial e segue para a ZapSign em base64.
+// Assim o documento assinado é idêntico ao que o usuário baixa hoje.
+app.post('/contrato/enviar-assinatura', async (req, res) => {
+  const authHeader = req.headers.authorization
+  let empresaId = 0
+  let usuarioId = 0
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(authHeader.slice(7).split('.')[1], 'base64').toString('utf-8'),
+      )
+      empresaId = payload.empresaId ?? 0
+      usuarioId = payload.userId ?? 0
+    } catch { /* token inválido */ }
+  }
+  if (!empresaId) return res.status(401).json({ error: 'Não autenticado' })
+
+  const { contratoHtml, anexo, propostaId, nomeDocumento } = req.body ?? {}
+  if (typeof contratoHtml !== 'string' || !contratoHtml.includes('<html')) {
+    return res.status(400).json({ error: 'Campo "contratoHtml" ausente ou inválido' })
+  }
+  if (!propostaId) return res.status(400).json({ error: 'Campo "propostaId" ausente' })
+
+  try {
+    const { zapsignConfigurado, criarDocumento } = await import('./services/zapsign')
+    if (!zapsignConfigurado()) {
+      return res.status(503).json({
+        error: 'ZAPSIGN_API_TOKEN não configurado na API. Adicione a variável no Railway e tente de novo.',
+      })
+    }
+
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+
+    // Cliente da proposta + representantes da Atom = signatários.
+    const [propRows]: any = await conn.execute(
+      `SELECT p.id, p.numero,
+              c.nome AS cliente_nome, c.email AS cliente_email, c.telefone AS cliente_telefone,
+              c.cpf_cnpj AS cliente_doc, c.tipo_pessoa AS cliente_tipo,
+              c.nome_responsavel, c.responsavel_email, c.responsavel_telefone, c.responsavel_cpf
+         FROM proposta p
+         LEFT JOIN cliente c ON c.id = p.cliente_id
+        WHERE p.id = ? AND p.empresa_id = ? LIMIT 1`,
+      [propostaId, empresaId],
+    )
+    const prop = (propRows as any[])[0]
+    if (!prop) { await conn.end(); return res.status(404).json({ error: 'Proposta não encontrada' }) }
+
+    const [empRows]: any = await conn.execute(
+      `SELECT rep1_nome, rep1_cpf, rep1_email, rep2_nome, rep2_cpf, rep2_email
+         FROM empresa WHERE id = ? LIMIT 1`,
+      [empresaId],
+    )
+    const emp = (empRows as any[])[0] ?? {}
+
+    // Em PJ quem assina pela empresa é o representante legal — mesma regra do
+    // preâmbulo e do bloco de assinatura do contrato.
+    const ehPj = prop.cliente_tipo === 'juridica'
+    const signatarios: any[] = [{
+      nome: (ehPj ? prop.nome_responsavel : prop.cliente_nome) || prop.cliente_nome || 'Contratante',
+      email: (ehPj ? prop.responsavel_email : prop.cliente_email) || prop.cliente_email || null,
+      telefone: (ehPj ? prop.responsavel_telefone : prop.cliente_telefone) || prop.cliente_telefone || null,
+      cpf: ehPj ? prop.responsavel_cpf : prop.cliente_doc,
+    }]
+    if (emp.rep1_nome) signatarios.push({ nome: emp.rep1_nome, email: emp.rep1_email, cpf: emp.rep1_cpf })
+    if (emp.rep2_nome) signatarios.push({ nome: emp.rep2_nome, email: emp.rep2_email, cpf: emp.rep2_cpf })
+
+    const semEmail = signatarios.filter(s => !s.email).map(s => s.nome)
+    if (!signatarios[0].email) {
+      await conn.end()
+      return res.status(400).json({
+        error: `Sem e-mail do contratante (${signatarios[0].nome}). Preencha no cadastro do cliente antes de enviar para assinatura.`,
+      })
+    }
+
+    const origensPermitidas = [
+      ...ALLOWED_ORIGINS,
+      ...(req.headers.origin ? [req.headers.origin] : []),
+      `${req.protocol}://${req.get('host')}`,
+    ]
+    const anexoValido = anexo && typeof anexo.bodyHtml === 'string' && anexo.bodyHtml.includes('<html')
+      ? anexo : null
+    const pdf = await renderPdfContratoComAnexo(contratoHtml, anexoValido, { origensPermitidas })
+
+    const nome = String(nomeDocumento ?? `Contrato ${prop.numero}`).slice(0, 255)
+    const doc = await criarDocumento({
+      nome,
+      base64Pdf: Buffer.from(pdf).toString('base64'),
+      signatarios,
+      externalId: `proposta-${prop.id}`,
+    })
+
+    await conn.execute(
+      `INSERT INTO contrato_assinatura
+         (proposta_id, empresa_id, doc_token, open_id, nome_documento, status, signatarios, criado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [prop.id, empresaId, doc.token, doc.openId, nome, doc.status,
+       JSON.stringify(doc.signatarios), usuarioId || null],
+    )
+    await conn.end()
+
+    res.json({ ok: true, ...doc, avisos: semEmail.length ? [`Sem e-mail cadastrado: ${semEmail.join(', ')} — envie o link manualmente.`] : [] })
+  } catch (e: any) {
+    console.error('Erro ao enviar contrato para assinatura:', e)
+    res.status(500).json({ error: e?.message ?? 'Falha ao enviar para assinatura' })
+  }
+})
+
 // ── Relatório de Energia — proxy para o serviço Python (apps/relatorio-energia) ──
 // apps/api nunca fala com a Anthropic nem manipula o .pptx: só autentica o usuário
 // do AGO, busca o cadastro do cliente no banco, repassa pro serviço interno
@@ -1901,6 +2011,58 @@ app.get('/run-migration-os-resumo-localizacao', async (_, res) => {
     }
   } catch (e: any) {
     console.error(e)
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// ── Migração: assinatura eletrônica de contrato (ZapSign) ────────────────────
+app.get('/run-migration-assinatura-zapsign', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const criadas: string[] = []
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa'
+          AND COLUMN_NAME IN ('rep1_email','rep2_email')`,
+    )
+    const existentes = cols.map((c: any) => c.COLUMN_NAME)
+    if (!existentes.includes('rep1_email')) {
+      await conn.execute(`ALTER TABLE empresa ADD COLUMN rep1_email VARCHAR(150) NULL AFTER rep1_descricao`)
+      criadas.push('empresa.rep1_email')
+    }
+    if (!existentes.includes('rep2_email')) {
+      await conn.execute(`ALTER TABLE empresa ADD COLUMN rep2_email VARCHAR(150) NULL AFTER rep2_descricao`)
+      criadas.push('empresa.rep2_email')
+    }
+
+    // Uma proposta pode ir para assinatura mais de uma vez (contrato refeito).
+    // Guardamos todas e a tela mostra a mais recente.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS contrato_assinatura (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        proposta_id   INT NOT NULL,
+        empresa_id    INT NOT NULL,
+        provedor      VARCHAR(20) NOT NULL DEFAULT 'zapsign',
+        doc_token     VARCHAR(100) NOT NULL,
+        open_id       INT NULL,
+        nome_documento VARCHAR(255) NULL,
+        status        VARCHAR(30) NOT NULL DEFAULT 'pending',
+        signatarios   JSON NULL,
+        cancelada     TINYINT(1) NOT NULL DEFAULT 0,
+        criado_por    INT NULL,
+        criado_em     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP NULL,
+        INDEX idx_contrato_ass_prop (proposta_id),
+        INDEX idx_contrato_ass_emp  (empresa_id),
+        UNIQUE KEY uk_contrato_ass_token (doc_token)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `)
+    criadas.push('tabela contrato_assinatura (ou já existia)')
+    await conn.end()
+    res.json({ ok: true, criadas })
+  } catch (e: any) {
     res.status(500).json({ ok: false, error: e.message })
   }
 })

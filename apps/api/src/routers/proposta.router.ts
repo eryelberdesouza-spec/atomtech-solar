@@ -2124,6 +2124,49 @@ export const propostaRouter = router({
   // proposta e toda a cascata sem deixar rastro — foi o que produziu os
   // buracos de numeração (AT-2026-06046 entre outros), impossíveis de auditar
   // depois. A tela usa estes dois; o `delete` ficou sem uso no app.
+  // ── Assinatura eletrônica do contrato ───────────────────────────────────
+  // O envio em si é no endpoint HTTP /contrato/enviar-assinatura (precisa
+  // renderizar o PDF). Aqui só se lê o estado e se atualiza contra a ZapSign.
+  assinaturaContrato: protectedProcedure
+    .input(z.object({ propostaId: z.number().int().positive(), atualizar: z.boolean().default(false) }))
+    .query(async ({ ctx, input }) => {
+      const pool = getRawPool()
+      const [rows]: any = await pool.execute(
+        `SELECT id, doc_token AS docToken, open_id AS openId, nome_documento AS nomeDocumento,
+                status, signatarios, criado_em AS criadoEm, atualizado_em AS atualizadoEm
+           FROM contrato_assinatura
+          WHERE proposta_id = ? AND empresa_id = ? AND cancelada = 0
+          ORDER BY id DESC LIMIT 1`,
+        [input.propostaId, ctx.usuario.empresaId],
+      )
+      const atual = (rows as any[])[0]
+      if (!atual) return null
+
+      // Sem webhook configurado, o status só muda quando alguém pede. Não
+      // consulta sozinho a cada render para não castigar a API da ZapSign.
+      const finalizado = ['signed', 'refused', 'canceled'].includes(String(atual.status))
+      if (input.atualizar && !finalizado) {
+        try {
+          const { consultarDocumento, zapsignConfigurado } = await import('../services/zapsign')
+          if (zapsignConfigurado()) {
+            const doc = await consultarDocumento(atual.docToken)
+            await pool.execute(
+              `UPDATE contrato_assinatura SET status = ?, signatarios = ?, atualizado_em = NOW() WHERE id = ?`,
+              [doc.status, JSON.stringify(doc.signatarios), atual.id],
+            )
+            return { ...atual, status: doc.status, signatarios: doc.signatarios }
+          }
+        } catch (e) {
+          console.error('[zapsign] falha ao atualizar status:', e)
+        }
+      }
+      return {
+        ...atual,
+        signatarios: typeof atual.signatarios === 'string'
+          ? JSON.parse(atual.signatarios) : atual.signatarios,
+      }
+    }),
+
   arquivar: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
