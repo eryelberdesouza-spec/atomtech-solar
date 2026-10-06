@@ -154,6 +154,22 @@ app.post('/pdf/render-contrato', async (req, res) => {
   }
 })
 
+// Checagem do token da ZapSign — só leitura, não cria documento nem notifica
+// ninguém. Exige autenticação para não virar sonda pública.
+app.get('/zapsign/diagnostico', async (req, res) => {
+  const authHeader = req.headers.authorization
+  let autenticado = false
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const payload = JSON.parse(Buffer.from(authHeader.slice(7).split('.')[1], 'base64').toString('utf-8'))
+      autenticado = Boolean(payload.userId && payload.empresaId)
+    } catch { /* token inválido */ }
+  }
+  if (!autenticado) return res.status(401).json({ error: 'Não autenticado' })
+  const { diagnosticar } = await import('./services/zapsign')
+  res.json(await diagnosticar())
+})
+
 // ── Contrato → assinatura eletrônica (ZapSign) ───────────────────────────────
 // Reaproveita exatamente o mesmo pipeline do contrato já validado: o front
 // manda o HTML, aqui vira PDF vetorial e segue para a ZapSign em base64.

@@ -121,6 +121,27 @@ export async function criarDocumento(opcoes: {
   }
 }
 
+/**
+ * Valida o token sem criar nada: faz uma leitura da lista de documentos.
+ * Serve para separar "token errado" de "erro no envio" antes de mandar um
+ * contrato de verdade para um cliente.
+ */
+export async function diagnosticar(): Promise<{ ok: boolean; detalhe: string }> {
+  if (!zapsignConfigurado()) {
+    return { ok: false, detalhe: 'ZAPSIGN_API_TOKEN não configurado na API.' }
+  }
+  try {
+    const r = await chamar('/docs/?page=1', { method: 'GET' })
+    const total = r?.count ?? (Array.isArray(r?.results) ? r.results.length : null)
+    return {
+      ok: true,
+      detalhe: `Token válido. A conta respondeu${total != null ? ` (${total} documento(s) na conta)` : ''}.`,
+    }
+  } catch (e: any) {
+    return { ok: false, detalhe: e?.message ?? String(e) }
+  }
+}
+
 /** Relê o documento na ZapSign — usado para atualizar o status na tela. */
 export async function consultarDocumento(docToken: string): Promise<DocumentoCriado> {
   const r = await chamar(`/docs/${docToken}/`, { method: 'GET' })
