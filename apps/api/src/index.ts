@@ -1956,11 +1956,16 @@ app.get('/run-migration-os-notificacao', async (_, res) => {
 
     // Vincula o técnico ao usuário quando o nome bate exatamente — o resto
     // continua como texto e passa a ser escolhido na tela.
+    // COLLATE explícito: usuario e ordem_servico foram criadas em momentos
+    // diferentes e ficaram com colações distintas (utf8mb4_0900_ai_ci x
+    // utf8mb4_unicode_ci) — comparar as duas sem isso dá "Illegal mix of
+    // collations" e a migração inteira falha.
     const [r]: any = await conn.execute(`
       UPDATE ordem_servico o
         JOIN usuario u ON u.empresa_id = o.empresa_id
                       AND u.ativo = 1
-                      AND LOWER(TRIM(u.nome)) = LOWER(TRIM(o.tecnico_responsavel))
+                      AND LOWER(TRIM(u.nome)) COLLATE utf8mb4_unicode_ci
+                        = LOWER(TRIM(o.tecnico_responsavel)) COLLATE utf8mb4_unicode_ci
          SET o.tecnico_responsavel_id = u.id
        WHERE o.tecnico_responsavel_id IS NULL
          AND o.tecnico_responsavel IS NOT NULL
