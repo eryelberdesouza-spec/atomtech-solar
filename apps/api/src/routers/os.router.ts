@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
 import { notificarOsEmBackground } from '../services/osNotificacao'
+import { enviarTexto, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from '../services/whatsapp'
 
 // Rótulo legível do status para o alerta de WhatsApp — o enum cru
 // ("em_execucao") não serve para mandar pra equipe.
@@ -586,6 +587,46 @@ export const osRouter = router({
       )
 
       return { ok: true }
+    }),
+
+  // Diagnóstico do alerta de WhatsApp: manda UMA mensagem para o telefone de
+  // quem chamou. Serve para validar WAHA/telefone sem precisar mexer numa OS
+  // real nem incomodar a equipe inteira.
+  testarAlertaWhatsapp: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const pool = getRawPool()
+      const [r]: any = await pool.execute(
+        'SELECT nome, telefone FROM usuario WHERE id = ? LIMIT 1',
+        [ctx.usuario.id],
+      )
+      const eu = (r as any[])[0]
+      if (!eu?.telefone) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Seu usuário está sem telefone cadastrado — preencha em Configurações › Usuários.',
+        })
+      }
+      const chatId = telefoneParaChatId(eu.telefone)
+      if (!chatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Telefone "${eu.telefone}" não virou um número de WhatsApp válido.`,
+        })
+      }
+      if (!whatsappAtivo()) {
+        return {
+          ok: false,
+          chatId,
+          detalhe: whatsappConfigurado()
+            ? 'WAHA configurado, mas WHATSAPP_ALERTAS_ATIVO não está em "true" — nada foi enviado.'
+            : 'WAHA_URL/WAHA_API_KEY ausentes na API — nada foi enviado.',
+        }
+      }
+      const res = await enviarTexto(
+        chatId,
+        `🔔 *AGO* — teste de alerta.\n\nSe você recebeu esta mensagem, os avisos de Ordem de Serviço estão funcionando.`,
+      )
+      return { ok: res.ok, chatId, detalhe: res.erro ?? 'enviada' }
     }),
 
   // ── Marcos ──────────────────────────────────────────────────────
