@@ -90,6 +90,29 @@ As `condicao_comercial` de uma proposta são as **opções ofertadas** ao client
 - Híbrido/off-grid sem bateria cadastrada gera **aviso, não bloqueio**: "sistema preparado, bateria depois" é caso real.
 - **Armadilha corrigida junto**: a tabela de equipamentos do PDF rotulava como "Inversor(es)" **tudo** que não fosse módulo — uma bateria sairia na proposta como inversor. Agora há mapa de rótulos (`LABEL_EQUIP_PDF`) e a especificação sai em Wp (módulo), kWh (bateria) ou kW (demais). Ao acrescentar tipo de equipamento, conferir SEMPRE os três lugares: tela, `gerarPdfBrowser.ts` e `LABEL_TIPO_EQUIPAMENTO` do contrato.
 
+## Assinatura eletrônica de contrato — ZapSign (2026-10-06, em produção)
+
+Opção "✍️ Enviar para assinatura (ZapSign)" no modal **Gerar Contrato**. O PDF é baixado primeiro e o envio vem **depois**, de propósito: se a ZapSign falhar, o contrato já está na mão do usuário.
+
+- `POST /contrato/enviar-assinatura` reusa `renderPdfContratoComAnexo` — o documento assinado é **byte a byte o mesmo** PDF que a equipe confere hoje. Não existe segundo gerador.
+- **Signatários: cliente + os dois sócios.** Em cliente PJ quem assina é o **representante legal** (`cliente.nome_responsavel` / `responsavel_email`), mesma regra do preâmbulo. Sócios vêm de `empresa.rep1_*`/`rep2_*` — `rep1_email`/`rep2_email` foram criados nesta data só para isso.
+- Convite: `send_automatic_email: true`, `send_automatic_whatsapp: false`. O link de cada signatário também aparece no card da proposta (botão copiar).
+- `ZAPSIGN_API_TOKEN` no Railway (serviço `atomtech-solar`). `ZAPSIGN_API_URL` é opcional e serve para apontar ao sandbox (`https://sandbox.api.zapsign.com.br/api/v1`) — contas sandbox são **separadas** e têm token próprio.
+- `GET /zapsign/diagnostico` (autenticado) valida o token com uma leitura, sem criar documento nem notificar ninguém. **Usar sempre antes de culpar o código**: foi assim que se descobriu, em minutos, que o primeiro token fornecido não autenticava (`403 API token not found`).
+- Tabela `contrato_assinatura` (token, status, signatários). **Status não muda sozinho** — não há webhook ainda; o card tem "Atualizar status", que relê na ZapSign. Migração: `GET /run-migration-assinatura-zapsign`.
+- **Armadilha achada no primeiro envio real**: a ZapSign recusa o documento **INTEIRO** com "forneça um CPF válido" se **um** signatário tiver CPF errado. O CPF do rep1 cadastrado estava com um dígito trocado (`031.303.751-22`, inválido; correto `031.363.751-22`) — e esse número saía impresso em **todos** os contratos. Agora `cpfValido()` filtra: CPF que não passa no dígito verificador é omitido (o signatário assina igual) e a resposta traz aviso nomeando o cadastro errado. Lição: validar dado de cadastro antes de mandar para API de terceiro, e nunca deixar um campo opcional derrubar a operação toda.
+
+## Alertas de alteração de OS por WhatsApp (2026-10-06, PRONTO mas DESLIGADO)
+
+Avisa **só quem está envolvido na OS** — técnico responsável e quem criou —, menos quem fez a alteração. Gatilhos: status, foto/anexo, marco concluído, agendamento (criação e mudança de status) e troca de técnico. Edição de texto solta **não** dispara.
+
+- **Obstáculo que apareceu**: `tecnico_responsavel` era texto livre e a OS não registrava autor — não havia para quem enviar. Criados `ordem_servico.tecnico_responsavel_id` e `criado_por`; o campo de texto continua valendo (técnico terceirizado não é usuário e não recebe alerta). Na tela virou seletor de usuários com opção "Outro (digitar nome)", e o técnico passou a ser **editável no detalhe** (antes era só leitura). Migração: `GET /run-migration-os-notificacao`.
+- Notificar é **efeito colateral**: tudo em try/catch, envio em background, sem `await` — nunca derruba a mutation que o usuário disparou.
+- `WHATSAPP_ALERTAS_ATIVO` é o interruptor. Desligado, nada sai, **mas `os_notificacao` registra o que SERIA enviado** — é assim que se valida antes de ligar.
+- `os.testarAlertaWhatsapp` manda UMA mensagem para o telefone de quem chamou, para testar sem incomodar a equipe.
+- **POR QUE ESTÁ DESLIGADO**: o número é o mesmo do bot de atendimento. Mensagem enviada por ele volta ao n8n como `fromMe` → o workflow pausa o bot 24h naquele chat (o que, por acaso, até protege) — mas se passarem 24h sem alerta, um colega escrevendo para o número pode ser tratado como **lead**. Antes de ligar, acrescentar lista de números internos ignorados no n8n, o que exige **Personal API Key do n8n** (Settings → n8n API). **Não editar o workflow pelo canvas** — ver armadilha na seção do bot.
+- Vars já configuradas no Railway (`atomtech-solar`): `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION`, `WHATSAPP_ALERTAS_ATIVO=false`.
+
 ## Preâmbulo dos contratos — qualificação única desde 2026-09-18
 
 `apps/web/src/lib/contratoPartes.ts` é a definição **única** de como a Atom qualifica CONTRATANTE e CONTRATADA. Os dois geradores de contrato (`gerarContratoBrowser.ts` do fotovoltaico e `gerarContratoServicoBrowser.ts`) importam de lá — **nunca editar a qualificação dentro de um deles**, era exatamente assim que os textos divergiram.
