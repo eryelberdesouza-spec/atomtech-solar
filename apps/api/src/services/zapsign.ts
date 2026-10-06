@@ -46,6 +46,29 @@ function soDigitos(v: string | null | undefined): string {
   return (v ?? '').replace(/\D/g, '')
 }
 
+/**
+ * Valida CPF por dígito verificador.
+ *
+ * A ZapSign recusa o documento INTEIRO com "forneça um CPF válido" quando
+ * um signatário vem com CPF errado — um dígito trocado no cadastro derruba
+ * o envio todo. Melhor mandar o signatário sem CPF (ele assina igual) e
+ * avisar, do que não conseguir coletar nenhuma assinatura.
+ */
+export function cpfValido(v: string | null | undefined): boolean {
+  const c = soDigitos(v)
+  if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false
+  let s = 0
+  for (let i = 0; i < 9; i++) s += Number(c[i]) * (10 - i)
+  let d1 = (s * 10) % 11
+  if (d1 === 10) d1 = 0
+  if (d1 !== Number(c[9])) return false
+  s = 0
+  for (let i = 0; i < 10; i++) s += Number(c[i]) * (11 - i)
+  let d2 = (s * 10) % 11
+  if (d2 === 10) d2 = 0
+  return d2 === Number(c[10])
+}
+
 async function chamar(caminho: string, init: RequestInit) {
   if (!zapsignConfigurado()) {
     throw new Error('ZAPSIGN_API_TOKEN não configurado na API.')
@@ -104,7 +127,8 @@ export async function criarDocumento(opcoes: {
         ...(tel.length === 10 || tel.length === 11
           ? { phone_country: '55', phone_number: tel }
           : {}),
-        ...(soDigitos(s.cpf).length === 11 ? { cpf: soDigitos(s.cpf) } : {}),
+        // Só manda CPF que passa no dígito verificador — ver cpfValido acima.
+        ...(cpfValido(s.cpf) ? { cpf: soDigitos(s.cpf) } : {}),
         auth_mode: 'assinaturaTela',
         send_automatic_email: s.enviarEmail !== false && Boolean(s.email),
         send_automatic_whatsapp: false,

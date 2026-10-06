@@ -196,7 +196,7 @@ app.post('/contrato/enviar-assinatura', async (req, res) => {
   if (!propostaId) return res.status(400).json({ error: 'Campo "propostaId" ausente' })
 
   try {
-    const { zapsignConfigurado, criarDocumento } = await import('./services/zapsign')
+    const { zapsignConfigurado, criarDocumento, cpfValido } = await import('./services/zapsign')
     if (!zapsignConfigurado()) {
       return res.status(503).json({
         error: 'ZAPSIGN_API_TOKEN não configurado na API. Adicione a variável no Railway e tente de novo.',
@@ -239,6 +239,11 @@ app.post('/contrato/enviar-assinatura', async (req, res) => {
     if (emp.rep1_nome) signatarios.push({ nome: emp.rep1_nome, email: emp.rep1_email, cpf: emp.rep1_cpf })
     if (emp.rep2_nome) signatarios.push({ nome: emp.rep2_nome, email: emp.rep2_email, cpf: emp.rep2_cpf })
 
+    // CPF inválido não impede a assinatura, mas precisa ser dito em voz alta:
+    // é dado do cadastro saindo errado também no contrato impresso.
+    const cpfRuim = signatarios
+      .filter(s => s.cpf && !cpfValido(s.cpf))
+      .map(s => `${s.nome} (${s.cpf})`)
     const semEmail = signatarios.filter(s => !s.email).map(s => s.nome)
     if (!signatarios[0].email) {
       await conn.end()
@@ -273,7 +278,14 @@ app.post('/contrato/enviar-assinatura', async (req, res) => {
     )
     await conn.end()
 
-    res.json({ ok: true, ...doc, avisos: semEmail.length ? [`Sem e-mail cadastrado: ${semEmail.join(', ')} — envie o link manualmente.`] : [] })
+    res.json({
+      ok: true,
+      ...doc,
+      avisos: [
+        ...(semEmail.length ? [`Sem e-mail cadastrado: ${semEmail.join(', ')} — envie o link manualmente.`] : []),
+        ...(cpfRuim.length ? [`CPF inválido no cadastro, enviado sem CPF: ${cpfRuim.join(', ')}. Confira — esse número também sai no contrato.`] : []),
+      ],
+    })
   } catch (e: any) {
     console.error('Erro ao enviar contrato para assinatura:', e)
     res.status(500).json({ error: e?.message ?? 'Falha ao enviar para assinatura' })
