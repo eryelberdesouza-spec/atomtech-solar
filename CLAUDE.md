@@ -290,3 +290,4 @@ Avisa **só quem está envolvido na OS** — técnico responsável e quem criou 
 
 ## Contexto de máquina
 - Memória local do Claude Code (PC casa): `C:\Users\usuario\.claude\projects\C--Projetos-atomtech-solar\memory\` — mais detalhada que este arquivo; este CLAUDE.md é o resumo portátil.
+// teste 2 1791409121
