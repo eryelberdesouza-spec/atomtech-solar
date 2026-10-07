@@ -11,7 +11,7 @@ import { parseOFX } from './lib/ofxParser'
 import { renderPdf, renderPdfComCapaSeparada, renderPdfContratoComAnexo, acharChromium } from './lib/pdfRenderer'
 import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
 import { notificarOsAgrupado } from './services/osNotificacao'
-import { hojeISO } from './lib/datas'
+import { hojeISO, agoraBR } from './lib/datas'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -153,6 +153,22 @@ app.post('/pdf/render-contrato', async (req, res) => {
     console.error('Erro ao gerar contrato:', e)
     res.status(500).json({ error: e?.message ?? 'Falha ao gerar contrato' })
   }
+})
+
+// Diagnóstico de fuso: mostra como o servidor enxerga a hora. Existe porque o
+// container rodou meses em UTC carimbando documento 3h no futuro, e não havia
+// como conferir isso sem gerar um relatório de verdade.
+app.get('/diagnostico/hora', (_req, res) => {
+  const agora = new Date()
+  res.json({
+    tzDoProcesso: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    tzEnv: process.env.TZ ?? '(não definida)',
+    agoraLocal: agora.toLocaleString('pt-BR'),
+    agoraBrasil: agoraBR(),
+    hojeISO: hojeISO(),
+    hojeUTC: agora.toISOString().slice(0, 10),
+    utcCompleto: agora.toISOString(),
+  })
 })
 
 // Checagem do token da ZapSign — só leitura, não cria documento nem notifica
