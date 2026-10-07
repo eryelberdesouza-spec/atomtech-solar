@@ -11,6 +11,7 @@ import { parseOFX } from './lib/ofxParser'
 import { renderPdf, renderPdfComCapaSeparada, renderPdfContratoComAnexo, acharChromium } from './lib/pdfRenderer'
 import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
 import { notificarOsAgrupado } from './services/osNotificacao'
+import { hojeISO } from './lib/datas'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -1426,12 +1427,12 @@ app.get('/fix-historicos', async (_, res) => {
       const descTit = `Contrato histórico — ${row.clienteNome} (${row.numero})`
       const [tIns]: any = await conn.execute(
         `INSERT INTO fin_titulo (empresa_id, tipo, descricao, documento, pessoa_id, proposta_id, valor_original, emissao, ativo) VALUES (?, 'RECEBER', ?, ?, ?, ?, ?, ?, 1)`,
-        [empId, descTit, row.numero, fpId, row.propostaId, String(row.valorTotal), row.dataEmissao ?? new Date().toISOString().slice(0,10)]
+        [empId, descTit, row.numero, fpId, row.propostaId, String(row.valorTotal), row.dataEmissao ?? hojeISO()]
       )
       const tituloId = (tIns as any).insertId
       // 5. fin_parcela
       const stParcela = row.osStatus === 'concluida' ? 'PAGA' : 'ABERTA'
-      const venc = row.dataConclusao ?? row.dataEmissao ?? new Date().toISOString().slice(0,10)
+      const venc = row.dataConclusao ?? row.dataEmissao ?? hojeISO()
       await conn.execute(
         `INSERT INTO fin_parcela (titulo_id, numero, valor, vencimento, status, data_pagamento) VALUES (?, 1, ?, ?, ?, ?)`,
         [tituloId, String(row.valorTotal), venc, stParcela, stParcela === 'PAGA' ? venc : null]

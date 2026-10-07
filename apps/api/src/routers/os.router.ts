@@ -9,6 +9,7 @@ import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
 import { notificarOsAgrupado, notificarOsEmBackground } from '../services/osNotificacao'
 import { enviarTexto, resolverChatId, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from '../services/whatsapp'
+import { hojeISO } from '../lib/datas'
 
 // Rótulo legível do status para o alerta de WhatsApp — o enum cru
 // ("em_execucao") não serve para mandar pra equipe.
@@ -517,7 +518,7 @@ export const osRouter = router({
         }
       }
 
-      const hoje = new Date().toISOString().slice(0, 10)
+      const hoje = hojeISO()
       let extra = ''
       const extraParams: any[] = []
 
@@ -676,7 +677,7 @@ export const osRouter = router({
         if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Marco não encontrado' })
         const marcoAntes = (check as any[])[0]
 
-        const hoje = new Date().toISOString().slice(0, 10)
+        const hoje = hojeISO()
         await pool.execute(
           `UPDATE os_marco SET
              concluido = ?, data_realizada = ?, responsavel = ?, observacoes = ?

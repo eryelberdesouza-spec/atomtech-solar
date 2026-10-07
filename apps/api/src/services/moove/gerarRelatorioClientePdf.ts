@@ -7,6 +7,11 @@ import { agregarPorHora, gerarImagemGraficoHorarios } from "./graficoHorarios";
 import type { RecargaMoove } from "./lerMoove";
 import { calcularValores } from "./cobranca";
 import type { ClienteParaRelatorio } from "./gerarRelatorio";
+import { agoraBR } from '../../lib/datas'
+
+// Documento vai para o cliente: fuso explicito, para nao depender da variavel
+// TZ do servidor continuar configurada.
+const FUSO_BR = "America/Sao_Paulo";
 
 const LOGO_PATH = path.join(__dirname, "assets", "logo-atomtech.png");
 
@@ -14,12 +19,12 @@ const NOME_TAXA_UNICA = "Taxa de Gestão, Cobrança e Atendimento";
 
 function fmtData(data: Date | null): string {
   if (!data) return "-";
-  return data.toLocaleDateString("pt-BR");
+  return data.toLocaleDateString("pt-BR", { timeZone: FUSO_BR });
 }
 
 function fmtDataHora(data: Date | null): string {
   if (!data) return "-";
-  return data.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return data.toLocaleString("pt-BR", { timeZone: FUSO_BR, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtMoeda(valor: number): string {
@@ -173,7 +178,7 @@ export async function gerarRelatorioClientePdf(
   </table>
 
   <p class="rodape">
-    Relatório gerado automaticamente pela Atom Tech em ${new Date().toLocaleString("pt-BR")}.
+    Relatório gerado automaticamente pela Atom Tech em ${agoraBR()}.
     O valor líquido já desconta a ${NOME_TAXA_UNICA.toLowerCase()}.
   </p>
 </body>

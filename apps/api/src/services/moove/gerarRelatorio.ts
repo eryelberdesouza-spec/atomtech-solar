@@ -5,6 +5,11 @@ import { inicioDaRecarga } from "./agregar";
 import { agregarPorHora, gerarImagemGraficoHorarios } from "./graficoHorarios";
 import type { RecargaMoove } from "./lerMoove";
 import { calcularValores, TAXA_MOOVE_PERCENTUAL } from "./cobranca";
+import { agoraBR } from '../../lib/datas'
+
+// Documento vai para o cliente: fuso explicito, para nao depender da variavel
+// TZ do servidor continuar configurada.
+const FUSO_BR = "America/Sao_Paulo";
 
 const LOGO_PATH = path.join(__dirname, "assets", "logo-atomtech.png");
 
@@ -29,12 +34,12 @@ export interface ClienteParaRelatorio {
 
 function fmtData(data: Date | null): string {
   if (!data) return "-";
-  return data.toLocaleDateString("pt-BR");
+  return data.toLocaleDateString("pt-BR", { timeZone: FUSO_BR });
 }
 
 function fmtDataHora(data: Date | null): string {
   if (!data) return "-";
-  return data.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return data.toLocaleString("pt-BR", { timeZone: FUSO_BR, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtMoeda(valor: number): string {
@@ -201,7 +206,7 @@ export async function gerarRelatorioCliente(
   const linhaRodape = linhaResumoPico + (horasComMovimento.length > 0 ? 4 : 1);
   sheet.mergeCells(`A${linhaRodape}:H${linhaRodape}`);
   const rodapeCell = sheet.getCell(`A${linhaRodape}`);
-  rodapeCell.value = `Relatório gerado automaticamente pela Atom Tech em ${new Date().toLocaleString("pt-BR")}. Veja a aba "Transações" para o detalhamento de cada recarga.`;
+  rodapeCell.value = `Relatório gerado automaticamente pela Atom Tech em ${agoraBR()}. Veja a aba "Transações" para o detalhamento de cada recarga.`;
   rodapeCell.font = { size: 9, italic: true, color: { argb: "FF999999" } };
 
   adicionarAbaTransacoes(workbook, cliente, recargasDoCliente);

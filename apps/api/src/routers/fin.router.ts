@@ -31,6 +31,7 @@ import {
   precificacao,
 } from '../db/schema'
 import { acharOuCriarClienteParaFinPessoa, propagarFinPessoaParaCliente } from '../lib/pessoaSync'
+import { hojeISO } from '../lib/datas'
 
 // ─── DATA — mysql2 devolve colunas DATE como objeto Date (não string), mesmo com
 // drizzle mode 'string'; String(dateObj).slice(0,10) corrompe o valor. Formata local.
@@ -885,7 +886,7 @@ const dashboardRouter = router({
         eq(finTitulo.ativo, true),
       ))
 
-    const hoje = new Date().toISOString().slice(0, 10)
+    const hoje = hojeISO()
 
     const aReceber = parcelas
       .filter((p: any) => p.tipo === 'RECEBER')
@@ -1031,7 +1032,7 @@ const tituloRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
-      const hoje = new Date().toISOString().slice(0, 10)
+      const hoje = hojeISO()
 
       const rows = await ctx.db
         .select({
@@ -2232,7 +2233,7 @@ const propostaFinRouter = router({
         centroCustoId: input.centroCustoId ?? null,
         propostaId:    prop.id,
         valorOriginal: String(parcelas.reduce((s, p) => s + Number(p.valor), 0)),
-        emissao:       prop.dataEmissao ?? new Date().toISOString().slice(0, 10),
+        emissao:       prop.dataEmissao ?? hojeISO(),
         observacoes:   input.observacoes ?? null,
         ativo:         true,
       })
@@ -2241,7 +2242,7 @@ const propostaFinRouter = router({
       // 7. Cria finParcelas
       const baseDate = prop.dataEmissao
         ? String(prop.dataEmissao).slice(0, 10)
-        : new Date().toISOString().slice(0, 10)
+        : hojeISO()
 
       for (const p of parcelas) {
         const venc = addDias(baseDate, Number(p.prazoDias ?? 0), p.tipoPrazo as 'corridos' | 'uteis')
@@ -2260,7 +2261,7 @@ const propostaFinRouter = router({
       if (input.isFinanciamento && input.valorKit && input.valorKit > 0) {
         const dataBase = prop.dataEmissao
           ? String(prop.dataEmissao).slice(0, 10)
-          : new Date().toISOString().slice(0, 10)
+          : hojeISO()
 
         const kitIns = await ctx.db.insert(finTitulo).values({
           empresaId:     empId,
@@ -2553,7 +2554,7 @@ const graficosRouter = router({
     .input(z.object({ dataIni: z.string().nullish(), dataFim: z.string().nullish() }))
     .query(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
-      const hoje = new Date().toISOString().slice(0, 10)
+      const hoje = hojeISO()
       const ini = input.dataIni ?? new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10)
       const fim = input.dataFim ?? hoje
 
@@ -2588,7 +2589,7 @@ const graficosRouter = router({
     .input(z.object({ tipo: z.enum(['PAGAR', 'RECEBER', 'AMBOS']).default('AMBOS') }))
     .query(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
-      const hoje = new Date().toISOString().slice(0, 10)
+      const hoje = hojeISO()
 
       const conds: any[] = [eq(finTitulo.empresaId, empId), eq(finTitulo.ativo, true), ne(finParcela.status, 'CANCELADA')]
       if (input.tipo !== 'AMBOS') conds.push(eq(finTitulo.tipo, input.tipo))
@@ -2625,7 +2626,7 @@ const relatoriosRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
-      const hoje = input.dataBase ?? new Date().toISOString().slice(0, 10)
+      const hoje = input.dataBase ?? hojeISO()
 
       const conds: any[] = [eq(finTitulo.empresaId, empId), eq(finTitulo.ativo, true), eq(finParcela.status, 'ABERTA')]
       if (input.tipo !== 'AMBOS') conds.push(eq(finTitulo.tipo, input.tipo))
@@ -2849,7 +2850,7 @@ const relatoriosRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const empId = ctx.usuario.empresaId
-      const hoje = new Date().toISOString().slice(0, 10)
+      const hoje = hojeISO()
       const limiteDias = new Date()
       limiteDias.setDate(limiteDias.getDate() - input.diasMin)
       const limiteStr = limiteDias.toISOString().slice(0, 10)
