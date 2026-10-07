@@ -6,6 +6,7 @@ import { Btn, Spinner, C } from '../../components/ui'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { gerarHtmlEncerramento } from '../../lib/gerarDocumentoEncerramentoBrowser'
 import { gerarPdfBase64DoServidor } from '../../lib/baixarPdfServidor'
+import { TecnicoResponsavelPicker } from '../../components/TecnicoResponsavelPicker'
 
 const STATUS_COLOR: Record<string, string> = {
   aberta:      '#58A6FF',
@@ -380,6 +381,76 @@ function linkMaps(localizacao: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(localizacao)}`
 }
 
+// ─── Técnico responsável: agora editável aqui ────────────────────────────────
+// Antes era só leitura — trocar o técnico exigia recriar a OS. E como é dele
+// que sai o telefone do alerta de WhatsApp, precisa ser ajustável.
+function LinhaTecnicoResponsavel({ os, osId, onRefresh }: any) {
+  const [editando, setEditando] = useState(false)
+  const [nome, setNome] = useState('')
+  const [usuarioId, setUsuarioId] = useState<number | null>(null)
+
+  const updateMut = (trpc as any).os.update.useMutation({
+    onSuccess: () => { setEditando(false); onRefresh() },
+    onError: (e: any) => alert('Erro ao salvar: ' + e.message),
+  })
+
+  const abrir = () => {
+    setNome(os.tecnicoResponsavel ?? '')
+    setUsuarioId(os.tecnicoResponsavelId ?? null)
+    setEditando(true)
+  }
+
+  if (!editando) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <InfoRow label="Técnico responsável" value={os.tecnicoResponsavel || '—'} />
+        </div>
+        {os.status !== 'cancelada' && (
+          <button onClick={abrir} title="Trocar técnico responsável"
+            style={{ background: 'none', border: 'none', color: '#7488A8', cursor: 'pointer', fontSize: 12 }}>
+            ✏️
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const inputSt: React.CSSProperties = {
+    width: '100%', padding: '7px 10px', borderRadius: 7,
+    background: '#0E1726', border: '1px solid #26334A', color: '#E6EDF7', fontSize: 13,
+    outline: 'none', boxSizing: 'border-box',
+  }
+  const labelSt: React.CSSProperties = {
+    display: 'block', fontSize: 10, color: '#7488A8', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4,
+  }
+
+  return (
+    <div style={{ padding: '8px 0' }}>
+      <TecnicoResponsavelPicker
+        nome={nome}
+        usuarioId={usuarioId}
+        onChange={v => { setNome(v.nome); setUsuarioId(v.usuarioId) }}
+        labelStyle={labelSt}
+        inputStyle={inputSt}
+      />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+        <button onClick={() => setEditando(false)}
+          style={{ background: 'none', border: '1px solid #26334A', color: '#9FB0C9', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}>
+          Cancelar
+        </button>
+        <button
+          disabled={updateMut.isLoading}
+          onClick={() => updateMut.mutate({ id: osId, tecnicoResponsavel: nome, tecnicoResponsavelId: usuarioId })}
+          style={{ background: '#F5A623', border: 'none', color: '#0E1726', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+          {updateMut.isLoading ? 'Salvando...' : 'Salvar'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Bloco: Resumo do Serviço + Localização (orientação da equipe em campo) ───
 function BlocoServicoCampo({ os, osId, onRefresh }: any) {
   const [editando, setEditando] = useState(false)
@@ -514,7 +585,7 @@ function AbaVisaoGeral({ os, osId, onRefresh, onShowModalMarco }: any) {
           {os.clienteTelefone && <InfoRow label="Telefone" value={os.clienteTelefone} />}
           {os.clienteEmail && <InfoRow label="E-mail" value={os.clienteEmail} />}
           {os.clienteEndereco && <InfoRow label="Endereço" value={os.clienteEndereco} />}
-          <InfoRow label="Técnico responsável" value={os.tecnicoResponsavel || '—'} />
+          <LinhaTecnicoResponsavel os={os} osId={osId} onRefresh={onRefresh} />
           <InfoRow label="Criada em" value={formatDate(String(os.createdAt).slice(0, 10))} />
           {os.dataInicio && <InfoRow label="Início" value={formatDate(String(os.dataInicio).slice(0, 10))} />}
           {os.dataConclusao && <InfoRow label="Conclusão" value={formatDate(String(os.dataConclusao).slice(0, 10))} />}

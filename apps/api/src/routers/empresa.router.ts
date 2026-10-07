@@ -36,9 +36,11 @@ const empresaUpdateSchema = z.object({
   rep1Nome: z.string().max(200).optional(),
   rep1Cpf: z.string().max(30).optional(),
   rep1Descricao: z.string().optional(),
+  rep1Email: z.string().max(150).optional(),
   rep2Nome: z.string().max(200).optional(),
   rep2Cpf: z.string().max(30).optional(),
   rep2Descricao: z.string().optional(),
+  rep2Email: z.string().max(150).optional(),
   // Regras de cadastro
   bloquearDupNome: z.boolean().optional(),
   bloquearDupEmpresa: z.boolean().optional(),

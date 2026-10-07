@@ -6,6 +6,7 @@ import { trpc } from '../../lib/trpc'
 import { formatDate } from '../../lib/utils'
 import { Spinner } from '../../components/ui'
 import { CadastroRapidoCliente } from '../../components/ui/CadastroRapidoCliente'
+import { TecnicoResponsavelPicker } from '../../components/TecnicoResponsavelPicker'
 import { useIsMobile } from '../../hooks/useIsMobile'
 
 const STATUS_OS = [
@@ -37,7 +38,7 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
   const isMobile = useIsMobile()
   const [form, setForm] = useState({
     clienteId: '', titulo: '', resumoServico: '', localizacao: '',
-    tecnicoResponsavel: '', dataPrevistaInicio: '', dataPrevistaFim: '',
+    tecnicoResponsavel: '', tecnicoResponsavelId: null as number | null, dataPrevistaInicio: '', dataPrevistaFim: '',
   })
   const [buscaCliente, setBuscaCliente] = useState('')
   const [mostraCadastro, setMostraCadastro] = useState(false)
@@ -67,6 +68,7 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
       resumoServico:      form.resumoServico.trim() || undefined,
       localizacao:        form.localizacao.trim() || undefined,
       tecnicoResponsavel: form.tecnicoResponsavel.trim() || undefined,
+      tecnicoResponsavelId: form.tecnicoResponsavelId ?? undefined,
       dataPrevistaInicio: form.dataPrevistaInicio || undefined,
       dataPrevistaFim:    form.dataPrevistaFim || undefined,
       temAgendamento:     false,
@@ -171,10 +173,13 @@ function ModalNovaOSAvulsa({ onClose, onSucesso }: { onClose: () => void; onSuce
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={labelSt}>Técnico responsável</label>
-              <input value={form.tecnicoResponsavel} onChange={e => setForm(f => ({ ...f, tecnicoResponsavel: e.target.value }))} style={inputSt} />
-            </div>
+            <TecnicoResponsavelPicker
+              nome={form.tecnicoResponsavel}
+              usuarioId={form.tecnicoResponsavelId}
+              onChange={v => setForm(f => ({ ...f, tecnicoResponsavel: v.nome, tecnicoResponsavelId: v.usuarioId }))}
+              labelStyle={labelSt}
+              inputStyle={inputSt}
+            />
             <div>
               <label style={labelSt}>Previsão início</label>
               <input type="date" value={form.dataPrevistaInicio} onChange={e => setForm(f => ({ ...f, dataPrevistaInicio: e.target.value }))} style={inputSt} />

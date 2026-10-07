@@ -7,6 +7,25 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
+import { notificarOsEmBackground } from '../services/osNotificacao'
+import { enviarTexto, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from '../services/whatsapp'
+
+// Rótulo legível do status para o alerta de WhatsApp — o enum cru
+// ("em_execucao") não serve para mandar pra equipe.
+const STATUS_LABEL: Record<string, string> = {
+  aberta: 'Aberta',
+  em_execucao: 'Em execução',
+  pendencia: 'Pendência',
+  concluida: 'Concluída',
+  cancelada: 'Cancelada',
+}
+
+// Contexto mínimo que o serviço de notificação precisa.
+const ctxNotif = (ctx: any) => ({
+  usuarioId: ctx.usuario.id,
+  usuarioNome: ctx.usuario.nome,
+  empresaId: ctx.usuario.empresaId,
+})
 
 // Marcos padrão criados automaticamente em toda OS nova
 const MARCOS_PADRAO = [
@@ -45,6 +64,9 @@ const criarInput = z.object({
   titulo:             z.string().max(200).optional(),
   descricao:          z.string().optional(),
   tecnicoResponsavel: z.string().max(100).optional(),
+  // Vínculo com o usuário, quando o técnico é do sistema — é daqui que sai o
+  // telefone do alerta. Técnico terceirizado fica só no campo de texto acima.
+  tecnicoResponsavelId: z.number().int().positive().nullable().optional(),
   resumoServico:      z.string().optional(),           // orientação pro técnico em campo
   localizacao:        z.string().max(500).optional(),  // endereço/link/coordenadas do local
   dataPrevistaInicio: z.string().optional(), // ISO YYYY-MM-DD
@@ -186,6 +208,8 @@ export const osRouter = router({
         `SELECT
            os.id, os.numero, os.status, os.titulo, os.descricao,
            os.tecnico_responsavel  AS tecnicoResponsavel,
+           os.tecnico_responsavel_id AS tecnicoResponsavelId,
+           os.criado_por           AS criadoPor,
            os.resumo_servico       AS resumoServico,
            os.localizacao,
            os.data_prevista_inicio AS dataPrevistaInicio,
@@ -291,8 +315,8 @@ export const osRouter = router({
            (empresa_id, proposta_id, cliente_id, origem, numero, status, titulo, descricao,
             tecnico_responsavel, resumo_servico, localizacao,
             data_prevista_inicio, data_prevista_fim,
-            tem_agendamento, observacoes)
-         VALUES (?, ?, ?, ?, ?, 'aberta', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            tem_agendamento, observacoes, tecnico_responsavel_id, criado_por)
+         VALUES (?, ?, ?, ?, ?, 'aberta', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           empId,
           input.propostaId ?? null,
@@ -308,6 +332,8 @@ export const osRouter = router({
           input.dataPrevistaFim ?? null,
           input.temAgendamento ? 1 : 0,
           input.observacoes ?? null,
+          input.tecnicoResponsavelId ?? null,
+          ctx.usuario.id,
         ],
       )
 
@@ -364,6 +390,7 @@ export const osRouter = router({
       titulo:             z.string().max(200).optional(),
       descricao:          z.string().optional(),
       tecnicoResponsavel: z.string().max(100).optional(),
+      tecnicoResponsavelId: z.number().int().positive().nullable().optional(),
       resumoServico:      z.string().optional(),
       localizacao:        z.string().max(500).optional(),
       dataPrevistaInicio: z.string().optional(),
@@ -378,15 +405,18 @@ export const osRouter = router({
 
       // Verifica propriedade
       const [check]: any = await pool.execute(
-        `SELECT id FROM ordem_servico WHERE id = ? AND empresa_id = ? LIMIT 1`,
+        `SELECT id, tecnico_responsavel, tecnico_responsavel_id
+           FROM ordem_servico WHERE id = ? AND empresa_id = ? LIMIT 1`,
         [id, ctx.usuario.empresaId],
       )
       if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
+      const osAntes = (check as any[])[0]
 
       const colunas: Record<string, string> = {
         titulo:             'titulo',
         descricao:          'descricao',
         tecnicoResponsavel: 'tecnico_responsavel',
+        tecnicoResponsavelId: 'tecnico_responsavel_id',
         resumoServico:      'resumo_servico',
         localizacao:        'localizacao',
         dataPrevistaInicio: 'data_prevista_inicio',
@@ -412,6 +442,19 @@ export const osRouter = router({
          WHERE id = ? AND empresa_id = ?`,
         [...params, id, ctx.usuario.empresaId],
       )
+
+      // Só a troca de técnico avisa — edição de texto solta não dispara nada,
+      // senão corrigir uma vírgula em observações viraria mensagem.
+      const trocouTecnico =
+        (input.tecnicoResponsavel !== undefined && input.tecnicoResponsavel !== osAntes.tecnico_responsavel) ||
+        (input.tecnicoResponsavelId !== undefined && input.tecnicoResponsavelId !== osAntes.tecnico_responsavel_id)
+      if (trocouTecnico) {
+        const novo = input.tecnicoResponsavel || '(não informado)'
+        notificarOsEmBackground(
+          ctxNotif(ctx), id, 'tecnico',
+          `definiu *${novo}* como técnico responsável`,
+        )
+      }
       return { ok: true }
     }),
 
@@ -537,7 +580,53 @@ export const osRouter = router({
         }
       }
 
+      const anterior = STATUS_LABEL[(check as any[])[0].status] ?? (check as any[])[0].status
+      notificarOsEmBackground(
+        ctxNotif(ctx), input.id, 'status',
+        `mudou o status de *${anterior}* para *${STATUS_LABEL[input.status] ?? input.status}*`,
+      )
+
       return { ok: true }
+    }),
+
+  // Diagnóstico do alerta de WhatsApp: manda UMA mensagem para o telefone de
+  // quem chamou. Serve para validar WAHA/telefone sem precisar mexer numa OS
+  // real nem incomodar a equipe inteira.
+  testarAlertaWhatsapp: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const pool = getRawPool()
+      const [r]: any = await pool.execute(
+        'SELECT nome, telefone FROM usuario WHERE id = ? LIMIT 1',
+        [ctx.usuario.id],
+      )
+      const eu = (r as any[])[0]
+      if (!eu?.telefone) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Seu usuário está sem telefone cadastrado — preencha em Configurações › Usuários.',
+        })
+      }
+      const chatId = telefoneParaChatId(eu.telefone)
+      if (!chatId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Telefone "${eu.telefone}" não virou um número de WhatsApp válido.`,
+        })
+      }
+      if (!whatsappAtivo()) {
+        return {
+          ok: false,
+          chatId,
+          detalhe: whatsappConfigurado()
+            ? 'WAHA configurado, mas WHATSAPP_ALERTAS_ATIVO não está em "true" — nada foi enviado.'
+            : 'WAHA_URL/WAHA_API_KEY ausentes na API — nada foi enviado.',
+        }
+      }
+      const res = await enviarTexto(
+        chatId,
+        `🔔 *AGO* — teste de alerta.\n\nSe você recebeu esta mensagem, os avisos de Ordem de Serviço estão funcionando.`,
+      )
+      return { ok: res.ok, chatId, detalhe: res.erro ?? 'enviada' }
     }),
 
   // ── Marcos ──────────────────────────────────────────────────────
@@ -551,12 +640,13 @@ export const osRouter = router({
 
         // Verifica que o marco pertence a uma OS da empresa
         const [check]: any = await pool.execute(
-          `SELECT m.id FROM os_marco m
+          `SELECT m.id, m.titulo, m.concluido, m.ordem_servico_id FROM os_marco m
            JOIN ordem_servico os ON os.id = m.ordem_servico_id
            WHERE m.id = ? AND os.empresa_id = ? LIMIT 1`,
           [input.id, ctx.usuario.empresaId],
         )
         if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Marco não encontrado' })
+        const marcoAntes = (check as any[])[0]
 
         const hoje = new Date().toISOString().slice(0, 10)
         await pool.execute(
@@ -571,6 +661,14 @@ export const osRouter = router({
             input.id,
           ],
         )
+
+        // Só avisa quando o marco PASSA a concluído — remarcar não é novidade.
+        if (input.concluido && !marcoAntes.concluido) {
+          notificarOsEmBackground(
+            ctxNotif(ctx), marcoAntes.ordem_servico_id, 'marco',
+            `concluiu o marco *${marcoAntes.titulo}*`,
+          )
+        }
         return { ok: true }
       }),
 
@@ -647,6 +745,12 @@ export const osRouter = router({
             input.observacoes ?? null,
           ],
         )
+
+        const quando = [input.dataAgendada, input.horaInicio].filter(Boolean).join(' às ')
+        notificarOsEmBackground(
+          ctxNotif(ctx), input.ordemServicoId, 'agendamento',
+          `agendou *${input.tipo}* para *${quando}*${input.tecnico ? ` com ${input.tecnico}` : ''}`,
+        )
         return { ok: true }
       }),
 
@@ -660,16 +764,22 @@ export const osRouter = router({
         const pool = getRawPool()
 
         const [check]: any = await pool.execute(
-          `SELECT a.id FROM os_agendamento a
+          `SELECT a.id, a.tipo, a.data_agendada, a.ordem_servico_id FROM os_agendamento a
            JOIN ordem_servico os ON os.id = a.ordem_servico_id
            WHERE a.id = ? AND os.empresa_id = ? LIMIT 1`,
           [input.id, ctx.usuario.empresaId],
         )
         if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Agendamento não encontrado' })
+        const ag = (check as any[])[0]
 
         await pool.execute(
           `UPDATE os_agendamento SET status = ? WHERE id = ?`,
           [input.status, input.id],
+        )
+
+        notificarOsEmBackground(
+          ctxNotif(ctx), ag.ordem_servico_id, 'agendamento',
+          `marcou o agendamento de *${ag.tipo}* como *${input.status}*`,
         )
         return { ok: true }
       }),
