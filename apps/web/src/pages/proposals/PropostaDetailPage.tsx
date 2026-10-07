@@ -2576,6 +2576,15 @@ function CardAssinatura({ propostaId }: { propostaId: number }) {
   )
   const [atualizando, setAtualizando] = useState(false)
 
+  const enviarWhats = (trpc as any).proposta.enviarLinkAssinaturaWhatsapp.useMutation({
+    onSuccess: (r: any) => alert(`Link de assinatura enviado pelo WhatsApp para ${r.telefone}.`),
+    onError: (e: any) => alert(e.message),
+  })
+  const cancelar = (trpc as any).proposta.cancelarAssinatura.useMutation({
+    onSuccess: () => utils.proposta.assinaturaContrato.invalidate({ propostaId }),
+    onError: (e: any) => alert('Erro ao cancelar: ' + e.message),
+  })
+
   if (isLoading || !data) return null
 
   const st = STATUS_ASSINATURA[String(data.status)] ?? { label: String(data.status), cor: C.textMuted }
@@ -2597,9 +2606,22 @@ function CardAssinatura({ propostaId }: { propostaId: number }) {
           <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: 0 }}>Assinatura do contrato</p>
           <Pill color={st.cor}>{st.label}</Pill>
         </div>
-        <Btn size="sm" variant="ghost" onClick={atualizar} disabled={atualizando}>
-          {atualizando ? '⏳ Atualizando...' : '↻ Atualizar status'}
-        </Btn>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <Btn size="sm" variant="ghost" onClick={atualizar} disabled={atualizando}>
+            {atualizando ? '⏳ Atualizando...' : '↻ Atualizar status'}
+          </Btn>
+          {data.status !== 'signed' && (
+            <Btn size="sm" variant="ghost" disabled={cancelar.isLoading}
+              style={{ color: C.danger, borderColor: `${C.danger}40` }}
+              onClick={() => {
+                if (confirm('Cancelar este envio? O documento é excluído na ZapSign e os links de assinatura deixam de valer. Não dá para desfazer.')) {
+                  cancelar.mutate({ propostaId })
+                }
+              }}>
+              {cancelar.isLoading ? '⏳' : '✕ Cancelar envio'}
+            </Btn>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2625,12 +2647,22 @@ function CardAssinatura({ propostaId }: { propostaId: number }) {
                 ⧉ Copiar link
               </Btn>
             )}
+            {i === 0 && s.signUrl && s.status !== 'signed' && (
+              <Btn size="sm" variant="ghost" disabled={enviarWhats.isLoading}
+                onClick={() => {
+                  if (confirm(`Enviar o link de assinatura para ${s.nome} pelo WhatsApp da Atom Tech?`)) {
+                    enviarWhats.mutate({ propostaId })
+                  }
+                }}>
+                {enviarWhats.isLoading ? '⏳ Enviando...' : '📲 Enviar por WhatsApp'}
+              </Btn>
+            )}
           </div>
         ))}
       </div>
       <p style={{ color: C.textDim, fontSize: 11, margin: '10px 0 0' }}>
         Documento criado na ZapSign em {formatDate(String(data.criadoEm).slice(0, 10))}.
-        O status não muda sozinho — use “Atualizar status”.
+        O status atualiza sozinho a cada assinatura.
       </p>
     </Card>
   )

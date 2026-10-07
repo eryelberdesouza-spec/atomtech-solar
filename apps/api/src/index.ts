@@ -292,6 +292,24 @@ app.post('/contrato/enviar-assinatura', async (req, res) => {
   }
 })
 
+// ── Webhook da ZapSign — mantém o status da assinatura em dia sozinho ────────
+// Configurado na conta ZapSign (todos os eventos) com o cabeçalho
+// X-Webhook-Secret = ZAPSIGN_WEBHOOK_SECRET. O corpo NÃO é confiado: só se usa
+// o `token` do documento para reler o estado direto na API da ZapSign. Responde
+// 200 na hora (a ZapSign reenvia se demorar) e sincroniza em background.
+app.post('/zapsign/webhook', (req, res) => {
+  const segredo = process.env.ZAPSIGN_WEBHOOK_SECRET
+  if (!segredo || req.headers['x-webhook-secret'] !== segredo) {
+    return res.status(401).json({ error: 'não autorizado' })
+  }
+  const token = typeof req.body?.token === 'string' ? req.body.token : null
+  res.json({ ok: true })
+  if (!token) return
+  import('./services/zapsign')
+    .then(({ sincronizarAssinatura }) => sincronizarAssinatura(token))
+    .catch(e => console.error('[zapsign webhook] falha ao sincronizar', token, e))
+})
+
 // ── Relatório de Energia — proxy para o serviço Python (apps/relatorio-energia) ──
 // apps/api nunca fala com a Anthropic nem manipula o .pptx: só autentica o usuário
 // do AGO, busca o cadastro do cliente no banco, repassa pro serviço interno

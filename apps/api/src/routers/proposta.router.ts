@@ -2162,19 +2162,16 @@ export const propostaRouter = router({
       const atual = (rows as any[])[0]
       if (!atual) return null
 
-      // Sem webhook configurado, o status só muda quando alguém pede. Não
-      // consulta sozinho a cada render para não castigar a API da ZapSign.
+      // O webhook da ZapSign (/zapsign/webhook) mantém o status em dia; o
+      // `atualizar` fica como recurso manual caso algum aviso se perca.
       const finalizado = ['signed', 'refused', 'canceled'].includes(String(atual.status))
       if (input.atualizar && !finalizado) {
         try {
-          const { consultarDocumento, zapsignConfigurado } = await import('../services/zapsign')
+          const { sincronizarAssinatura, zapsignConfigurado } = await import('../services/zapsign')
           if (zapsignConfigurado()) {
-            const doc = await consultarDocumento(atual.docToken)
-            await pool.execute(
-              `UPDATE contrato_assinatura SET status = ?, signatarios = ?, atualizado_em = NOW() WHERE id = ?`,
-              [doc.status, JSON.stringify(doc.signatarios), atual.id],
-            )
-            return { ...atual, status: doc.status, signatarios: doc.signatarios }
+            const s = await sincronizarAssinatura(atual.docToken)
+            if (s?.cancelada) return null
+            if (s) return { ...atual, status: s.status, signatarios: s.signatarios }
           }
         } catch (e) {
           console.error('[zapsign] falha ao atualizar status:', e)
@@ -2185,6 +2182,86 @@ export const propostaRouter = router({
         signatarios: typeof atual.signatarios === 'string'
           ? JSON.parse(atual.signatarios) : atual.signatarios,
       }
+    }),
+
+  // Link de assinatura ao CONTRATANTE pelo WhatsApp do próprio bot. O envio
+  // automático por WhatsApp da ZapSign é cobrado à parte; antes a equipe copiava
+  // o link e mandava à mão. Efeito colateral conhecido: mensagem saída deste
+  // número pausa o bot por 24h naquele chat (o n8n trata como atendimento
+  // humano) — adequado, já que a conversa sobre o contrato é da equipe.
+  enviarLinkAssinaturaWhatsapp: protectedProcedure
+    .input(z.object({ propostaId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getRawPool()
+      const [rows]: any = await pool.execute(
+        `SELECT a.signatarios, p.numero, c.tipo_pessoa, c.telefone, c.responsavel_telefone
+           FROM contrato_assinatura a
+           JOIN proposta p ON p.id = a.proposta_id
+           LEFT JOIN cliente c ON c.id = p.cliente_id
+          WHERE a.proposta_id = ? AND a.empresa_id = ? AND a.cancelada = 0
+          ORDER BY a.id DESC LIMIT 1`,
+        [input.propostaId, ctx.usuario.empresaId],
+      )
+      const reg = (rows as any[])[0]
+      if (!reg) throw new TRPCError({ code: 'NOT_FOUND', message: 'Esta proposta não tem contrato enviado para assinatura.' })
+
+      const sigs = typeof reg.signatarios === 'string' ? JSON.parse(reg.signatarios) : (reg.signatarios ?? [])
+      // O contratante é sempre o primeiro signatário (ordem do envio).
+      const contratante = sigs[0]
+      if (!contratante?.signUrl) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Link de assinatura do contratante indisponível.' })
+      if (contratante.status === 'signed') throw new TRPCError({ code: 'BAD_REQUEST', message: `${contratante.nome} já assinou.` })
+
+      // Mesma regra do envio à ZapSign: em PJ quem assina é o representante legal.
+      const telefone = (reg.tipo_pessoa === 'juridica' ? reg.responsavel_telefone : reg.telefone) || reg.telefone
+      if (!telefone) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cliente sem telefone no cadastro — preencha para enviar pelo WhatsApp, ou copie o link.' })
+      }
+
+      const { enviarTexto, resolverChatId, telefoneParaChatId } = await import('../services/whatsapp')
+      const montado = telefoneParaChatId(telefone)
+      const chatId = montado ? await resolverChatId(montado) : null
+      if (!chatId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `O telefone ${telefone} não tem WhatsApp ativo. Copie o link e envie por outro meio.` })
+      }
+
+      const nome = String(contratante.nome ?? '').trim().split(/\s+/)[0] ?? ''
+      const saudacao = nome ? `Olá, ${nome.charAt(0).toUpperCase()}${nome.slice(1).toLowerCase()}.` : 'Olá.'
+      const texto = `${saudacao}\n\n`
+        + `Segue o link para a assinatura eletrônica do contrato referente à proposta ${reg.numero}, da Atom Tech:\n`
+        + `${contratante.signUrl}\n\n`
+        + 'A assinatura é feita pelo próprio navegador, sem necessidade de instalar aplicativos. '
+        + 'Em caso de dúvida, nossa equipe está à disposição por este número.'
+
+      const r = await enviarTexto(chatId, texto, { acaoDoUsuario: true })
+      if (!r.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Falha no envio pelo WhatsApp: ${r.erro}` })
+      return { ok: true, telefone }
+    }),
+
+  // Cancela o envio: exclui o documento na ZapSign (links deixam de valer —
+  // irreversível) e marca o registro como cancelado. Usado quando o contrato
+  // saiu com erro e precisa ser reenviado, ou num envio de teste.
+  cancelarAssinatura: protectedProcedure
+    .input(z.object({ propostaId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getRawPool()
+      const [rows]: any = await pool.execute(
+        `SELECT id, doc_token AS docToken, status FROM contrato_assinatura
+          WHERE proposta_id = ? AND empresa_id = ? AND cancelada = 0
+          ORDER BY id DESC LIMIT 1`,
+        [input.propostaId, ctx.usuario.empresaId],
+      )
+      const atual = (rows as any[])[0]
+      if (!atual) throw new TRPCError({ code: 'NOT_FOUND', message: 'Nenhum envio ativo para cancelar.' })
+      if (atual.status === 'signed') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Contrato já assinado por todos — não pode ser cancelado.' })
+      }
+      const { excluirDocumento } = await import('../services/zapsign')
+      await excluirDocumento(atual.docToken)
+      await pool.execute(
+        `UPDATE contrato_assinatura SET cancelada = 1, status = 'canceled', atualizado_em = NOW() WHERE id = ?`,
+        [atual.id],
+      )
+      return { ok: true }
     }),
 
   arquivar: protectedProcedure

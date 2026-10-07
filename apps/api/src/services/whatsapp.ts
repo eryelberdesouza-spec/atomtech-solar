@@ -86,9 +86,15 @@ type EnvioResultado = { chatId: string; ok: boolean; erro?: string }
  * Envia uma mensagem de texto. Nunca lança — devolve o resultado para quem
  * chamou decidir o que registrar. Alerta que falha não pode derrubar a
  * operação que o usuário estava fazendo na tela.
+ *
+ * `acaoDoUsuario`: envio disparado por clique explícito (ex.: link de
+ * assinatura ao cliente) — não depende do interruptor dos ALERTAS automáticos.
  */
-export async function enviarTexto(chatId: string, texto: string): Promise<EnvioResultado> {
-  if (!whatsappAtivo()) {
+export async function enviarTexto(
+  chatId: string, texto: string, opcoes?: { acaoDoUsuario?: boolean },
+): Promise<EnvioResultado> {
+  const liberado = opcoes?.acaoDoUsuario ? whatsappConfigurado() : whatsappAtivo()
+  if (!liberado) {
     return { chatId, ok: false, erro: 'alertas de WhatsApp desativados ou WAHA não configurado' }
   }
   try {

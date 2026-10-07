@@ -8,8 +8,12 @@
 //
 // Decisões do usuário (2026-10-06):
 // - Signatários: cliente + os dois sócios da Atom.
-// - Convite: a ZapSign manda o e-mail automaticamente; o link também aparece
-//   na tela do AGO para envio manual (send_automatic_whatsapp fica desligado).
+// - Convite: a ZapSign manda o e-mail automaticamente. O WhatsApp da ZapSign
+//   (send_automatic_whatsapp) fica DESLIGADO porque é cobrado à parte — o link
+//   vai pelo WhatsApp do próprio bot (botão no card da proposta).
+// - Status: webhook da ZapSign → POST /zapsign/webhook (ver index.ts).
+
+import { getRawPool } from '../routers/trpc'
 
 const BASE = (process.env.ZAPSIGN_API_URL ?? 'https://api.zapsign.com.br/api/v1').replace(/\/$/, '')
 const TOKEN = process.env.ZAPSIGN_API_TOKEN ?? ''
@@ -167,12 +171,44 @@ export async function diagnosticar(): Promise<{ ok: boolean; detalhe: string }> 
 }
 
 /** Relê o documento na ZapSign — usado para atualizar o status na tela. */
-export async function consultarDocumento(docToken: string): Promise<DocumentoCriado> {
+export async function consultarDocumento(docToken: string): Promise<DocumentoCriado & { excluido: boolean }> {
   const r = await chamar(`/docs/${docToken}/`, { method: 'GET' })
   return {
     token: r?.token ?? docToken,
     openId: r?.open_id ?? null,
     status: r?.status ?? 'pending',
     signatarios: mapearSignatarios(r?.signers),
+    excluido: r?.deleted === true,
   }
+}
+
+/**
+ * Cancela o documento: exclusão lógica na ZapSign (some da interface, os links
+ * deixam de valer, continua consultável pela API). IRREVERSÍVEL.
+ */
+export async function excluirDocumento(docToken: string): Promise<void> {
+  await chamar(`/docs/${docToken}/`, { method: 'DELETE' })
+}
+
+/**
+ * Relê o documento na ZapSign e grava o estado em contrato_assinatura.
+ * Usado pelo webhook e pelo botão "Atualizar status". Devolve null se o
+ * token não é de um envio feito pelo AGO (a conta tem documentos avulsos).
+ */
+export async function sincronizarAssinatura(docToken: string) {
+  const pool = getRawPool()
+  const [rows]: any = await pool.execute(
+    'SELECT id FROM contrato_assinatura WHERE doc_token = ? LIMIT 1', [docToken],
+  )
+  const reg = (rows as any[])[0]
+  if (!reg) return null
+  const doc = await consultarDocumento(docToken)
+  const status = doc.excluido ? 'canceled' : doc.status
+  await pool.execute(
+    `UPDATE contrato_assinatura
+        SET status = ?, signatarios = ?, cancelada = (cancelada OR ?), atualizado_em = NOW()
+      WHERE id = ?`,
+    [status, JSON.stringify(doc.signatarios), doc.excluido ? 1 : 0, reg.id],
+  )
+  return { status, signatarios: doc.signatarios, cancelada: doc.excluido }
 }
