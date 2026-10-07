@@ -12,6 +12,7 @@ import { renderPdf, renderPdfComCapaSeparada, renderPdfContratoComAnexo, acharCh
 import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
 import { notificarOsAgrupado } from './services/osNotificacao'
 import { hojeISO, agoraBR } from './lib/datas'
+import { iniciarMonitorWhatsapp } from './services/monitorWhatsapp'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -152,6 +153,35 @@ app.post('/pdf/render-contrato', async (req, res) => {
   } catch (e: any) {
     console.error('Erro ao gerar contrato:', e)
     res.status(500).json({ error: e?.message ?? 'Falha ao gerar contrato' })
+  }
+})
+
+// ── Migração: alertas de saúde do sistema (infra) ────────────────────────────
+// Separada de fin_alerta, que é de negócio (cobrança pendente) e aparece no
+// AGF. Estes são de infraestrutura e precisam aparecer no AGO, onde a equipe
+// trabalha o dia todo.
+app.get('/run-migration-sistema-alerta', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS sistema_alerta (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id   INT NOT NULL,
+        tipo         VARCHAR(60) NOT NULL,
+        severidade   ENUM('aviso','critico') NOT NULL DEFAULT 'critico',
+        titulo       VARCHAR(200) NOT NULL,
+        descricao    TEXT,
+        resolvido    TINYINT(1) NOT NULL DEFAULT 0,
+        criado_em    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        resolvido_em TIMESTAMP NULL,
+        INDEX idx_sis_alerta_aberto (empresa_id, tipo, resolvido)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `)
+    await conn.end()
+    res.json({ ok: true, criadas: ['tabela sistema_alerta (ou já existia)'] })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
   }
 })
 
@@ -2651,6 +2681,7 @@ async function main() {
   app.listen(PORT, () => {
     console.log(`\n🚀 Atom Tech API → http://localhost:${PORT}`)
     console.log(`   tRPC: http://localhost:${PORT}/trpc\n`)
+    iniciarMonitorWhatsapp()
   })
 }
 

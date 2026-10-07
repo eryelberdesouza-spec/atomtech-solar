@@ -403,6 +403,21 @@ export const propostaRouter = router({
   // proposta que nunca chegou a ser enviada e venceu é o caso mais evitável.
   // Não é recortado pelo período do painel — vencimento é sempre sobre o que
   // vem à frente, independente do filtro que estiver selecionado na tela.
+  // Alertas de infraestrutura abertos pelo vigia (ex.: WhatsApp fora do ar).
+  // Fica aqui por conveniência — é o router que o painel do AGO já consulta.
+  alertasSistema: protectedProcedure
+    .query(async ({ ctx }) => {
+      const pool = getRawPool()
+      const [rows]: any = await pool.execute(
+        `SELECT id, tipo, severidade, titulo, descricao, criado_em AS criadoEm
+           FROM sistema_alerta
+          WHERE empresa_id = ? AND resolvido = 0
+          ORDER BY id DESC LIMIT 5`,
+        [ctx.usuario.empresaId],
+      )
+      return rows as any[]
+    }),
+
   aVencer: protectedProcedure
     .input(z.object({ dias: z.number().int().min(1).max(60).default(7) }).optional())
     .query(async ({ ctx, input }) => {

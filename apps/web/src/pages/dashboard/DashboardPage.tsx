@@ -47,6 +47,14 @@ export function DashboardPage() {
   )
   const qtdAVencer: number = (aVencer ?? []).length
 
+  // Alertas de infraestrutura (hoje: WhatsApp fora do ar). Ficam na tela
+  // inicial porque o custo de não ver é alto — bot mudo é cliente sem
+  // resposta, e a última queda passou um dia inteiro despercebida.
+  const { data: alertasSistema } = (trpc as any).proposta.alertasSistema.useQuery(
+    undefined,
+    { refetchInterval: 120_000 },
+  )
+
   // Técnico só enxerga Operacional (mesma regra do menu lateral).
   const destinos = (isTecnico ? NAV.filter(n => n.path === '/ordens-servico') : NAV)
     .filter(n => n.path !== '/dashboard')
@@ -87,6 +95,24 @@ export function DashboardPage() {
           {(empresa as any)?.nome ?? 'Atom Tech'} · Por onde você quer começar?
         </p>
       </div>
+
+      {(alertasSistema ?? []).map((a: any) => (
+        <div key={a.id} style={{
+          background: '#3A1416', border: '1px solid #EF444460', borderLeft: '4px solid #EF4444',
+          borderRadius: 12, padding: '14px 18px', marginBottom: 16,
+          display: 'flex', gap: 12, alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: 18, lineHeight: 1.2 }}>⚠️</span>
+          <div>
+            <p style={{ color: '#FFD9DA', fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>
+              {a.titulo}
+            </p>
+            <p style={{ color: '#E8B9BB', fontSize: 12.5, margin: 0, lineHeight: 1.5 }}>
+              {a.descricao}
+            </p>
+          </div>
+        </div>
+      ))}
 
       <div style={{
         display: 'grid',
