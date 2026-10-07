@@ -210,13 +210,33 @@ interface MarcoCustom {
   tipoPrazo: 'uteis' | 'corridos'
 }
 
+// 2026-10-06: descoberto que a maioria dos usuários não revisava as 4
+// condições geradas aqui — ficavam com os valores padrão (50/20/20/10 nos
+// marcos, financiamento/cartão sempre incluídos) mesmo quando não era bem
+// isso que tinha sido combinado, gerando inconsistência com o fluxo de caixa
+// previsto. Agora exige preenchimento manual: `avistaDescricao` e
+// `marcosCustom` deixam de ter fallback hardcoded na tela de Nova Proposta
+// (o schema do router exige os dois); financiamento/cartão passam a ser
+// opt-in por proposta via `incluirFinanciamento`/`incluirCartao`.
+// `incluirFinanciamento`/`incluirCartao` default a `true` aqui só para não
+// quebrar o outro caller (criação de proposta de serviço, que ainda não
+// expõe essa escolha na tela — mantém o comportamento antigo).
 export function gerarCondicoesCompletasAtomTech(
   propostaId: number,
   valorFinal: number,
   dadosBancarios: DadosBancarios,
-  descontoAvista?: number,
-  marcosCustom?: MarcoCustom[],
+  opcoes?: {
+    descontoAvista?: number
+    avistaDescricao?: string
+    marcosCustom?: MarcoCustom[]
+    incluirFinanciamento?: boolean
+    incluirCartao?: boolean
+  },
 ): CondicaoComercial[] {
+  const {
+    descontoAvista, avistaDescricao, marcosCustom,
+    incluirFinanciamento = true, incluirCartao = true,
+  } = opcoes ?? {}
   const condições: CondicaoComercial[] = []
 
   // 1. À vista (com desconto se informado)
@@ -225,6 +245,9 @@ export function gerarCondicoesCompletasAtomTech(
     : valorFinal
 
   const condAvista = gerarPagamentoAVista(propostaId, valorAvista, dadosBancarios)
+  if (avistaDescricao && avistaDescricao.trim()) {
+    condAvista.parcelas[0].descricaoEvento = avistaDescricao.trim()
+  }
   if (descontoAvista && descontoAvista > 0) {
     condAvista.descricao = `Pagamento à Vista — ${descontoAvista}% de desconto`
   }
@@ -263,48 +286,53 @@ export function gerarCondicoesCompletasAtomTech(
     )
   }
 
-  // 3. Financiamento bancário genérico (sujeito a análise de crédito)
-  condições.push({
-    propostaId,
-    tipo: 'financiamento' as const,
-    descricao: 'Financiamento Bancário — em até 72 meses *',
-    valorTotal: String(valorFinal),
-    ativa: true,
-    ordem: 3,
-    parcelas: [{
-      numeroParcela: 1,
-      descricaoEvento: 'Financiamento bancário em até 72 meses por meio de bancos e financeiras conveniadas',
-      valor: String(valorFinal),
-      percentualDoTotal: '100',
-      prazoDias: 0,
-      tipoPrazo: 'corridos' as const,
-      referenciaEvento: 'aprovacao_financiamento',
-      meiosPagamento: ['financiamento_bancario'] as any,
-      dadosBancariosJson: null,
-      observacao: '* Financiamento sujeito à análise de crédito. Consulte condições junto à financeira.',
-    }],
-  })
+  // 3. Financiamento bancário genérico (sujeito a análise de crédito) —
+  //    opcional: nem toda proposta cabe financiamento (ex.: serviço avulso).
+  if (incluirFinanciamento) {
+    condições.push({
+      propostaId,
+      tipo: 'financiamento' as const,
+      descricao: 'Financiamento Bancário — em até 72 meses *',
+      valorTotal: String(valorFinal),
+      ativa: true,
+      ordem: 3,
+      parcelas: [{
+        numeroParcela: 1,
+        descricaoEvento: 'Financiamento bancário em até 72 meses por meio de bancos e financeiras conveniadas',
+        valor: String(valorFinal),
+        percentualDoTotal: '100',
+        prazoDias: 0,
+        tipoPrazo: 'corridos' as const,
+        referenciaEvento: 'aprovacao_financiamento',
+        meiosPagamento: ['financiamento_bancario'] as any,
+        dadosBancariosJson: null,
+        observacao: '* Financiamento sujeito à análise de crédito. Consulte condições junto à financeira.',
+      }],
+    })
+  }
 
-  // 4. Cartão de crédito em até 18x
-  condições.push({
-    propostaId,
-    tipo: 'cartao' as const,
-    descricao: 'Cartão de Crédito — em até 18 parcelas',
-    valorTotal: String(valorFinal),
-    ativa: true,
-    ordem: 4,
-    parcelas: [{
-      numeroParcela: 1,
-      descricaoEvento: 'Pagamento via cartão de crédito em até 18 parcelas conforme taxas da operadora',
-      valor: String(valorFinal),
-      percentualDoTotal: '100',
-      prazoDias: 0,
-      tipoPrazo: 'corridos' as const,
-      referenciaEvento: 'pagamento_cartao',
-      meiosPagamento: ['cartao_credito'] as any,
-      dadosBancariosJson: null,
-    }],
-  })
+  // 4. Cartão de crédito em até 18x — opcional, mesmo motivo.
+  if (incluirCartao) {
+    condições.push({
+      propostaId,
+      tipo: 'cartao' as const,
+      descricao: 'Cartão de Crédito — em até 18 parcelas',
+      valorTotal: String(valorFinal),
+      ativa: true,
+      ordem: 4,
+      parcelas: [{
+        numeroParcela: 1,
+        descricaoEvento: 'Pagamento via cartão de crédito em até 18 parcelas conforme taxas da operadora',
+        valor: String(valorFinal),
+        percentualDoTotal: '100',
+        prazoDias: 0,
+        tipoPrazo: 'corridos' as const,
+        referenciaEvento: 'pagamento_cartao',
+        meiosPagamento: ['cartao_credito'] as any,
+        dadosBancariosJson: null,
+      }],
+    })
+  }
 
   return condições
 }

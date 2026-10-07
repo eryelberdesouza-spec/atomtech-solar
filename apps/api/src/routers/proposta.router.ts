@@ -533,12 +533,17 @@ export const propostaRouter = router({
         modeloProposta: z.enum(['classico', 'direto_ao_ponto']).default('classico'),
         sobredimensionamento: z.number().min(0).max(100).default(50),
         descontoAvista: z.number().optional(),
+        // 2026-10-06: condições de pagamento passam a ser preenchidas na mão —
+        // nada de fallback silencioso pro padrão Atom Tech (ver payment.engine.ts).
+        condicoesAvista: z.string().min(1, 'Informe as condições de pagamento à vista'),
         marcoParcelas: z.array(z.object({
-          descricao: z.string(),
-          percentual: z.number(),
-          prazoDias: z.number(),
+          descricao: z.string().min(1, 'Informe a descrição do marco'),
+          percentual: z.number().positive(),
+          prazoDias: z.number().min(0),
           tipoPrazo: z.enum(['uteis', 'corridos']),
-        })).optional(),
+        })).min(1, 'Informe ao menos um marco de pagamento'),
+        incluirFinanciamento: z.boolean().default(false),
+        incluirCartao: z.boolean().default(false),
         fabricanteModulo: z.string().optional(),
         modeloModulo: z.string().optional(),
         potenciaModuloWp: z.number().default(620),
@@ -781,9 +786,20 @@ export const propostaRouter = router({
 
       const dadosBancarios = { banco: emp?.bancoNome ?? undefined, pixChave: emp?.bancoPixChave ?? undefined }
 
-      const condicoes = gerarCondicoesCompletasAtomTech(
-        propostaId, pricingResult.precoFinal, dadosBancarios, input.descontoAvista, input.marcoParcelas,
-      )
+      // Confere no servidor também (não só na tela) — é exatamente a checagem
+      // que faltava e deixava passar splits que não fechavam em 100%.
+      const totalMarcos = input.marcoParcelas.reduce((s, m) => s + m.percentual, 0)
+      if (Math.abs(totalMarcos - 100) > 0.5) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Os marcos de pagamento somam ${totalMarcos}% — precisam somar 100%.` })
+      }
+
+      const condicoes = gerarCondicoesCompletasAtomTech(propostaId, pricingResult.precoFinal, dadosBancarios, {
+        descontoAvista: input.descontoAvista,
+        avistaDescricao: input.condicoesAvista,
+        marcosCustom: input.marcoParcelas,
+        incluirFinanciamento: input.incluirFinanciamento,
+        incluirCartao: input.incluirCartao,
+      })
 
       for (const cond of condicoes) {
         const [condResult] = await ctx.db.insert(ccTable).values({
@@ -1782,9 +1798,13 @@ export const propostaRouter = router({
 
       const dadosBancarios = { banco: emp?.bancoNome ?? undefined, pixChave: emp?.bancoPixChave ?? undefined }
 
-      const condicoes = gerarCondicoesCompletasAtomTech(
-        propostaId, valorTotal, dadosBancarios, input.descontoAvista, input.marcoParcelas,
-      )
+      // Fluxo de serviço geral ainda não expõe a tela de condições manuais
+      // (ver create acima) — mantém o comportamento de sempre (financiamento
+      // e cartão inclusos por padrão) até ganhar a mesma etapa.
+      const condicoes = gerarCondicoesCompletasAtomTech(propostaId, valorTotal, dadosBancarios, {
+        descontoAvista: input.descontoAvista,
+        marcosCustom: input.marcoParcelas,
+      })
 
       for (const cond of condicoes) {
         const [condResult] = await ctx.db.insert(ccTable).values({

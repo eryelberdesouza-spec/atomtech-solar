@@ -154,12 +154,16 @@ const TELHADO_OPTIONS = [
 const hoje     = new Date().toISOString().split('T')[0]
 const validade = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0]
 
+// 2026-10-06: deixou de ser o default silencioso (ver nota em FORM_INICIAL)
+// — agora só entra se o usuário clicar em "Preencher com padrão Atom Tech",
+// como ponto de partida que ainda precisa ser revisado/editado antes de criar.
 const MARCOES_PADRAO = [
   { descricao: 'Entrada — assinatura do contrato',      percentual: 50, prazoDias: 2,  tipoPrazo: 'uteis'    },
   { descricao: '2ª parcela — entrega dos equipamentos', percentual: 20, prazoDias: 2,  tipoPrazo: 'uteis'    },
   { descricao: '3ª parcela — conclusão dos serviços',   percentual: 20, prazoDias: 2,  tipoPrazo: 'uteis'    },
   { descricao: '4ª parcela — 28 dias corridos após 3ª', percentual: 10, prazoDias: 28, tipoPrazo: 'corridos' },
 ]
+const MARCO_VAZIO = { descricao: '', percentual: 0, prazoDias: 2, tipoPrazo: 'uteis' as const }
 
 const FORM_INICIAL = {
   clienteId: '', dataEmissao: hoje, dataValidade: validade,
@@ -170,7 +174,13 @@ const FORM_INICIAL = {
   fabricanteInversor: '', modeloInversor: '', potenciaInversorKw: 0,
   overloadInversor: 0, entradasPorMicro: 1, quantidadeInversoresManual: 0,
   custoKitFotovoltaico: 0, comissao: 0, descontoAvista: 0,
-  marcoParcelas: MARCOES_PADRAO,
+  // Condições de pagamento: desde 2026-10-06 preenchidas na mão, sem valor
+  // padrão aplicado em silêncio — era isso que gerava inconsistência com o
+  // fluxo de caixa previsto (ninguém revisava o que o sistema já gravava).
+  condicoesAvista: '',
+  marcoParcelas: [{ ...MARCO_VAZIO }] as typeof MARCOES_PADRAO,
+  incluirFinanciamento: false,
+  incluirCartao: false,
   observacoes: '',
   titulo: '',
   propostaRapida: false,
@@ -191,7 +201,6 @@ export function NovaPropostaPage() {
   // Pré-seleciona o cliente quando aberto a partir da página do cliente (?clienteId=N)
   const clienteIdParam = new URLSearchParams(window.location.search).get('clienteId') ?? ''
   const [form, setForm] = useState({ ...FORM_INICIAL, clienteId: clienteIdParam })
-  const [mostrarParcelamento, setMostrarParcela] = useState(false)
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
   const { data: clientes }   = trpc.cliente.list.useQuery({ porPagina: 200 }, { staleTime: 0 })
@@ -213,7 +222,7 @@ export function NovaPropostaPage() {
   const propostasExistentes = (propostasCliente?.data ?? []).filter((p: any) => !p.isTemplate)
 
   const handleCreate = () => {
-    if (!form.clienteId || form.custoKitFotovoltaico <= 0) return
+    if (!form.clienteId || form.custoKitFotovoltaico <= 0 || !pagamentoValido) return
     createMutation.mutate({
       clienteId: Number(form.clienteId),
       consumoMedioMensalKwh: form.modoCalculo === 'kwh' ? form.consumoMensalKwh : undefined,
@@ -234,7 +243,10 @@ export function NovaPropostaPage() {
       propostaRapida: form.propostaRapida || undefined,
       modeloProposta: form.modeloProposta,
       descontoAvista: form.descontoAvista || undefined,
+      condicoesAvista: form.condicoesAvista.trim(),
       marcoParcelas: form.marcoParcelas,
+      incluirFinanciamento: form.incluirFinanciamento,
+      incluirCartao: form.incluirCartao,
     } as any)
   }
 
@@ -246,6 +258,14 @@ export function NovaPropostaPage() {
   const precoVendaEstimado = custoTotalEstimado * (1 + MARGEM_PADRAO / 100)
   const comissaoEstimada   = precoVendaEstimado * (form.comissao / 100)
   const precoFinalEstimado = precoVendaEstimado + comissaoEstimada
+
+  // Gate de condições de pagamento: nada de avançar com a soma errada ou
+  // com a descrição à vista em branco — era isso que o sistema deixava
+  // passar em silêncio antes.
+  const totalMarcos    = form.marcoParcelas.reduce((s: number, p: any) => s + Number(p.percentual || 0), 0)
+  const marcosValidos  = form.marcoParcelas.length > 0 && form.marcoParcelas.every((p: any) => p.descricao.trim().length > 0) && Math.abs(totalMarcos - 100) < 0.5
+  const avistaValido   = form.condicoesAvista.trim().length > 0
+  const pagamentoValido = marcosValidos && avistaValido
 
   const StepBar = () => (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
@@ -455,36 +475,64 @@ export function NovaPropostaPage() {
             )}
 
             <div style={{ background: C.dark, borderRadius: 10, padding: '14px 16px', border: `1px solid ${C.darkBorder}` }}>
-              <p style={{ color: C.text, fontSize: 13, fontWeight: 600, margin: '0 0 10px' }}>💰 Desconto à Vista</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="number" min={0} max={30} value={form.descontoAvista || ''} onChange={(e: any) => set('descontoAvista', Number(e.target.value))} placeholder="0" style={{ width: 80, padding: '8px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none' }} />
-                <span style={{ color: C.textMuted }}>%</span>
-                {form.descontoAvista > 0 && form.custoKitFotovoltaico > 0 && <span style={{ color: C.green, fontSize: 13, fontWeight: 600 }}>À vista: {formatCurrency(precoFinalEstimado * (1 - form.descontoAvista / 100))}</span>}
-              </div>
-              <p style={{ color: C.textDim, fontSize: 11, margin: '4px 0 0' }}>Aplicado apenas na condição de pagamento à vista.</p>
-            </div>
+              <p style={{ color: C.text, fontSize: 13, fontWeight: 700, margin: '0 0 2px' }}>💳 Condições de Pagamento *</p>
+              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 12px' }}>
+                Preenchimento manual — nada aqui vem pronto. É isso que evita a proposta sair com uma condição
+                que ninguém revisou e que não bate com o que foi combinado.
+              </p>
 
-            <div style={{ background: C.dark, borderRadius: 10, border: `1px solid ${C.darkBorder}` }}>
-              <button onClick={() => setMostrarParcela(!mostrarParcelamento)} style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'inherit' }}>
-                <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>📋 Parcelamento por Marcos</span>
-                <span style={{ color: C.textMuted, fontSize: 12 }}>{mostrarParcelamento ? '▲ Recolher' : '▼ Personalizar (opcional)'}</span>
-              </button>
-              {!mostrarParcelamento && <div style={{ padding: '0 16px 14px' }}><p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>Padrão Atom Tech: 50% entrada · 20% entrega · 20% conclusão · 10% após 28 dias.</p></div>}
-              {mostrarParcelamento && (
-                <div style={{ padding: '0 16px 16px' }}>
-                  {form.marcoParcelas.map((p: any, i: number) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 55px 55px' : '1fr 60px 60px 90px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                      <input value={p.descricao} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], descricao: e.target.value }; set('marcoParcelas', n) }} style={{ padding: '6px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><input type="number" min={1} max={100} value={p.percentual} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], percentual: Number(e.target.value) }; set('marcoParcelas', n) }} style={{ width: '100%', padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} /><span style={{ color: C.textDim, fontSize: 10 }}>%</span></div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><input type="number" min={0} value={p.prazoDias} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], prazoDias: Number(e.target.value) }; set('marcoParcelas', n) }} style={{ width: '100%', padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} /><span style={{ color: C.textDim, fontSize: 10 }}>d</span></div>
-                      <select value={p.tipoPrazo} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], tipoPrazo: e.target.value }; set('marcoParcelas', n) }} style={{ padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.textMuted, fontSize: 11, outline: 'none' }}><option value="uteis">úteis</option><option value="corridos">corridos</option></select>
-                    </div>
-                  ))}
-                  <div style={{ textAlign: 'right', paddingTop: 6, borderTop: `1px solid ${C.darkBorder}` }}>
-                    {(() => { const total = form.marcoParcelas.reduce((s: number, p: any) => s + p.percentual, 0); return <span style={{ fontSize: 12, fontWeight: 700, color: total === 100 ? C.green : C.danger }}>Total: {total}% {total !== 100 ? '⚠ deve ser 100%' : '✓'}</span> })()}
+              {/* À Vista — sempre oferecida */}
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ color: C.text, fontSize: 12.5, fontWeight: 600, margin: '0 0 8px' }}>💰 À Vista</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="number" min={0} max={30} value={form.descontoAvista || ''} onChange={(e: any) => set('descontoAvista', Number(e.target.value))} placeholder="0" style={{ width: 70, padding: '8px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none' }} />
+                    <span style={{ color: C.textMuted, fontSize: 12 }}>% de desconto</span>
                   </div>
+                  {form.descontoAvista > 0 && form.custoKitFotovoltaico > 0 && <span style={{ color: C.green, fontSize: 13, fontWeight: 600 }}>À vista: {formatCurrency(precoFinalEstimado * (1 - form.descontoAvista / 100))}</span>}
                 </div>
-              )}
+                <input
+                  value={form.condicoesAvista}
+                  onChange={(e: any) => set('condicoesAvista', e.target.value)}
+                  placeholder="Condições — ex.: pagamento integral via PIX em até 2 dias úteis após a assinatura do contrato"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${!avistaValido ? `${C.danger}60` : C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Parcelado por Marcos */}
+              <div style={{ borderTop: `1px solid ${C.darkBorder}`, paddingTop: 12, marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <p style={{ color: C.text, fontSize: 12.5, fontWeight: 600, margin: 0 }}>📋 Parcelado por Marcos</p>
+                  <button type="button" onClick={() => set('marcoParcelas', MARCOES_PADRAO.map(m => ({ ...m })))} style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
+                    Preencher com padrão Atom Tech (ainda editável)
+                  </button>
+                </div>
+                {form.marcoParcelas.map((p: any, i: number) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 50px 50px 26px' : '1fr 60px 60px 90px 26px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <input value={p.descricao} placeholder="Ex.: Entrada — assinatura do contrato" onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], descricao: e.target.value }; set('marcoParcelas', n) }} style={{ padding: '6px 10px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><input type="number" min={0} max={100} value={p.percentual || ''} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], percentual: Number(e.target.value) }; set('marcoParcelas', n) }} style={{ width: '100%', padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.solar, fontSize: 13, fontWeight: 700, outline: 'none' }} /><span style={{ color: C.textDim, fontSize: 10 }}>%</span></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><input type="number" min={0} value={p.prazoDias} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], prazoDias: Number(e.target.value) }; set('marcoParcelas', n) }} style={{ width: '100%', padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 12, outline: 'none' }} /><span style={{ color: C.textDim, fontSize: 10 }}>d</span></div>
+                    <select value={p.tipoPrazo} onChange={(e: any) => { const n = [...form.marcoParcelas]; (n[i] as any) = { ...n[i], tipoPrazo: e.target.value }; set('marcoParcelas', n) }} style={{ padding: '6px', borderRadius: 7, background: C.darkCard, border: `1px solid ${C.darkBorder}`, color: C.textMuted, fontSize: 11, outline: 'none' }}><option value="uteis">úteis</option><option value="corridos">corridos</option></select>
+                    <button type="button" onClick={() => set('marcoParcelas', form.marcoParcelas.length > 1 ? form.marcoParcelas.filter((_: any, j: number) => j !== i) : form.marcoParcelas)} disabled={form.marcoParcelas.length === 1} style={{ padding: '6px 0', borderRadius: 7, border: `1px solid ${C.danger}40`, background: `${C.danger}10`, color: form.marcoParcelas.length === 1 ? C.textDim : C.danger, cursor: form.marcoParcelas.length === 1 ? 'default' : 'pointer', fontSize: 11 }}>✕</button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTop: `1px solid ${C.darkBorder}` }}>
+                  <button type="button" onClick={() => set('marcoParcelas', [...form.marcoParcelas, { ...MARCO_VAZIO }])} style={{ background: 'none', border: 'none', color: C.accent, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>+ Adicionar marco</button>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: Math.abs(totalMarcos - 100) < 0.5 ? C.green : C.danger }}>Total: {totalMarcos}% {Math.abs(totalMarcos - 100) >= 0.5 ? '⚠ deve ser 100%' : '✓'}</span>
+                </div>
+              </div>
+
+              {/* Financiamento e Cartão — opcionais conforme o tipo de proposta */}
+              <div style={{ borderTop: `1px solid ${C.darkBorder}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label onClick={() => set('incluirFinanciamento', !form.incluirFinanciamento)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.incluirFinanciamento} readOnly style={{ accentColor: C.solar, cursor: 'pointer' }} />
+                  <span style={{ color: C.text, fontSize: 12.5 }}>🏦 Incluir Financiamento Bancário <span style={{ color: C.textDim }}>(até 72 meses)</span></span>
+                </label>
+                <label onClick={() => set('incluirCartao', !form.incluirCartao)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.incluirCartao} readOnly style={{ accentColor: C.solar, cursor: 'pointer' }} />
+                  <span style={{ color: C.text, fontSize: 12.5 }}>💳 Incluir Cartão de Crédito <span style={{ color: C.textDim }}>(até 18 parcelas)</span></span>
+                </label>
+              </div>
             </div>
 
             <div>
@@ -520,11 +568,17 @@ export function NovaPropostaPage() {
               )}
             </div>
 
+            {!pagamentoValido && (
+              <p style={{ color: C.danger, fontSize: 11.5, margin: 0 }}>
+                ⚠ Preencha as condições de pagamento acima (à vista + marcos somando 100%) para poder criar a proposta.
+              </p>
+            )}
+
             {createMutation.error && <div style={{ background: '#3A1A1A', border: `1px solid ${C.danger}`, borderRadius: 8, padding: '10px 14px', color: C.danger, fontSize: 13 }}>{(createMutation.error as any).message}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
               <Btn variant="ghost" onClick={() => setStep(2)}>← Voltar</Btn>
-              <Btn onClick={handleCreate} disabled={form.custoKitFotovoltaico <= 0 || createMutation.isLoading}>{createMutation.isLoading ? '⏳ Criando...' : '✓ Criar Proposta'}</Btn>
+              <Btn onClick={handleCreate} disabled={form.custoKitFotovoltaico <= 0 || !pagamentoValido || createMutation.isLoading}>{createMutation.isLoading ? '⏳ Criando...' : '✓ Criar Proposta'}</Btn>
             </div>
           </div>
         )}
