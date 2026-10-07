@@ -100,10 +100,43 @@ Sessão caiu ~05/10 14:35 UTC (WhatsApp derrubou o pareamento do lado do celular
 - A janela do QR dura **~2min40s** (`QR refs attempts ended`) e depois a sessão volta a `FAILED`. Deixar o celular já aberto em "Conectar um aparelho" ANTES de clicar Restart.
 - O webhook do n8n sobreviveu ao logout/restart (`config` preservado) — não precisou refazer.
 
+**SEGUNDA QUEDA no mesmo dia (07/10, fim da tarde)** — e aqui o diagnóstico mudou. Reparei pelo dashboard, e **a causa provável é humana**: o usuário levantou que o dispositivo pode ter sido **excluído acidentalmente** da lista de *Aparelhos conectados* do celular. Isso bate com o relato de 05/10 ("nenhum aparelho aparecia").
+
+> **Avisar a equipe**: na lista de dispositivos conectados do WhatsApp da Atom há um **"Ubuntu · Chrome"**. É o bot. Removê-lo derruba o atendimento inteiro, e nenhuma correção técnica impede isso.
+
+Eu havia levantado a hipótese de o WhatsApp estar **bloqueando cliente não oficial** (Baileys) e cheguei a propor migrar para a API oficial. Com a informação da exclusão acidental, essa hipótese perde força — **não repetir como se fosse diagnóstico fechado**. Fica anotada só como possibilidade se voltar a cair sem ninguém mexer no celular.
+
+### O que foi investigado e DESCARTADO (não refazer)
+- **Versão do WAHA defasada**: estava na mais recente (2026.9.2, de 02/10). Não era isso.
+- **Região do servidor**: o CLAUDE.md dizia "Sudeste Asiático" e eu repeti como fato. Medindo latência, WAHA (0,65s) ≈ API (0,57s) ≈ n8n (0,58s). **A anotação provavelmente está desatualizada** — hipótese enfraquecida.
+- **`WAHA_NOWEB_WA_VERSION=auto-web`** (aplicado 07/10): o log confirma que passou a buscar a versão corrente (`2.3000.1049587578`) no lugar da fixa (`...1045649367`). **A versão estava mesmo defasada e isso é causa conhecida de recusa de conexão — mas não era a causa daquele dia.** Vale manter.
+- **`WAHA_RESTART_ALL_SESSIONS=True`** também aplicado (reinicia sessões STOPPED quando o container sobe; não cobre FAILED).
+- **Não existe auto-restart para sessão FAILED** no WAHA — confirmado na documentação. É o que justifica o vigia abaixo.
+
 ### Limpezas ainda pendentes
 - Planilha **Leads**: apagar a linha de teste "Teste Interno" / `556198050301`.
 - n8n → Settings → n8n API: revogar as chaves **"Claude - ajuste bot OS"** (expira 05/11) e **"Claude — protecao bot"**.
 - ~~Proposta AT-2026-10292~~ — documento cancelado na ZapSign e proposta arquivada em 07/10.
+- **Workflow "Pesquisa de Satisfação" falha de hora em hora** (visto no painel do n8n: 47% de falha geral). Parte era o WhatsApp fora do ar; conferir se o número cai sozinho agora que a sessão voltou.
+
+## Vigia da sessão do WhatsApp (07/10/2026)
+
+`apps/api/src/services/monitorWhatsapp.ts`, iniciado no `app.listen`. A cada 5 min pergunta o status da sessão; se não for `WORKING`, tenta religar sozinho e confere de novo; se não voltar, abre alerta **crítico na tela inicial do AGO** (tabela `sistema_alerta`, migração `GET /run-migration-sistema-alerta`, exposto em `proposta.alertasSistema`).
+
+- `SCAN_QR_CODE` é tratado à parte: religar não adianta, precisa de gente com o celular — o alerta diz isso com todas as letras em vez de tentar em silêncio, e lembra do "Ubuntu · Chrome".
+- **Não avisa por WhatsApp de propósito**: quando o WhatsApp cai, é justamente o canal que não funciona.
+- `sistema_alerta` (infra, aparece no AGO) é separada de `fin_alerta` (negócio, aparece no AGF).
+- Existe porque a queda de 05/10 passou mais de um dia despercebida — o único monitor era tarefa que só roda com o Claude Code aberto num PC.
+
+## Fuso horário — servidor rodava em UTC (corrigido 07/10/2026)
+
+Relatório de recargas saía com data certa e **hora 3h adiantada**. O container roda em UTC e `toLocaleString('pt-BR')` **sem `timeZone`** formata no fuso do PROCESSO. Medido: servidor 17:43 GMT × 14:43 em Brasília.
+
+- **Achado mais grave, silencioso**: `new Date().toISOString().slice(0,10)` usado como "hoje" em **13 lugares** devolve a data em **UTC sempre**. Entre 21h e meia-noite de Brasília o UTC já virou o dia seguinte → título lançado às 22h nascia com emissão de amanhã, OS concluída às 22h ficava com conclusão de amanhã, "vence hoje" comparava errado. **`toISOString` ignora `TZ`** — configurar o fuso NÃO resolve isso. Usar `hojeISO()` de `apps/api/src/lib/datas.ts`.
+- `TZ=America/Sao_Paulo` no serviço `atomtech-solar`.
+- **ACOPLAMENTO que quase virou regressão**: os horários das recargas vinham certos **por acidente** (lidos em UTC e exibidos em UTC, os erros se anulavam). Mudar só a exibição os quebraria. Fuso do servidor e formatação explícita têm que andar juntos.
+- `GET /diagnostico/hora` mostra TZ do processo, hoje-no-Brasil × hoje-em-UTC. Usar antes de investigar qualquer queixa de horário.
+- **PENDENTE DE CONFERÊNCIA**: gerar um relatório de recargas e verificar (a) rodapé batendo com o relógio e (b) horários das recargas iguais aos do arquivo da Moove. O (b) é o risco real.
 
 ## Bot WhatsApp — filtro de números internos (2026-10-06)
 
@@ -129,6 +162,14 @@ Opção "✍️ Enviar para assinatura (ZapSign)" no modal **Gerar Contrato**. O
 - Tabela `contrato_assinatura` (token, status, signatários). O "Atualizar status" do card continua como recurso manual caso algum aviso do webhook se perca. Migração: `GET /run-migration-assinatura-zapsign`.
 - **Armadilha achada no primeiro envio real**: a ZapSign recusa o documento **INTEIRO** com "forneça um CPF válido" se **um** signatário tiver CPF errado. O CPF do rep1 cadastrado estava com um dígito trocado (`031.303.751-22`, inválido; correto `031.363.751-22`) — e esse número saía impresso em **todos** os contratos. Agora `cpfValido()` filtra: CPF que não passa no dígito verificador é omitido (o signatário assina igual) e a resposta traz aviso nomeando o cadastro errado. Lição: validar dado de cadastro antes de mandar para API de terceiro, e nunca deixar um campo opcional derrubar a operação toda.
 
+## Níveis de acesso — PROPOSTA AGUARDANDO SUA APROVAÇÃO
+
+Ver **`docs/permissoes-proposta.md`**. Resumo do diagnóstico: os quatro perfis existem no cadastro e aparecem na tela com descrições, **mas quase nada é verificado no servidor** — só `empresa.update`, cancelar OS e gestão de usuários. O bloqueio do perfil Técnico é só no front (`App.tsx`/`Layout.tsx`): o navegador esconde o menu, a API não recusa. Um **Visualizador** cria e edita proposta, cliente e OS normalmente.
+
+**Buraco mais sério encontrado**: o AGF está aberto para **qualquer usuário logado**, inclusive Técnico e Visualizador.
+
+Seis decisões dependem do usuário (listadas no doc). Implementação proposta: tabela única `permissoes.ts` no servidor (`exigePermissao('proposta:editar')`), front consultando a mesma tabela, e **rodar primeiro em modo "só registra"** por alguns dias antes de bloquear de verdade.
+
 ## Alertas de alteração de OS por WhatsApp (2026-10-06; LIGADO desde 07/10)
 
 **Ligado em 07/10** (`WHATSAPP_ALERTAS_ATIVO=true`), depois de três correções achadas no log de validação (`os_notificacao` com status `desativado`):
@@ -137,7 +178,9 @@ Opção "✍️ Enviar para assinatura (ZapSign)" no modal **Gerar Contrato**. O
 - **Cliente**: 52 de 68 OS são ligadas via proposta (sem `cliente_id` próprio) e a mensagem saía sem o cliente. Agora `COALESCE(p.cliente_id, o.cliente_id)`, como no `os.byId`.
 - Teste (`os.testarAlertaWhatsapp`) confirmado no celular do Eryelber em 07/10.
 
-Avisa **só quem está envolvido na OS** — técnico responsável e quem criou —, menos quem fez a alteração. Gatilhos: status, foto/anexo, marco concluído, agendamento (criação e mudança de status) e troca de técnico. Edição de texto solta **não** dispara.
+Avisa **só quem está envolvido na OS** — técnico responsável e quem criou —, menos quem fez a alteração. Gatilhos: **criação da OS com técnico definido**, status, foto/anexo, marco concluído, agendamento (criação e mudança de status) e troca de técnico. Edição de texto solta **não** dispara.
+
+**Gatilho de criação acrescentado em 07/10** depois de teste real do usuário (OS-2026-10009 com Guilherme) não notificar ninguém. A OS estava correta — os gatilhos é que cobriam só alterações POSTERIORES. Atribuir na criação era silencioso e atribuir depois avisava: incoerente, e justamente o aviso mais importante (a OS caiu no seu colo) era o que não saía. Na mesma rodada, a troca de técnico passou a avisar **também quem saiu** — senão a pessoa aparece numa obra que já não é dela. Isso exigiu `destinatariosPorIds()`: no momento do aviso o antigo responsável já não consta na OS, então a regra normal de destinatários nunca o encontraria.
 
 - **Obstáculo que apareceu**: `tecnico_responsavel` era texto livre e a OS não registrava autor — não havia para quem enviar. Criados `ordem_servico.tecnico_responsavel_id` e `criado_por`; o campo de texto continua valendo (técnico terceirizado não é usuário e não recebe alerta). Na tela virou seletor de usuários com opção "Outro (digitar nome)", e o técnico passou a ser **editável no detalhe** (antes era só leitura). Migração: `GET /run-migration-os-notificacao`.
 - Notificar é **efeito colateral**: tudo em try/catch, envio em background, sem `await` — nunca derruba a mutation que o usuário disparou.
