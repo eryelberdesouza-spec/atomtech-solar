@@ -90,26 +90,20 @@ As `condicao_comercial` de uma proposta são as **opções ofertadas** ao client
 - Híbrido/off-grid sem bateria cadastrada gera **aviso, não bloqueio**: "sistema preparado, bateria depois" é caso real.
 - **Armadilha corrigida junto**: a tabela de equipamentos do PDF rotulava como "Inversor(es)" **tudo** que não fosse módulo — uma bateria sairia na proposta como inversor. Agora há mapa de rótulos (`LABEL_EQUIP_PDF`) e a especificação sai em Wp (módulo), kWh (bateria) ou kW (demais). Ao acrescentar tipo de equipamento, conferir SEMPRE os três lugares: tela, `gerarPdfBrowser.ts` e `LABEL_TIPO_EQUIPAMENTO` do contrato.
 
-## ⚠️ EM ABERTO — retomar aqui (2026-10-06, fim do dia, PC escritório)
+## Queda do bot de 05→07/10/2026 — RESOLVIDA (re-pareamento pelo dashboard do WAHA)
 
-**O bot de WhatsApp está FORA DO AR e o re-pareamento ficou pela metade.** Clientes escrevem no número da Atom e ninguém responde desde ~05/10 14:35 UTC.
+Sessão caiu ~05/10 14:35 UTC (WhatsApp derrubou o pareamento do lado do celular). Restart, redeploy e logout+QR por PNG não resolveram. **Voltou em 07/10 pelo dashboard do WAHA** (`<WAHA_URL>/dashboard`, login `admin` + `WAHA_DASHBOARD_PASSWORD`). Lições, na ordem em que custaram tempo:
 
-Sequência do que já foi tentado hoje, para não repetir:
-1. `POST /api/sessions/default/start` (restart simples) → continuou `FAILED`.
-2. `railway redeploy --service courteous-celebration` → container subiu limpo, **webhook do n8n se reconfigurou sozinho** (não precisa refazer à mão), mas a sessão voltou a `FAILED` com `Error: Connection Failure` logo após `logging in...`. **Diferente de agosto/2026: lá o redeploy resolveu; aqui NÃO resolveu.**
-3. Usuário confirmou no celular: **nenhum aparelho conectado** na lista do WhatsApp — o WhatsApp derrubou o pareamento do lado dele. Credencial salva estava morta, logo o `logout` não destruiu nada útil.
-4. `logout` + `start` → sessão foi para `SCAN_QR_CODE`. **Escanear falhou** com "não é possível conectar o dispositivo" no celular; no log do WAHA: `QR refs attempts ended / QR code has not been scanned yet`.
+- **PNG do QR pelo chat não funciona**: o WAHA rotaciona o QR a cada ~20s. Usar o dashboard, que mostra o QR ao vivo.
+- **A API key do worker no dashboard fica no `localStorage` DO NAVEGADOR** — não é configuração do servidor. Configurar num navegador não vale para outro: cada pessoa que abrir o dashboard precisa clicar no **lápis (verde)** da linha WAHA e colar a `WAHA_API_KEY`. Sem isso o worker aparece "not connected" e "Sessions" vem vazia.
+- **▶ Start numa sessão `FAILED` não faz nada** — o WAHA responde "Session is already running". Usar **↻ Restart** (para e inicia).
+- A janela do QR dura **~2min40s** (`QR refs attempts ended`) e depois a sessão volta a `FAILED`. Deixar o celular já aberto em "Conectar um aparelho" ANTES de clicar Restart.
+- O webhook do n8n sobreviveu ao logout/restart (`config` preservado) — não precisou refazer.
 
-**LIÇÃO: não adianta mandar PNG do QR pelo chat.** O WAHA rotaciona o QR a cada ~20s; quando o usuário abre a imagem, aquele código já morreu. O caminho certo é o **dashboard do WAHA** (`<WAHA_URL>/dashboard`, login `admin` + `WAHA_DASHBOARD_PASSWORD` nas vars do serviço `courteous-celebration`), que mostra o QR ao vivo renovando sozinho.
-
-**PRÓXIMO PASSO**: no dashboard, a linha do worker WAHA vem **desconectada** — é preciso clicar no lápis e informar a `WAHA_API_KEY` (o dashboard é só o cliente; não herda a key do servidor). Só depois a sessão aparece e o QR ao vivo fica disponível. Se com QR ao vivo ainda falhar, as suspeitas seguintes são: versão do WhatsApp no celular desatualizada, relógio do celular fora de hora, e por fim versão do WAHA (`2026.9.2`, engine NOWEB) velha para o protocolo atual.
-
-**Enquanto a sessão não voltar**, `WHATSAPP_ALERTAS_ATIVO` continua `false` — alertas de OS não saem (e nem adiantaria, o envio usa o mesmo WAHA).
-
-### Limpezas pendentes (minhas, desta sessão)
-- Planilha **Leads**: apagar a linha de teste "Teste Interno" / `556198050301`. Entrou porque o filtro novo do n8n foi ao ar com um bug (ver abaixo) e o fluxo rodou inteiro.
-- Proposta **AT-2026-10292** ("TESTE DE ASSINATURA ELETRÔNICA — NÃO FATURAR", cliente ATOM TECH): arquivar. Criada só para validar a ZapSign.
-- n8n → Settings → n8n API: revogar as chaves **"Claude - ajuste bot OS"** (expira 05/11) e **"Claude — protecao bot"** (não chegou a ser usada).
+### Limpezas ainda pendentes
+- Planilha **Leads**: apagar a linha de teste "Teste Interno" / `556198050301`.
+- n8n → Settings → n8n API: revogar as chaves **"Claude - ajuste bot OS"** (expira 05/11) e **"Claude — protecao bot"**.
+- ~~Proposta AT-2026-10292~~ — documento cancelado na ZapSign e proposta arquivada em 07/10.
 
 ## Bot WhatsApp — filtro de números internos (2026-10-06)
 
@@ -127,13 +121,21 @@ Opção "✍️ Enviar para assinatura (ZapSign)" no modal **Gerar Contrato**. O
 
 - `POST /contrato/enviar-assinatura` reusa `renderPdfContratoComAnexo` — o documento assinado é **byte a byte o mesmo** PDF que a equipe confere hoje. Não existe segundo gerador.
 - **Signatários: cliente + os dois sócios.** Em cliente PJ quem assina é o **representante legal** (`cliente.nome_responsavel` / `responsavel_email`), mesma regra do preâmbulo. Sócios vêm de `empresa.rep1_*`/`rep2_*` — `rep1_email`/`rep2_email` foram criados nesta data só para isso.
-- Convite: `send_automatic_email: true`, `send_automatic_whatsapp: false`. O link de cada signatário também aparece no card da proposta (botão copiar).
+- Convite: `send_automatic_email: true`, `send_automatic_whatsapp: false` — **o WhatsApp da ZapSign é cobrado à parte**. Desde 07/10 o card tem **"📲 Enviar por WhatsApp"** (só para o contratante): manda o link pelo **número do bot** via WAHA (`proposta.enviarLinkAssinaturaWhatsapp`), com o telefone pela mesma regra do envio (PJ → `responsavel_telefone`). Não depende de `WHATSAPP_ALERTAS_ATIVO`. Efeito colateral aceito: mensagem saída do número do bot **pausa o bot 24h naquele chat** — a conversa sobre o contrato fica com a equipe. O botão copiar continua.
+- **Status sozinho via webhook (07/10)**: webhook da conta ZapSign (id **286241**, todos os eventos) → `POST /zapsign/webhook`, exigindo cabeçalho `X-Webhook-Secret` = `ZAPSIGN_WEBHOOK_SECRET` (var no Railway). O corpo **não é confiado**: só o `token` é usado para reler o documento direto na ZapSign (`sincronizarAssinatura`). Dispara a cada assinatura individual (`doc_signed`), recusa e exclusão. Remover: `DELETE /user/company/webhook/delete/` com `{"id": "286241"}`.
+- **"✕ Cancelar envio"** (`proposta.cancelarAssinatura`): `DELETE /docs/{token}` na ZapSign — exclusão lógica **irreversível**, os links deixam de valer — e marca `cancelada = 1`. Bloqueado se já assinado por todos.
 - `ZAPSIGN_API_TOKEN` no Railway (serviço `atomtech-solar`). `ZAPSIGN_API_URL` é opcional e serve para apontar ao sandbox (`https://sandbox.api.zapsign.com.br/api/v1`) — contas sandbox são **separadas** e têm token próprio.
 - `GET /zapsign/diagnostico` (autenticado) valida o token com uma leitura, sem criar documento nem notificar ninguém. **Usar sempre antes de culpar o código**: foi assim que se descobriu, em minutos, que o primeiro token fornecido não autenticava (`403 API token not found`).
-- Tabela `contrato_assinatura` (token, status, signatários). **Status não muda sozinho** — não há webhook ainda; o card tem "Atualizar status", que relê na ZapSign. Migração: `GET /run-migration-assinatura-zapsign`.
+- Tabela `contrato_assinatura` (token, status, signatários). O "Atualizar status" do card continua como recurso manual caso algum aviso do webhook se perca. Migração: `GET /run-migration-assinatura-zapsign`.
 - **Armadilha achada no primeiro envio real**: a ZapSign recusa o documento **INTEIRO** com "forneça um CPF válido" se **um** signatário tiver CPF errado. O CPF do rep1 cadastrado estava com um dígito trocado (`031.303.751-22`, inválido; correto `031.363.751-22`) — e esse número saía impresso em **todos** os contratos. Agora `cpfValido()` filtra: CPF que não passa no dígito verificador é omitido (o signatário assina igual) e a resposta traz aviso nomeando o cadastro errado. Lição: validar dado de cadastro antes de mandar para API de terceiro, e nunca deixar um campo opcional derrubar a operação toda.
 
-## Alertas de alteração de OS por WhatsApp (2026-10-06, PRONTO mas DESLIGADO)
+## Alertas de alteração de OS por WhatsApp (2026-10-06; LIGADO desde 07/10)
+
+**Ligado em 07/10** (`WHATSAPP_ALERTAS_ATIVO=true`), depois de três correções achadas no log de validação (`os_notificacao` com status `desativado`):
+- **Nono dígito**: os 4 telefones da equipe estão no WhatsApp SEM o 9 (`556198050301`). O JID montado do cadastro (`5561998050301`) não chegaria a ninguém. Agora `resolverChatId()` pergunta ao WAHA (`/api/contacts/check-exists`) o JID real, com cache em memória — vale para qualquer envio a número BR.
+- **Rajada**: upload de 10 fotos gerava 10 alertas em 30s. `notificarOsAgrupado()` junta fotos e marcos da mesma OS pelo mesmo autor numa mensagem ("incluiu 10 fotos"), após 60s sem novidade (máx. 3 min). Em memória: redeploy no meio da janela perde aquele alerta.
+- **Cliente**: 52 de 68 OS são ligadas via proposta (sem `cliente_id` próprio) e a mensagem saía sem o cliente. Agora `COALESCE(p.cliente_id, o.cliente_id)`, como no `os.byId`.
+- Teste (`os.testarAlertaWhatsapp`) confirmado no celular do Eryelber em 07/10.
 
 Avisa **só quem está envolvido na OS** — técnico responsável e quem criou —, menos quem fez a alteração. Gatilhos: status, foto/anexo, marco concluído, agendamento (criação e mudança de status) e troca de técnico. Edição de texto solta **não** dispara.
 
@@ -141,8 +143,9 @@ Avisa **só quem está envolvido na OS** — técnico responsável e quem criou 
 - Notificar é **efeito colateral**: tudo em try/catch, envio em background, sem `await` — nunca derruba a mutation que o usuário disparou.
 - `WHATSAPP_ALERTAS_ATIVO` é o interruptor. Desligado, nada sai, **mas `os_notificacao` registra o que SERIA enviado** — é assim que se valida antes de ligar.
 - `os.testarAlertaWhatsapp` manda UMA mensagem para o telefone de quem chamou, para testar sem incomodar a equipe.
-- **POR QUE ESTÁ DESLIGADO**: o número é o mesmo do bot de atendimento. Mensagem enviada por ele volta ao n8n como `fromMe` → o workflow pausa o bot 24h naquele chat (o que, por acaso, até protege) — mas se passarem 24h sem alerta, um colega escrevendo para o número pode ser tratado como **lead**. Antes de ligar, acrescentar lista de números internos ignorados no n8n, o que exige **Personal API Key do n8n** (Settings → n8n API). **Não editar o workflow pelo canvas** — ver armadilha na seção do bot.
-- Vars já configuradas no Railway (`atomtech-solar`): `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION`, `WHATSAPP_ALERTAS_ATIVO=false`.
+- **Por que ficou desligado até 07/10**: o número é o mesmo do bot de atendimento. Mensagem enviada por ele volta ao n8n como `fromMe` → o workflow pausa o bot 24h naquele chat (o que, por acaso, até protege) — mas se passarem 24h sem alerta, um colega escrevendo para o número pode ser tratado como **lead**. Antes de ligar, acrescentar lista de números internos ignorados no n8n, o que exige **Personal API Key do n8n** (Settings → n8n API). **Não editar o workflow pelo canvas** — ver armadilha na seção do bot.
+- Vars no Railway (`atomtech-solar`): `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION`, `WHATSAPP_ALERTAS_ATIVO=true`.
+- **Ao incluir alguém na equipe**: o telefone dele precisa entrar também na lista do nó "É número interno?" do n8n, senão a resposta dele a um alerta é tratada como lead. A lista não foi conferida em 07/10 (sem chave da API do n8n à mão) — se um colega responder a um alerta e receber o menu de boas-vindas, o número dele está faltando ali.
 
 ## Preâmbulo dos contratos — qualificação única desde 2026-09-18
 
