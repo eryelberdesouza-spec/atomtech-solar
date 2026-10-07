@@ -377,6 +377,21 @@ export const osRouter = router({
         )
       }
 
+      // Avisa o técnico de que a OS caiu no colo dele. Faltava: os gatilhos
+      // cobriam só alterações POSTERIORES, então atribuir na criação era
+      // silencioso e atribuir depois avisava — incoerente, e o aviso mais
+      // importante de todos era justamente o que não saía.
+      if (input.tecnicoResponsavelId) {
+        const quando = input.dataPrevistaInicio
+          ? ` — previsão de início em *${input.dataPrevistaInicio.split('-').reverse().join('/')}*`
+          : ''
+        const onde = input.localizacao ? `\n📍 ${input.localizacao}` : ''
+        notificarOsEmBackground(
+          ctxNotif(ctx), osId, 'criacao',
+          `abriu esta OS e definiu *você* como técnico responsável${quando}${onde}`,
+        )
+      }
+
       return { id: osId, numero }
     }),
 
@@ -450,10 +465,22 @@ export const osRouter = router({
         (input.tecnicoResponsavelId !== undefined && input.tecnicoResponsavelId !== osAntes.tecnico_responsavel_id)
       if (trocouTecnico) {
         const novo = input.tecnicoResponsavel || '(não informado)'
+        // Quem ASSUMIU (e quem criou a OS) — lê o estado já atualizado.
         notificarOsEmBackground(
           ctxNotif(ctx), id, 'tecnico',
-          `definiu *${novo}* como técnico responsável`,
+          `passou esta OS para *${novo}*`,
         )
+        // Quem SAIU precisa saber, senão aparece numa obra que não é mais
+        // dele. Vai por id explícito: nesse momento ele já não consta na OS,
+        // então a regra normal de destinatários nunca o encontraria.
+        const anteriorId = osAntes.tecnico_responsavel_id
+        if (anteriorId && anteriorId !== input.tecnicoResponsavelId) {
+          notificarOsEmBackground(
+            ctxNotif(ctx), id, 'tecnico',
+            `retirou você desta OS — o responsável agora é *${novo}*`,
+            { somenteIds: [anteriorId] },
+          )
+        }
       }
       return { ok: true }
     }),

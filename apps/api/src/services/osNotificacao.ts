@@ -17,6 +17,7 @@ import { getRawPool } from '../routers/trpc'
 import { enviarParaVarios, resolverChatId, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from './whatsapp'
 
 export type EventoOs =
+  | 'criacao'
   | 'status'
   | 'anexo'
   | 'marco'
@@ -35,7 +36,7 @@ function montarMensagem(
   const linhaOs = `*${os.numero}*${os.titulo ? ` — ${os.titulo}` : ''}`
   const linhaCliente = os.cliente ? `\n👤 ${os.cliente}` : ''
   const icone: Record<EventoOs, string> = {
-    status: '🔄', anexo: '📷', marco: '✅', agendamento: '📅', tecnico: '👷',
+    criacao: '🆕', status: '🔄', anexo: '📷', marco: '✅', agendamento: '📅', tecnico: '👷',
   }
   return `${icone[evento]} *AGO — Ordem de Serviço*\n\n${linhaOs}${linhaCliente}\n\n${autor} ${detalhe}.`
 }
@@ -44,6 +45,25 @@ function montarMensagem(
  * Resolve os telefones de quem deve ser avisado: técnico responsável e autor
  * da OS, menos quem fez a alteração. Só usuários ativos e com telefone.
  */
+/**
+ * Destinatários explícitos, por id — não dependem do estado atual da OS.
+ * Preciso para avisar o técnico que FOI REMOVIDO: no momento do aviso ele já
+ * não consta na OS, então `destinatarios()` nunca o encontraria.
+ */
+async function destinatariosPorIds(ids: number[], autorId: number, empresaId: number) {
+  const alvo = [...new Set(ids)].filter(id => id && id !== autorId)
+  if (!alvo.length) return []
+  const pool = getRawPool()
+  const [rows]: any = await pool.execute(
+    `SELECT id, nome, telefone FROM usuario
+      WHERE id IN (${alvo.map(() => '?').join(',')})
+        AND empresa_id = ? AND ativo = 1
+        AND telefone IS NOT NULL AND telefone <> ''`,
+    [...alvo, empresaId],
+  )
+  return rows as { id: number; nome: string; telefone: string }[]
+}
+
 async function destinatarios(ordemServicoId: number, autorId: number) {
   const pool = getRawPool()
   const [rows]: any = await pool.execute(
@@ -103,12 +123,15 @@ export async function notificarOs(
   ordemServicoId: number,
   evento: EventoOs,
   detalhe: string,
+  opcoes?: { somenteIds?: number[] },
 ): Promise<void> {
   try {
     const os = await dadosOs(ordemServicoId)
     if (!os) return
 
-    const pessoas = await destinatarios(ordemServicoId, ctx.usuarioId)
+    const pessoas = opcoes?.somenteIds
+      ? await destinatariosPorIds(opcoes.somenteIds, ctx.usuarioId, ctx.empresaId)
+      : await destinatarios(ordemServicoId, ctx.usuarioId)
     // O nome vem do JWT e pode chegar vazio — sem ele a frase ficaria "  alterou
     // o status". Busca no banco só nesse caso.
     let autor = (ctx.usuarioNome ?? '').trim()
@@ -161,8 +184,9 @@ export async function notificarOs(
 /** Açúcar: dispara sem bloquear quem chamou. */
 export function notificarOsEmBackground(
   ctx: Ctx, ordemServicoId: number, evento: EventoOs, detalhe: string,
+  opcoes?: { somenteIds?: number[] },
 ) {
-  void notificarOs(ctx, ordemServicoId, evento, detalhe)
+  void notificarOs(ctx, ordemServicoId, evento, detalhe, opcoes)
     .catch(e => console.error('[osNotificacao] background:', e))
 }
 
