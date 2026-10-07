@@ -7,8 +7,8 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
-import { notificarOsEmBackground } from '../services/osNotificacao'
-import { enviarTexto, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from '../services/whatsapp'
+import { notificarOsAgrupado, notificarOsEmBackground } from '../services/osNotificacao'
+import { enviarTexto, resolverChatId, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from '../services/whatsapp'
 
 // Rótulo legível do status para o alerta de WhatsApp — o enum cru
 // ("em_execucao") não serve para mandar pra equipe.
@@ -606,11 +606,12 @@ export const osRouter = router({
           message: 'Seu usuário está sem telefone cadastrado — preencha em Configurações › Usuários.',
         })
       }
-      const chatId = telefoneParaChatId(eu.telefone)
+      const montado = telefoneParaChatId(eu.telefone)
+      const chatId = montado ? await resolverChatId(montado) : null
       if (!chatId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Telefone "${eu.telefone}" não virou um número de WhatsApp válido.`,
+          message: `Telefone "${eu.telefone}" não corresponde a um número com WhatsApp.`,
         })
       }
       if (!whatsappAtivo()) {
@@ -664,10 +665,7 @@ export const osRouter = router({
 
         // Só avisa quando o marco PASSA a concluído — remarcar não é novidade.
         if (input.concluido && !marcoAntes.concluido) {
-          notificarOsEmBackground(
-            ctxNotif(ctx), marcoAntes.ordem_servico_id, 'marco',
-            `concluiu o marco *${marcoAntes.titulo}*`,
-          )
+          notificarOsAgrupado(ctxNotif(ctx), marcoAntes.ordem_servico_id, 'marco', marcoAntes.titulo)
         }
         return { ok: true }
       }),

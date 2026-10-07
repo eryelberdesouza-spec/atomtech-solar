@@ -14,7 +14,7 @@
 // try/catch e o envio não é aguardado pela resposta ao cliente.
 
 import { getRawPool } from '../routers/trpc'
-import { enviarParaVarios, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from './whatsapp'
+import { enviarParaVarios, resolverChatId, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from './whatsapp'
 
 export type EventoOs =
   | 'status'
@@ -64,10 +64,13 @@ async function destinatarios(ordemServicoId: number, autorId: number) {
 
 async function dadosOs(ordemServicoId: number) {
   const pool = getRawPool()
+  // OS de contrato não tem cliente_id próprio — o cliente vem pela proposta
+  // (52 de 68 OS em 2026-10-07). Mesmo COALESCE do os.byId.
   const [rows]: any = await pool.execute(
     `SELECT o.numero, o.titulo, c.nome AS cliente
        FROM ordem_servico o
-       LEFT JOIN cliente c ON c.id = o.cliente_id
+       LEFT JOIN proposta p ON p.id = o.proposta_id
+       LEFT JOIN cliente c ON c.id = COALESCE(p.cliente_id, o.cliente_id)
       WHERE o.id = ? LIMIT 1`,
     [ordemServicoId],
   )
@@ -121,9 +124,12 @@ export async function notificarOs(
       return
     }
 
-    const alvos = pessoas
-      .map(p => ({ ...p, chatId: telefoneParaChatId(p.telefone) }))
-      .filter(p => p.chatId)
+    // JID real no WhatsApp (nono dígito) — resolvido mesmo com o envio
+    // desligado, para o log de validação mostrar o destino verdadeiro.
+    const alvos = (await Promise.all(pessoas.map(async p => {
+      const montado = telefoneParaChatId(p.telefone)
+      return { ...p, chatId: montado ? await resolverChatId(montado) : null }
+    }))).filter(p => p.chatId)
 
     if (!whatsappAtivo()) {
       // Sem envio, mas o log mostra exatamente o que teria sido mandado —
@@ -158,4 +164,64 @@ export function notificarOsEmBackground(
 ) {
   void notificarOs(ctx, ordemServicoId, evento, detalhe)
     .catch(e => console.error('[osNotificacao] background:', e))
+}
+
+// ── Agrupamento de rajadas ───────────────────────────────────────────
+// Em 2026-10-07 um upload de 10 fotos gerou 10 alertas em 30s — ligado, seriam
+// 10 WhatsApps seguidos para a mesma pessoa. Fotos e marcos da mesma OS, pelo
+// mesmo autor, viram UMA mensagem: espera 60s sem novidade (no máximo 3 min
+// desde o primeiro) e manda o resumo. Fica em memória: um redeploy no meio da
+// janela perde aquele alerta, o que é aceitável para efeito colateral.
+const SILENCIO_MS = 60_000
+const MAXIMO_MS = 180_000
+
+type EventoAgrupavel = 'anexo' | 'marco'
+type Rajada = {
+  ctx: Ctx; ordemServicoId: number; evento: EventoAgrupavel
+  itens: string[]; inicio: number; timer: ReturnType<typeof setTimeout>
+}
+const rajadas = new Map<string, Rajada>()
+
+function resumir(evento: EventoAgrupavel, itens: string[]): string {
+  if (evento === 'anexo') {
+    const fotos = itens.filter(i => i === 'foto').length
+    const outros = itens.length - fotos
+    const partes: string[] = []
+    if (fotos) partes.push(fotos === 1 ? 'uma foto' : `${fotos} fotos`)
+    if (outros) partes.push(outros === 1 ? 'um anexo' : `${outros} anexos`)
+    return `incluiu ${partes.join(' e ')}`
+  }
+  const nomes = itens.map(t => `*${t}*`)
+  if (nomes.length === 1) return `concluiu o marco ${nomes[0]}`
+  return `concluiu os marcos ${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`
+}
+
+function dispararRajada(chave: string) {
+  const r = rajadas.get(chave)
+  if (!r) return
+  rajadas.delete(chave)
+  notificarOsEmBackground(r.ctx, r.ordemServicoId, r.evento, resumir(r.evento, r.itens))
+}
+
+/**
+ * Para eventos que costumam vir em sequência. `item`: 'foto' | 'anexo' para
+ * anexos, o título do marco para marcos.
+ */
+export function notificarOsAgrupado(
+  ctx: Ctx, ordemServicoId: number, evento: EventoAgrupavel, item: string,
+) {
+  const chave = `${ordemServicoId}|${evento}|${ctx.usuarioId}`
+  const agora = Date.now()
+  const r = rajadas.get(chave)
+  if (r) {
+    clearTimeout(r.timer)
+    r.itens.push(item)
+    const espera = Math.min(SILENCIO_MS, Math.max(0, r.inicio + MAXIMO_MS - agora))
+    r.timer = setTimeout(() => dispararRajada(chave), espera)
+    return
+  }
+  rajadas.set(chave, {
+    ctx, ordemServicoId, evento, itens: [item], inicio: agora,
+    timer: setTimeout(() => dispararRajada(chave), SILENCIO_MS),
+  })
 }

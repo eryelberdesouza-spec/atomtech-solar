@@ -10,7 +10,7 @@ import { parseInter, parseSicoob } from './lib/extratoParser'
 import { parseOFX } from './lib/ofxParser'
 import { renderPdf, renderPdfComCapaSeparada, renderPdfContratoComAnexo, acharChromium } from './lib/pdfRenderer'
 import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moove/processarArquivo'
-import { notificarOsEmBackground } from './services/osNotificacao'
+import { notificarOsAgrupado } from './services/osNotificacao'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -2520,13 +2520,11 @@ app.post('/os/:osId/anexo', uploadAnexo.single('arquivo'), async (req, res) => {
     const id = (idRow as any[])[0]?.id
     await conn.end()
 
-    // Alerta à equipe — exatamente o caso "Fulano incluiu uma foto na OS X".
-    // Em background: a resposta do upload não espera o WhatsApp.
-    const ehImagem = tipoMime.startsWith('image/')
-    notificarOsEmBackground(
+    // Alerta à equipe — "Fulano incluiu N fotos na OS X". Agrupado: um upload
+    // de várias fotos vira uma mensagem só (ver osNotificacao.ts).
+    notificarOsAgrupado(
       { usuarioId: autorId, usuarioNome: autorNome, empresaId },
-      osId, 'anexo',
-      `incluiu ${ehImagem ? 'uma foto' : 'um anexo'} (${nomeFinal})`,
+      osId, 'anexo', tipoMime.startsWith('image/') ? 'foto' : 'anexo',
     )
 
     res.json({ ok: true, id, nome: nomeFinal, tipoMime, tamanho: dados.length })
