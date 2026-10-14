@@ -13,7 +13,9 @@ export const MODELOS_CHECKLIST_PADRAO: ModeloPadrao[] = [
   // Fotovoltaico em dois modelos (ajuste do usuário em 2026-10-14): hoje a
   // maioria das obras é com microinversor, e as verificações mudam — sem
   // string CC longa não há Voc por string a medir; o que importa é conexão
-  // módulo↔micro, cabo tronco CA e todos os micros comunicando.
+  // módulo↔micro, cabo tronco CA e todos os micros comunicando. As medições
+  // de aterramento/isolamento saíram, mas o aterramento das estruturas fica
+  // como verificação obrigatória sem medição (exigência normativa).
   {
     nome: 'Sistema fotovoltaico — inversor string',
     itens: [
@@ -21,6 +23,7 @@ export const MODELOS_CHECKLIST_PADRAO: ModeloPadrao[] = [
       { descricao: 'Módulos fixados e alinhados, sem avarias visíveis', obr: true },
       { descricao: 'Polaridade das strings conferida antes da conexão ao inversor', obr: true },
       { descricao: 'Tensão de circuito aberto (Voc) por string', obr: true, unidade: 'V' },
+      { descricao: 'Equipotencialização e aterramento de estruturas e massas executados', obr: true },
       { descricao: 'DPS CC e CA instalados conforme projeto', obr: true },
       { descricao: 'Proteções CA (disjuntor/DR) instaladas conforme projeto', obr: true },
       { descricao: 'Inversor fixado, com ventilação adequada', obr: true },
@@ -41,6 +44,7 @@ export const MODELOS_CHECKLIST_PADRAO: ModeloPadrao[] = [
       { descricao: 'Microinversores fixados na estrutura, conectores módulo↔micro travados', obr: true },
       { descricao: 'Cabo tronco CA conectado, extremidade vedada (terminador)', obr: true },
       { descricao: 'Tensão CA no ponto de conexão dos microinversores', obr: true, unidade: 'V' },
+      { descricao: 'Equipotencialização e aterramento de estruturas e massas executados', obr: true },
       { descricao: 'DPS CA instalado conforme projeto', obr: true },
       { descricao: 'Proteções CA (disjuntor/DR) instaladas conforme projeto', obr: true },
       { descricao: 'Condutores identificados e protegidos (eletroduto/eletrocalha)', obr: true },

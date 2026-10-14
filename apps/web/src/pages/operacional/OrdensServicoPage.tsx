@@ -744,6 +744,28 @@ export function OrdensServicoPage() {
   const [showModalNovaOS, setShowModalNovaOS] = useState(false)
   const [osEtiquetas, setOsEtiquetas] = useState<any | null>(null) // OS aberta no modal de etiquetas
   const [draggingOs, setDraggingOs] = useState<any | null>(null)
+  // Lista do celular agrupada por status, na mesma ordem das colunas do Kanban
+  // do computador. Concluídas/canceladas começam recolhidas — é o que mais
+  // atrapalhava achar a OS do dia. Preferência lembrada por aparelho.
+  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>(() => {
+    const padrao = { aberta: true, em_execucao: true, pendencia: true, concluida: false, cancelada: false }
+    try { return { ...padrao, ...JSON.parse(localStorage.getItem('os_grupos_abertos') || '{}') } } catch { return padrao }
+  })
+  const irParaGrupo = (id: string) => {
+    alternarGrupo(id, true)
+    // Rola o contêiner da lista (não a página) até o cabeçalho do grupo —
+    // a lista é position: relative, então offsetTop já é relativo a ela.
+    setTimeout(() => {
+      const lista = document.getElementById('lista-os-mobile')
+      const grupo = document.getElementById(`grupo-os-${id}`)
+      if (lista && grupo) lista.scrollTo({ top: grupo.offsetTop, behavior: 'smooth' })
+    }, 50)
+  }
+  const alternarGrupo = (id: string, abrir?: boolean) => setGruposAbertos(g => {
+    const novo = { ...g, [id]: abrir ?? !g[id] }
+    try { localStorage.setItem('os_grupos_abertos', JSON.stringify(novo)) } catch { /* sem storage: só não lembra */ }
+    return novo
+  })
 
   const utils = (trpc as any).useUtils()
   const { data, isLoading } = (trpc as any).os.list.useQuery(
@@ -868,11 +890,16 @@ export function OrdensServicoPage() {
       </div>
 
       {/* ── Resumo KPIs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: isMobile ? 8 : 10, marginBottom: isMobile ? 14 : 20 }}>
+      {/* No celular os cards viram uma faixa compacta de uma linha — em grade
+          2x3 ocupavam metade da tela e sobrava pouco espaço para as OS. Na
+          lista, tocar num card abre o grupo e rola até ele. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: isMobile ? 5 : 10, marginBottom: isMobile ? 12 : 20 }}>
         {resumo.map(s => (
-          <div key={s.id} style={{ background: '#111D2E', border: `1px solid ${s.color}30`, borderRadius: 10, padding: isMobile ? '8px 12px' : '10px 14px', borderTop: `2px solid ${s.color}` }}>
-            <div style={{ fontSize: isMobile ? 10 : 11, color: '#7488A8', fontWeight: 700, marginBottom: 2 }}>{s.icon} {s.label}</div>
-            <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 800, color: s.color }}>{s.count}</div>
+          <div key={s.id}
+            onClick={isMobile && view === 'lista' ? () => irParaGrupo(s.id) : undefined}
+            style={{ background: '#111D2E', border: `1px solid ${s.color}30`, borderRadius: isMobile ? 8 : 10, padding: isMobile ? '5px 4px' : '10px 14px', borderTop: `2px solid ${s.color}`, cursor: isMobile && view === 'lista' ? 'pointer' : 'default', textAlign: isMobile ? 'center' : 'left', minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? 9 : 11, color: '#7488A8', fontWeight: 700, marginBottom: isMobile ? 0 : 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isMobile ? s.label.replace('Em Execução', 'Execução') : `${s.icon} ${s.label}`}</div>
+            <div style={{ fontSize: isMobile ? 16 : 22, fontWeight: 800, color: s.color }}>{s.count}</div>
           </div>
         ))}
       </div>
@@ -962,13 +989,30 @@ export function OrdensServicoPage() {
         </div>
       )}
 
-      {/* ── LISTA mobile — cards empilhados ── */}
+      {/* ── LISTA mobile — grupos por status, mesma ordem do Kanban ── */}
       {view === 'lista' && isMobile && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div id="lista-os-mobile" style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
           {filtradas.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#7488A8', padding: 40, fontSize: 13 }}>Nenhuma OS encontrada</div>
           ) : (
-            filtradas.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} onAbrirEtiquetas={() => setOsEtiquetas(os)} />)
+            colunas.filter(col => col.itens.length > 0).map(col => {
+              // Buscando, mostra tudo o que achou — senão a OS procurada podia
+              // estar escondida num grupo recolhido.
+              const aberto = !!busca || gruposAbertos[col.id]
+              return (
+                <div key={col.id} id={`grupo-os-${col.id}`} style={{ marginBottom: 12 }}>
+                  <button onClick={() => alternarGrupo(col.id)}
+                    style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: aberto ? 8 : 0, padding: '9px 12px', borderRadius: 8, background: col.color + '12', border: `1px solid ${col.color}30`, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: col.color }}>{col.icon} {col.label}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: col.color, background: col.color + '20', borderRadius: 12, padding: '1px 8px' }}>{col.itens.length}</span>
+                      <span style={{ fontSize: 11, color: col.color }}>{aberto ? '▾' : '▸'}</span>
+                    </span>
+                  </button>
+                  {aberto && col.itens.map((os: any) => <OSCard key={os.id} os={os} onClick={() => navigate(`/ordens-servico/${os.id}`)} onAbrirEtiquetas={() => setOsEtiquetas(os)} />)}
+                </div>
+              )
+            })
           )}
         </div>
       )}
