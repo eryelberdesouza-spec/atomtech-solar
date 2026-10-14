@@ -2325,6 +2325,66 @@ app.get('/run-migration-os-status-pendencia', async (_, res) => {
   }
 })
 
+// ── Migração: checklist de execução da OS ─────────────────────────────────────
+// Modelos por tipo de serviço (editáveis em Configurações) e itens por OS. Ao
+// aplicar um modelo os itens são COPIADOS para a OS — editar o modelo depois
+// não muda o que já foi executado/assinado.
+app.get('/run-migration-os-checklist', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_checklist_modelo (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id  INT NOT NULL,
+        nome        VARCHAR(100) NOT NULL,
+        ativo       TINYINT NOT NULL DEFAULT 1,
+        ordem       INT NOT NULL DEFAULT 0,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ocm_emp (empresa_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_checklist_modelo_item (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        modelo_id       INT NOT NULL,
+        descricao       VARCHAR(300) NOT NULL,
+        obrigatorio     TINYINT NOT NULL DEFAULT 0,
+        unidade_medida  VARCHAR(20) NULL,
+        ordem           INT NOT NULL DEFAULT 0,
+        INDEX idx_ocmi_modelo (modelo_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS os_checklist_item (
+        id                  INT AUTO_INCREMENT PRIMARY KEY,
+        ordem_servico_id    INT NOT NULL,
+        empresa_id          INT NOT NULL,
+        modelo_id           INT NULL,
+        grupo               VARCHAR(100) NOT NULL,
+        descricao           VARCHAR(300) NOT NULL,
+        obrigatorio         TINYINT NOT NULL DEFAULT 0,
+        unidade_medida      VARCHAR(20) NULL,
+        ordem               INT NOT NULL DEFAULT 0,
+        status              ENUM('pendente','feito','nao_aplica') NOT NULL DEFAULT 'pendente',
+        valor_medido        VARCHAR(100) NULL,
+        justificativa       TEXT NULL,
+        anexo_id            INT NULL,
+        concluido_por       INT NULL,
+        concluido_por_nome  VARCHAR(150) NULL,
+        concluido_em        DATETIME NULL,
+        created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_oci_os (ordem_servico_id),
+        INDEX idx_oci_emp (empresa_id)
+      )
+    `)
+    await conn.end()
+    res.json({ ok: true, message: 'Tabelas de checklist de OS criadas (os_checklist_modelo, os_checklist_modelo_item, os_checklist_item)' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: desconto no fechamento da proposta — condicao_comercial ganha
 //    valor_original (snapshot do valor ofertado), desconto e mostrar_desconto,
 //    pra dar desconto na hora de fechar sem sobrescrever o valor inicial ───────

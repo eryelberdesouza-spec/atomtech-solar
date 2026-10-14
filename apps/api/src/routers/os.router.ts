@@ -10,6 +10,7 @@ import { router, protectedProcedure, getRawPool } from './trpc'
 import { notificarOsAgrupado, notificarOsEmBackground } from '../services/osNotificacao'
 import { enviarTexto, resolverChatId, telefoneParaChatId, whatsappAtivo, whatsappConfigurado } from '../services/whatsapp'
 import { hojeISO } from '../lib/datas'
+import { MODELOS_CHECKLIST_PADRAO } from '../lib/checklistModelosPadrao'
 
 // Rótulo legível do status para o alerta de WhatsApp — o enum cru
 // ("em_execucao") não serve para mandar pra equipe.
@@ -54,6 +55,79 @@ async function gerarNumeroOS(empresaId: number): Promise<string> {
   const seq = (Number((rows as any[])[0]?.total ?? 0) + 1).toString().padStart(3, '0')
   return `${prefix}${seq}`
 }
+
+// ─── Checklist: obrigatórios em aberto ───────────────────────────────
+// Item obrigatório só sai do caminho como 'feito' ou 'nao_aplica' (este com
+// justificativa). Enquanto houver algum 'pendente', a OS não encerra nem conclui.
+async function checklistObrigatoriosPendentes(osId: number, empresaId: number): Promise<string[]> {
+  const pool = getRawPool()
+  const [rows]: any = await pool.execute(
+    `SELECT descricao FROM os_checklist_item
+     WHERE ordem_servico_id = ? AND empresa_id = ? AND obrigatorio = 1 AND status = 'pendente'
+     ORDER BY ordem, id`,
+    [osId, empresaId],
+  )
+  return (rows as any[]).map(r => r.descricao)
+}
+
+function erroChecklistPendente(pendentes: string[]): TRPCError {
+  const lista = pendentes.slice(0, 5).map(d => `• ${d}`).join('\n')
+  const resto = pendentes.length > 5 ? `\n… e mais ${pendentes.length - 5}` : ''
+  return new TRPCError({
+    code: 'BAD_REQUEST',
+    message: `Checklist com ${pendentes.length} item(ns) obrigatório(s) em aberto. Marque como feito ou "não se aplica" (com justificativa):\n${lista}${resto}`,
+  })
+}
+
+// Item de checklist da OS, já conferida a empresa. Recusa alteração com a OS
+// concluída/cancelada: o checklist foi para o termo assinado e não muda mais.
+async function itemChecklistEditavel(itemId: number, empresaId: number) {
+  const pool = getRawPool()
+  const [rows]: any = await pool.execute(
+    `SELECT i.id, i.ordem_servico_id AS osId, i.modelo_id AS modeloId, i.grupo,
+            i.obrigatorio, i.unidade_medida AS unidadeMedida, i.status, os.status AS osStatus
+     FROM os_checklist_item i
+     JOIN ordem_servico os ON os.id = i.ordem_servico_id
+     WHERE i.id = ? AND i.empresa_id = ? LIMIT 1`,
+    [itemId, empresaId],
+  )
+  const item = (rows as any[])[0]
+  if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Item do checklist não encontrado' })
+  if (item.osStatus === 'concluida' || item.osStatus === 'cancelada') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'OS encerrada — o checklist não pode mais ser alterado.' })
+  }
+  return item
+}
+
+async function osEditavelChecklist(osId: number, empresaId: number) {
+  const pool = getRawPool()
+  const [rows]: any = await pool.execute(
+    `SELECT status FROM ordem_servico WHERE id = ? AND empresa_id = ? LIMIT 1`,
+    [osId, empresaId],
+  )
+  const os = (rows as any[])[0]
+  if (!os) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
+  if (os.status === 'concluida' || os.status === 'cancelada') {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'OS encerrada — o checklist não pode mais ser alterado.' })
+  }
+}
+
+async function proximaOrdemChecklist(osId: number): Promise<number> {
+  const pool = getRawPool()
+  const [rows]: any = await pool.execute(
+    `SELECT COALESCE(MAX(ordem), 0) AS m FROM os_checklist_item WHERE ordem_servico_id = ?`,
+    [osId],
+  )
+  return Number((rows as any[])[0]?.m ?? 0) + 1
+}
+
+const GRUPO_AVULSO = 'Itens avulsos'
+
+const itemModeloInput = z.object({
+  descricao:     z.string().trim().min(1).max(300),
+  obrigatorio:   z.boolean().default(false),
+  unidadeMedida: z.string().trim().max(20).nullable().optional(),
+})
 
 // ─── Schemas ─────────────────────────────────────────────────────────
 
@@ -509,6 +583,9 @@ export const osRouter = router({
       // motivo registrado) — ver encerramento.criar, chamado pelo front antes
       // desta mutation quando o próximo status é 'concluida'.
       if (input.status === 'concluida') {
+        const pendentes = await checklistObrigatoriosPendentes(input.id, ctx.usuario.empresaId)
+        if (pendentes.length) throw erroChecklistPendente(pendentes)
+
         const [enc]: any = await pool.execute(
           `SELECT id FROM os_encerramento WHERE ordem_servico_id = ? AND empresa_id = ? LIMIT 1`,
           [input.id, ctx.usuario.empresaId],
@@ -952,6 +1029,11 @@ export const osRouter = router({
         )
         if (!(check as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'OS não encontrada' })
 
+        // O termo leva o checklist executado — não faz sentido o cliente
+        // assinar com item obrigatório ainda em aberto.
+        const pendentes = await checklistObrigatoriosPendentes(input.ordemServicoId, ctx.usuario.empresaId)
+        if (pendentes.length) throw erroChecklistPendente(pendentes)
+
         const assinaturaBuf = input.assinaturaImagemBase64
           ? Buffer.from(input.assinaturaImagemBase64, 'base64')
           : null
@@ -969,6 +1051,311 @@ export const osRouter = router({
           ],
         )
         return { ok: true, id: (ins as any).insertId }
+      }),
+  }),
+
+  // ── Checklist de execução ────────────────────────────────────────
+  // Modelos (por tipo de serviço) ficam em os_checklist_modelo*; ao aplicar um
+  // modelo numa OS os itens são COPIADOS para os_checklist_item, então editar o
+  // modelo depois não altera OS já em andamento nem termo já assinado.
+  checklist: router({
+    modelo: router({
+      list: protectedProcedure
+        .input(z.object({ incluirInativos: z.boolean().default(false) }).optional())
+        .query(async ({ ctx, input }) => {
+          const pool = getRawPool()
+          const [modelos]: any = await pool.execute(
+            `SELECT id, nome, ativo, ordem FROM os_checklist_modelo
+             WHERE empresa_id = ? ${input?.incluirInativos ? '' : 'AND ativo = 1'}
+             ORDER BY ordem, nome`,
+            [ctx.usuario.empresaId],
+          )
+          const lista = modelos as any[]
+          if (!lista.length) return []
+          const [itens]: any = await pool.query(
+            `SELECT id, modelo_id AS modeloId, descricao, obrigatorio,
+                    unidade_medida AS unidadeMedida, ordem
+             FROM os_checklist_modelo_item WHERE modelo_id IN (?)
+             ORDER BY ordem, id`,
+            [lista.map(m => m.id)],
+          )
+          return lista.map(m => ({
+            id: m.id,
+            nome: m.nome,
+            ativo: Number(m.ativo) === 1,
+            itens: (itens as any[])
+              .filter(i => i.modeloId === m.id)
+              .map(i => ({ ...i, obrigatorio: Number(i.obrigatorio) === 1 })),
+          }))
+        }),
+
+      // Cria ou substitui o modelo inteiro (nome + lista de itens). Substituir
+      // os itens é seguro: as OS guardam cópia, não referência.
+      salvar: protectedProcedure
+        .input(z.object({
+          id:    z.number().int().positive().optional(),
+          nome:  z.string().trim().min(1).max(100),
+          ativo: z.boolean().default(true),
+          itens: z.array(itemModeloInput).min(1, 'O modelo precisa de pelo menos um item.'),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const pool = getRawPool()
+          let modeloId = input.id
+          if (modeloId) {
+            const [upd]: any = await pool.execute(
+              `UPDATE os_checklist_modelo SET nome = ?, ativo = ? WHERE id = ? AND empresa_id = ?`,
+              [input.nome, input.ativo ? 1 : 0, modeloId, ctx.usuario.empresaId],
+            )
+            if (!(upd as any).affectedRows) throw new TRPCError({ code: 'NOT_FOUND', message: 'Modelo não encontrado' })
+            await pool.execute(`DELETE FROM os_checklist_modelo_item WHERE modelo_id = ?`, [modeloId])
+          } else {
+            const [ins]: any = await pool.execute(
+              `INSERT INTO os_checklist_modelo (empresa_id, nome, ativo, ordem)
+               SELECT ?, ?, ?, COALESCE(MAX(ordem), 0) + 1 FROM os_checklist_modelo WHERE empresa_id = ?`,
+              [ctx.usuario.empresaId, input.nome, input.ativo ? 1 : 0, ctx.usuario.empresaId],
+            )
+            modeloId = (ins as any).insertId as number
+          }
+          let ordem = 1
+          for (const it of input.itens) {
+            await pool.execute(
+              `INSERT INTO os_checklist_modelo_item (modelo_id, descricao, obrigatorio, unidade_medida, ordem)
+               VALUES (?, ?, ?, ?, ?)`,
+              [modeloId, it.descricao, it.obrigatorio ? 1 : 0, it.unidadeMedida || null, ordem++],
+            )
+          }
+          return { ok: true, id: modeloId }
+        }),
+
+      excluir: protectedProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .mutation(async ({ ctx, input }) => {
+          const pool = getRawPool()
+          const [del]: any = await pool.execute(
+            `DELETE FROM os_checklist_modelo WHERE id = ? AND empresa_id = ?`,
+            [input.id, ctx.usuario.empresaId],
+          )
+          if (!(del as any).affectedRows) throw new TRPCError({ code: 'NOT_FOUND', message: 'Modelo não encontrado' })
+          await pool.execute(`DELETE FROM os_checklist_modelo_item WHERE modelo_id = ?`, [input.id])
+          return { ok: true }
+        }),
+
+      // Insere os modelos de lib/checklistModelosPadrao.ts que a empresa ainda
+      // não tem (compara pelo nome) — rodar de novo não duplica.
+      carregarPadrao: protectedProcedure
+        .mutation(async ({ ctx }) => {
+          const pool = getRawPool()
+          const [existentes]: any = await pool.execute(
+            `SELECT nome FROM os_checklist_modelo WHERE empresa_id = ?`,
+            [ctx.usuario.empresaId],
+          )
+          const nomes = new Set((existentes as any[]).map(r => String(r.nome).toLowerCase()))
+          const criados: string[] = []
+          for (const modelo of MODELOS_CHECKLIST_PADRAO) {
+            if (nomes.has(modelo.nome.toLowerCase())) continue
+            const [ins]: any = await pool.execute(
+              `INSERT INTO os_checklist_modelo (empresa_id, nome, ativo, ordem)
+               SELECT ?, ?, 1, COALESCE(MAX(ordem), 0) + 1 FROM os_checklist_modelo WHERE empresa_id = ?`,
+              [ctx.usuario.empresaId, modelo.nome, ctx.usuario.empresaId],
+            )
+            const modeloId = (ins as any).insertId
+            let ordem = 1
+            for (const it of modelo.itens) {
+              await pool.execute(
+                `INSERT INTO os_checklist_modelo_item (modelo_id, descricao, obrigatorio, unidade_medida, ordem)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [modeloId, it.descricao, it.obr ? 1 : 0, it.unidade ?? null, ordem++],
+              )
+            }
+            criados.push(modelo.nome)
+          }
+          return { ok: true, criados }
+        }),
+    }),
+
+    // Itens da OS, na ordem em que foram aplicados.
+    list: protectedProcedure
+      .input(z.object({ ordemServicoId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const pool = getRawPool()
+        const [rows]: any = await pool.execute(
+          `SELECT i.id, i.modelo_id AS modeloId, i.grupo, i.descricao, i.obrigatorio,
+                  i.unidade_medida AS unidadeMedida, i.ordem, i.status,
+                  i.valor_medido AS valorMedido, i.justificativa, i.anexo_id AS anexoId,
+                  a.nome AS anexoNome, i.concluido_por_nome AS concluidoPorNome,
+                  i.concluido_em AS concluidoEm
+           FROM os_checklist_item i
+           LEFT JOIN os_anexo a ON a.id = i.anexo_id
+           WHERE i.ordem_servico_id = ? AND i.empresa_id = ?
+           ORDER BY i.ordem, i.id`,
+          [input.ordemServicoId, ctx.usuario.empresaId],
+        )
+        return (rows as any[]).map(r => ({ ...r, obrigatorio: Number(r.obrigatorio) === 1 }))
+      }),
+
+    aplicarModelo: protectedProcedure
+      .input(z.object({
+        ordemServicoId: z.number().int().positive(),
+        modeloId:       z.number().int().positive(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await osEditavelChecklist(input.ordemServicoId, ctx.usuario.empresaId)
+        const pool = getRawPool()
+        const [mod]: any = await pool.execute(
+          `SELECT id, nome FROM os_checklist_modelo WHERE id = ? AND empresa_id = ? LIMIT 1`,
+          [input.modeloId, ctx.usuario.empresaId],
+        )
+        const modelo = (mod as any[])[0]
+        if (!modelo) throw new TRPCError({ code: 'NOT_FOUND', message: 'Modelo não encontrado' })
+
+        const [ja]: any = await pool.execute(
+          `SELECT id FROM os_checklist_item WHERE ordem_servico_id = ? AND modelo_id = ? LIMIT 1`,
+          [input.ordemServicoId, input.modeloId],
+        )
+        if ((ja as any[]).length) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: `O checklist "${modelo.nome}" já está nesta OS.` })
+        }
+
+        const [itens]: any = await pool.execute(
+          `SELECT descricao, obrigatorio, unidade_medida FROM os_checklist_modelo_item
+           WHERE modelo_id = ? ORDER BY ordem, id`,
+          [input.modeloId],
+        )
+        let ordem = await proximaOrdemChecklist(input.ordemServicoId)
+        for (const it of itens as any[]) {
+          await pool.execute(
+            `INSERT INTO os_checklist_item
+               (ordem_servico_id, empresa_id, modelo_id, grupo, descricao, obrigatorio, unidade_medida, ordem)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [input.ordemServicoId, ctx.usuario.empresaId, input.modeloId, modelo.nome,
+             it.descricao, Number(it.obrigatorio) === 1 ? 1 : 0, it.unidade_medida ?? null, ordem++],
+          )
+        }
+        return { ok: true, total: (itens as any[]).length }
+      }),
+
+    adicionarItem: protectedProcedure
+      .input(itemModeloInput.extend({ ordemServicoId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await osEditavelChecklist(input.ordemServicoId, ctx.usuario.empresaId)
+        const pool = getRawPool()
+        const ordem = await proximaOrdemChecklist(input.ordemServicoId)
+        const [ins]: any = await pool.execute(
+          `INSERT INTO os_checklist_item
+             (ordem_servico_id, empresa_id, modelo_id, grupo, descricao, obrigatorio, unidade_medida, ordem)
+           VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+          [input.ordemServicoId, ctx.usuario.empresaId, GRUPO_AVULSO, input.descricao,
+           input.obrigatorio ? 1 : 0, input.unidadeMedida || null, ordem],
+        )
+        return { ok: true, id: (ins as any).insertId }
+      }),
+
+    // Ticar o item: 'feito' (com medição, se o item pede) ou 'nao_aplica'
+    // (sempre com justificativa). Registra quem e quando — é a prova.
+    marcar: protectedProcedure
+      .input(z.object({
+        id:            z.number().int().positive(),
+        status:        z.enum(['feito', 'nao_aplica']),
+        valorMedido:   z.string().trim().max(100).optional(),
+        justificativa: z.string().trim().max(2000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const item = await itemChecklistEditavel(input.id, ctx.usuario.empresaId)
+        if (input.status === 'feito' && item.unidadeMedida && !input.valorMedido) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: `Informe o valor medido (${item.unidadeMedida}).` })
+        }
+        if (input.status === 'nao_aplica' && !input.justificativa) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Justifique por que o item não se aplica.' })
+        }
+        const pool = getRawPool()
+        // concluido_em vem do Node, não de NOW(): o MySQL roda em UTC e o pool
+        // lê DATETIME no fuso do processo (Brasília) — NOW() voltaria 3h adiantado.
+        await pool.execute(
+          `UPDATE os_checklist_item
+           SET status = ?, valor_medido = ?, justificativa = ?,
+               concluido_por = ?, concluido_por_nome = ?, concluido_em = ?
+           WHERE id = ?`,
+          [input.status,
+           input.status === 'feito' ? (input.valorMedido || null) : null,
+           input.status === 'nao_aplica' ? (input.justificativa ?? null) : null,
+           ctx.usuario.id, ctx.usuario.nome, new Date(), input.id],
+        )
+        return { ok: true }
+      }),
+
+    desmarcar: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await itemChecklistEditavel(input.id, ctx.usuario.empresaId)
+        const pool = getRawPool()
+        await pool.execute(
+          `UPDATE os_checklist_item
+           SET status = 'pendente', valor_medido = NULL, justificativa = NULL,
+               concluido_por = NULL, concluido_por_nome = NULL, concluido_em = NULL
+           WHERE id = ?`,
+          [input.id],
+        )
+        return { ok: true }
+      }),
+
+    // Foto de comprovação: um anexo da própria OS (enviado pela rota de
+    // upload de sempre) vinculado ao item. null desvincula sem apagar a foto.
+    definirFoto: protectedProcedure
+      .input(z.object({
+        id:      z.number().int().positive(),
+        anexoId: z.number().int().positive().nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const item = await itemChecklistEditavel(input.id, ctx.usuario.empresaId)
+        const pool = getRawPool()
+        if (input.anexoId) {
+          const [an]: any = await pool.execute(
+            `SELECT id FROM os_anexo WHERE id = ? AND ordem_servico_id = ? LIMIT 1`,
+            [input.anexoId, item.osId],
+          )
+          if (!(an as any[]).length) throw new TRPCError({ code: 'NOT_FOUND', message: 'Foto não encontrada nesta OS' })
+        }
+        await pool.execute(`UPDATE os_checklist_item SET anexo_id = ? WHERE id = ?`, [input.anexoId, input.id])
+        return { ok: true }
+      }),
+
+    // Item obrigatório de modelo não se remove — senão bastaria apagar para
+    // passar pelo bloqueio. O caminho é "não se aplica" com justificativa.
+    removerItem: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const item = await itemChecklistEditavel(input.id, ctx.usuario.empresaId)
+        if (Number(item.obrigatorio) === 1 && item.modeloId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Item obrigatório do modelo — marque como "não se aplica" com justificativa em vez de remover.' })
+        }
+        const pool = getRawPool()
+        await pool.execute(`DELETE FROM os_checklist_item WHERE id = ?`, [input.id])
+        return { ok: true }
+      }),
+
+    // Desfaz um modelo aplicado por engano — só enquanto nenhum item dele
+    // foi ticado.
+    removerModelo: protectedProcedure
+      .input(z.object({
+        ordemServicoId: z.number().int().positive(),
+        modeloId:       z.number().int().positive(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await osEditavelChecklist(input.ordemServicoId, ctx.usuario.empresaId)
+        const pool = getRawPool()
+        const [tic]: any = await pool.execute(
+          `SELECT COUNT(*) AS n FROM os_checklist_item
+           WHERE ordem_servico_id = ? AND empresa_id = ? AND modelo_id = ? AND status <> 'pendente'`,
+          [input.ordemServicoId, ctx.usuario.empresaId, input.modeloId],
+        )
+        if (Number((tic as any[])[0]?.n ?? 0) > 0) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Este checklist já tem itens marcados — desmarque-os antes de remover.' })
+        }
+        await pool.execute(
+          `DELETE FROM os_checklist_item WHERE ordem_servico_id = ? AND empresa_id = ? AND modelo_id = ?`,
+          [input.ordemServicoId, ctx.usuario.empresaId, input.modeloId],
+        )
+        return { ok: true }
       }),
   }),
 

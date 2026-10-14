@@ -7,6 +7,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
 import { Btn, Input, Select, Toggle, Card, Spinner, C } from '../../components/ui'
 import { AbaBlocos } from './AbaBlocos'
+import { AbaChecklistOs } from './AbaChecklistOs'
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 
 interface ItemAdicional {
@@ -577,6 +578,7 @@ const CONFIG_ABAS = [
   { path: 'modelos',   label: 'Modelos de Bloco' },
   { path: 'blocos',    label: 'Blocos da Proposta' },
   { path: 'catalogo',  label: 'Catálogo de Equip.' },
+  { path: 'checklists', label: 'Checklists de OS' },
   { path: 'usuarios',  label: 'Usuários' },
 ]
 function AbaTextos() {
@@ -1438,6 +1440,7 @@ export function ConfiguracoesPage() {
           <Route path="blocos"    element={<AbaBlocos />} />
           <Route path="usuarios"  element={<AbaUsuarios />} />
           <Route path="catalogo"  element={<AbaCatalogo />} />
+          <Route path="checklists" element={<AbaChecklistOs />} />
         </Routes>
       </div>
     </div>

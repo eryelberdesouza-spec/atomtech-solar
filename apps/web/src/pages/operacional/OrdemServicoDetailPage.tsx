@@ -7,6 +7,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { gerarHtmlEncerramento } from '../../lib/gerarDocumentoEncerramentoBrowser'
 import { gerarPdfBase64DoServidor } from '../../lib/baixarPdfServidor'
 import { TecnicoResponsavelPicker } from '../../components/TecnicoResponsavelPicker'
+import { AbaChecklist, obrigatoriosPendentes, type ItemChecklist } from './ChecklistOS'
 
 const STATUS_COLOR: Record<string, string> = {
   aberta:      '#58A6FF',
@@ -243,7 +244,9 @@ const MOTIVO_OPCOES = [
   { value: 'outro',           label: 'Outro motivo' },
 ]
 
-function ModalEncerramento({ os, osId, onClose, onSuccess }: { os: any; osId: number; onClose: () => void; onSuccess: () => void }) {
+function ModalEncerramento({ os, osId, checklist, onIrChecklist, onClose, onSuccess }: { os: any; osId: number; checklist: ItemChecklist[]; onIrChecklist: () => void; onClose: () => void; onSuccess: () => void }) {
+  // Obrigatórios em aberto travam o encerramento (o servidor também recusa).
+  const pendentesObr = obrigatoriosPendentes(checklist)
   const [modo, setModo] = useState<'assinar' | 'sem_assinatura'>('assinar')
   const [assinaturaDataUrl, setAssinaturaDataUrl] = useState<string | null>(null)
   const [nomeSignatario, setNomeSignatario] = useState(os.clienteNome ?? '')
@@ -262,7 +265,8 @@ function ModalEncerramento({ os, osId, onClose, onSuccess }: { os: any; osId: nu
 
     setProcessando(true)
     try {
-      const dataConclusao = new Date().toISOString().slice(0, 10)
+      // Data local do navegador — toISOString() daria o dia seguinte depois das 21h.
+      const dataConclusao = new Date().toLocaleDateString('en-CA')
       const html = gerarHtmlEncerramento({
         osNumero: os.numero,
         clienteNome: os.clienteNome ?? '—',
@@ -275,6 +279,7 @@ function ModalEncerramento({ os, osId, onClose, onSuccess }: { os: any; osId: nu
         nomeSignatario: nomeSignatario || undefined,
         motivoSemAssinatura: modo === 'sem_assinatura' ? motivo : undefined,
         observacao: observacao || undefined,
+        checklist,
       })
       const pdfBase64 = await gerarPdfBase64DoServidor(html, `Encerramento-${os.numero}.pdf`)
       const assinaturaBase64 = assinaturaDataUrl ? assinaturaDataUrl.split(',')[1] : undefined
@@ -303,6 +308,18 @@ function ModalEncerramento({ os, osId, onClose, onSuccess }: { os: any; osId: nu
       <div style={{ background: '#131F30', border: '1px solid #1E3050', borderRadius: 14, padding: 24, width: 480, maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <h3 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0 }}>✔ Encerrar OS {os.numero}</h3>
         <p style={{ color: '#7488A8', fontSize: 12, margin: 0 }}>Gera o termo de encerramento e conclui a OS.</p>
+
+        {pendentesObr.length > 0 && (
+          <div style={{ background: '#F5A62312', border: '1px solid #F5A62350', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#F5A623' }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ {pendentesObr.length} item(ns) obrigatório(s) do checklist em aberto</div>
+            <ul style={{ margin: '0 0 6px', paddingLeft: 18, color: '#C8D8EC' }}>
+              {pendentesObr.slice(0, 6).map(i => <li key={i.id}>{i.descricao}</li>)}
+              {pendentesObr.length > 6 && <li>… e mais {pendentesObr.length - 6}</li>}
+            </ul>
+            <div style={{ color: '#9FB0C9' }}>Marque como feito ou "não se aplica" (com justificativa) antes de encerrar.</div>
+            <button type="button" onClick={onIrChecklist} style={{ ...sectionActionStyle, marginTop: 8 }}>Ir para o checklist →</button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" onClick={() => setModo('assinar')} style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: `1px solid ${modo === 'assinar' ? '#3EBB7A' : '#1E3050'}`, background: modo === 'assinar' ? '#3EBB7A18' : 'transparent', color: modo === 'assinar' ? '#3EBB7A' : '#7488A8', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
@@ -342,7 +359,7 @@ function ModalEncerramento({ os, osId, onClose, onSuccess }: { os: any; osId: nu
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button type="button" onClick={onClose} disabled={processando} style={cancelBtnStyle}>Cancelar</button>
-          <button type="button" onClick={handleConfirmar} disabled={processando} style={saveBtnStyle}>
+          <button type="button" onClick={handleConfirmar} disabled={processando || pendentesObr.length > 0} style={{ ...saveBtnStyle, opacity: pendentesObr.length > 0 ? 0.5 : 1, cursor: pendentesObr.length > 0 ? 'not-allowed' : 'pointer' }}>
             {processando ? '⏳ Gerando documento...' : '✔ Confirmar e concluir OS'}
           </button>
         </div>
@@ -1218,7 +1235,7 @@ export function OrdemServicoDetailPage() {
 
   const { data: os, isLoading } = (trpc as any).os.byId.useQuery({ id: osId }, { enabled: !!osId, staleTime: 0 })
 
-  const [aba, setAba] = useState<'geral' | 'agendamentos' | 'diario' | 'anexos' | 'encerramento'>('geral')
+  const [aba, setAba] = useState<'geral' | 'agendamentos' | 'diario' | 'checklist' | 'anexos' | 'encerramento'>('geral')
   const [showModalAg, setShowModalAg]               = useState(false)
   const [showModalMarco, setShowModalMarco]         = useState(false)
   const [showModalEncerramento, setShowModalEncerramento] = useState(false)
@@ -1234,6 +1251,10 @@ export function OrdemServicoDetailPage() {
   const { data: anexos = [] } = (trpc as any).os.anexo.list.useQuery(
     { ordemServicoId: osId },
     { staleTime: 30_000, enabled: !!osId },
+  )
+  const { data: checklist = [] } = (trpc as any).os.checklist.list.useQuery(
+    { ordemServicoId: osId },
+    { staleTime: 10_000, enabled: !!osId },
   )
 
   if (isLoading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}><Spinner /></div>
@@ -1277,6 +1298,7 @@ export function OrdemServicoDetailPage() {
     { id: 'geral',        label: '📋 Visão Geral' },
     { id: 'agendamentos', label: `📅 Agendamentos${os.agendamentos?.length ? ` (${os.agendamentos.length})` : ''}` },
     { id: 'diario',       label: `📓 Diário de Campo${os.notas?.length ? ` (${os.notas.length})` : ''}` },
+    { id: 'checklist',    label: `✅ Checklist${(checklist as any[]).length ? ` (${(checklist as any[]).filter((i: any) => i.status !== 'pendente').length}/${(checklist as any[]).length})` : ''}` },
     { id: 'anexos',       label: `📎 Anexos${(anexos as any[]).length ? ` (${(anexos as any[]).length})` : ''}` },
     { id: 'encerramento', label: '📄 Encerramento' },
   ]
@@ -1384,6 +1406,7 @@ export function OrdemServicoDetailPage() {
         {aba === 'geral'        && <AbaVisaoGeral os={os} osId={osId} onRefresh={refresh} onShowModalMarco={() => setShowModalMarco(true)} />}
         {aba === 'agendamentos' && <AbaAgendamentos os={os} osId={osId} onRefresh={refresh} onShowModal={() => setShowModalAg(true)} />}
         {aba === 'diario'       && <AbaDiarioCampo os={os} osId={osId} onRefresh={refresh} />}
+        {aba === 'checklist'    && <AbaChecklist osId={osId} osStatus={os.status} />}
         {aba === 'anexos'       && <AbaAnexos osId={osId} osStatus={os.status} />}
         {aba === 'encerramento' && <AbaEncerramento osId={osId} osNumero={os.numero} />}
       </div>
@@ -1391,7 +1414,7 @@ export function OrdemServicoDetailPage() {
       {/* Modais */}
       {showModalAg          && <ModalAgendamento  osId={osId} onClose={() => setShowModalAg(false)}          onSuccess={refresh} />}
       {showModalMarco       && <ModalMarco        osId={osId} onClose={() => setShowModalMarco(false)}       onSuccess={refresh} />}
-      {showModalEncerramento && <ModalEncerramento os={os} osId={osId} onClose={() => setShowModalEncerramento(false)} onSuccess={() => { utils.os.encerramento.get.invalidate({ ordemServicoId: osId }); refresh() }} />}
+      {showModalEncerramento && <ModalEncerramento os={os} osId={osId} checklist={checklist as ItemChecklist[]} onIrChecklist={() => { setShowModalEncerramento(false); setAba('checklist') }} onClose={() => setShowModalEncerramento(false)} onSuccess={() => { utils.os.encerramento.get.invalidate({ ordemServicoId: osId }); refresh() }} />}
     </div>
   )
 }
