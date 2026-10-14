@@ -162,6 +162,18 @@ Opção "✍️ Enviar para assinatura (ZapSign)" no modal **Gerar Contrato**. O
 - Tabela `contrato_assinatura` (token, status, signatários). O "Atualizar status" do card continua como recurso manual caso algum aviso do webhook se perca. Migração: `GET /run-migration-assinatura-zapsign`.
 - **Armadilha achada no primeiro envio real**: a ZapSign recusa o documento **INTEIRO** com "forneça um CPF válido" se **um** signatário tiver CPF errado. O CPF do rep1 cadastrado estava com um dígito trocado (`031.303.751-22`, inválido; correto `031.363.751-22`) — e esse número saía impresso em **todos** os contratos. Agora `cpfValido()` filtra: CPF que não passa no dígito verificador é omitido (o signatário assina igual) e a resposta traz aviso nomeando o cadastro errado. Lição: validar dado de cadastro antes de mandar para API de terceiro, e nunca deixar um campo opcional derrubar a operação toda.
 
+## Checklist de execução da OS (2026-10-14)
+
+Aba **✅ Checklist** na OS: cada item é ticado como **feito** (com valor medido quando o item tem unidade — V, A, Ω…) ou **não se aplica** (justificativa obrigatória), com foto opcional e registro de quem/quando. É a prova de execução e **sai no termo de encerramento** que o cliente assina.
+
+- Tabelas `os_checklist_modelo` / `_modelo_item` (modelos) e `os_checklist_item` (itens da OS). Migração `GET /run-migration-os-checklist`. Router `os.checklist.*`.
+- **Aplicar modelo COPIA os itens** para a OS — editar o modelo depois não muda OS em andamento nem termo assinado. O nome do modelo vira o `grupo`; itens avulsos ficam em "Itens avulsos".
+- **Obrigatório em aberto bloqueia** `encerramento.criar` e `updateStatus('concluida')` (servidor) e desabilita o botão do modal. Item obrigatório de modelo **não se remove** (seria o atalho para furar o bloqueio) — o caminho é N/A com justificativa. Modelo inteiro só se remove enquanto nenhum item dele foi ticado. OS concluída/cancelada = checklist congelado.
+- Foto do item = um `os_anexo` comum (mesma rota de upload) ligado por `anexo_id`; aparece também na aba Anexos.
+- Modelos padrão em `apps/api/src/lib/checklistModelosPadrao.ts`, carregados pelo botão **"Carregar modelos padrão"** em Configurações › Checklists de OS (não duplica: compara pelo nome). Fotovoltaico é **dois modelos** — inversor string e microinversor — porque as verificações mudam (micro não tem Voc por string; tem cabo tronco CA e gateway comunicando). Decisões do usuário: aterramento/resistência/isolamento/Isc fora do FV; teste de recarga e corrente configurada do wallbox opcionais (cliente sem veículo não pode travar a OS); resistência de aterramento, termografia e quadro de cargas fora do modelo de infraestrutura — entram como avulso.
+- **Armadilha de fuso evitada**: `concluido_em` é DATETIME gravado com `new Date()` do Node, não `NOW()` — o MySQL roda em UTC e o pool lê DATETIME no fuso do processo (Brasília), então `NOW()` voltaria 3h adiantado.
+- Termo: com checklist passa de 1 página — `@page { margin: 12mm 0 }` + `@page :first { margin-top: 0 }` (a faixa do cabeçalho continua encostada no topo da 1ª), rodapé deixou de ser `position: fixed` e foi para o fim, junto da declaração e assinatura (`break-inside: avoid`).
+
 ## Níveis de acesso — PROPOSTA AGUARDANDO SUA APROVAÇÃO
 
 Ver **`docs/permissoes-proposta.md`**. Resumo do diagnóstico: os quatro perfis existem no cadastro e aparecem na tela com descrições, **mas quase nada é verificado no servidor** — só `empresa.update`, cancelar OS e gestão de usuários. O bloqueio do perfil Técnico é só no front (`App.tsx`/`Layout.tsx`): o navegador esconde o menu, a API não recusa. Um **Visualizador** cria e edita proposta, cliente e OS normalmente.
