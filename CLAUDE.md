@@ -174,6 +174,12 @@ Aba **✅ Checklist** na OS: cada item é ticado como **feito** (com valor medid
 - **Armadilha de fuso evitada**: `concluido_em` é DATETIME gravado com `new Date()` do Node, não `NOW()` — o MySQL roda em UTC e o pool lê DATETIME no fuso do processo (Brasília), então `NOW()` voltaria 3h adiantado.
 - Termo: com checklist passa de 1 página — `@page { margin: 12mm 0 }` + `@page :first { margin-top: 0 }` (a faixa do cabeçalho continua encostada no topo da 1ª), rodapé deixou de ser `position: fixed` e foi para o fim, junto da declaração e assinatura (`break-inside: avoid`).
 
+- Aterramento/equipotencialização das estruturas voltou aos dois modelos de FV como obrigatório **sem medição** (ajuste do usuário, mesmo dia). Em produção os modelos já tinham sido carregados antes — o item foi incluído pela rota `modelo.salvar`. Lembrete: modelo carregado no banco **não** acompanha mudanças em `checklistModelosPadrao.ts`.
+
+## Operacional no celular (2026-10-14)
+
+A lista do celular (`OrdensServicoPage.tsx`, view `lista` + `isMobile`) era uma fila única por data de abertura, misturando concluídas/canceladas com as OS do dia. Agora segue a lógica do Kanban do computador: grupos por status na ordem das colunas, concluída/cancelada recolhidas por padrão (lembrado em `localStorage` `os_grupos_abertos`), busca abre todos os grupos. Cards de resumo viraram faixa de 1 linha no celular (em 2x3 comiam metade da tela) e tocar num deles abre e rola até o grupo.
+
 ## Níveis de acesso — PROPOSTA AGUARDANDO SUA APROVAÇÃO
 
 Ver **`docs/permissoes-proposta.md`**. Resumo do diagnóstico: os quatro perfis existem no cadastro e aparecem na tela com descrições, **mas quase nada é verificado no servidor** — só `empresa.update`, cancelar OS e gestão de usuários. O bloqueio do perfil Técnico é só no front (`App.tsx`/`Layout.tsx`): o navegador esconde o menu, a API não recusa. Um **Visualizador** cria e edita proposta, cliente e OS normalmente.
