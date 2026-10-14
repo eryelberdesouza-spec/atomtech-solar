@@ -34,10 +34,14 @@ import { acharOuCriarClienteParaFinPessoa, propagarFinPessoaParaCliente } from '
 import { hojeISO } from '../lib/datas'
 
 // ─── DATA — mysql2 devolve colunas DATE como objeto Date (não string), mesmo com
-// drizzle mode 'string'; String(dateObj).slice(0,10) corrompe o valor. Formata local.
+// drizzle mode 'string'; String(dateObj).slice(0,10) corrompe o valor.
+// Getters UTC, NÃO locais: o Drizzle entrega meia-noite UTC e a API roda com
+// TZ=America/Sao_Paulo — getDate() local devolvia o dia ANTERIOR (recibo com
+// vencimento 14/10 para parcela de 15/10, emissão recuando 1 dia a cada
+// salvamento). Pool cru (meia-noite local = 03:00Z) dá o mesmo dia em UTC.
 function fmtDateISO(d: unknown): string {
   if (d instanceof Date) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
   }
   return String(d).slice(0, 10)
 }

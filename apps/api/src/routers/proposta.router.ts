@@ -103,10 +103,11 @@ const DESCRICOES_ADICIONAIS = [DESC_INSTALACAO_MODULOS, DESC_INSTALACAO_INVERSOR
 // mysql2 devolve colunas DATE como objeto Date, não string (mesmo com drizzle
 // date() sem mode explícito) — String(dateObj).slice(0,10) vira lixo tipo
 // "Thu May 07" em vez de "2026-05-07", quebrando comparação de string em
-// silêncio. Mesmo padrão já usado em fin.router.ts (fmtDateISO).
+// silêncio. Mesmo padrão já usado em fin.router.ts (fmtDateISO) — getters
+// UTC pelo mesmo motivo (TZ=America/Sao_Paulo recuava um dia).
 function dataParaISO(d: unknown): string {
   if (d instanceof Date) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
   }
   return String(d).slice(0, 10)
 }

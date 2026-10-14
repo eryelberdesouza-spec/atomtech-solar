@@ -1499,10 +1499,10 @@ export const osRouter = router({
         }
 
         const numero = await gerarNumeroOS(empId)
-        // mysql2 devolve DATE como objeto Date — formatar como YYYY-MM-DD local
+        // mysql2 devolve DATE como objeto Date — getters UTC (ver fmtDateISO em fin.router.ts)
         const pd = plano.proxima_data
         const proximaData = pd instanceof Date
-          ? `${pd.getFullYear()}-${String(pd.getMonth() + 1).padStart(2, '0')}-${String(pd.getDate()).padStart(2, '0')}`
+          ? `${pd.getUTCFullYear()}-${String(pd.getUTCMonth() + 1).padStart(2, '0')}-${String(pd.getUTCDate()).padStart(2, '0')}`
           : String(pd).slice(0, 10)
 
         await pool.execute(

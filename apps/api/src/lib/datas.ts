@@ -25,7 +25,12 @@ export function hojeISO(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: FUSO })
 }
 
-/** Data (Date ou string) convertida para YYYY-MM-DD no fuso do Brasil. */
+/**
+ * Data (Date ou string) convertida para YYYY-MM-DD no fuso do Brasil.
+ * Só para INSTANTES (timestamp/datetime). NÃO usar em coluna DATE do banco:
+ * o Drizzle a entrega como meia-noite UTC, que no fuso do Brasil é o dia
+ * anterior — para DATE use getters UTC (fmtDateISO em fin.router.ts).
+ */
 export function paraDataISO(d: Date | string | null | undefined): string | null {
   if (!d) return null
   const data = d instanceof Date ? d : new Date(d)
