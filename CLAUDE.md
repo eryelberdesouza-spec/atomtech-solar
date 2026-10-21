@@ -194,7 +194,9 @@ Diagnóstico que motivou (conferência linha a linha dos OFX jan–out × AGF, p
 - Cada importação compara saldo do banco × AGF na data do OFX (cartão da conta mostra a diferença). Atenção: no **Inter o LEDGERBAL é o saldo do dia do download**, não do fim do período do arquivo.
 - "Reabrir" desfaz o vínculo e devolve a linha à fila, mas **não estorna a baixa** da parcela (pode ter sido manual); transferência criada pela conciliação é apagada junto.
 - `lib/finHelpers.ts` passou a abrigar `fmtDateISO`, `registrarAuditoria`, `verificarPeriodoAberto` (antes locais do fin.router).
-- **Pendente**: aplicar as decisões da planilha de conferência (duplicados, contas trocadas, datas) e importar os OFX jan–out na tela nova; depois conferir que saldo AGF = banco nas duas contas.
+- **20/10 em produção**: `data_saldo_inicial = 2026-01-01` gravada nas duas contas (sai do saldo o que é de 2024 no Inter) e OFX jan–20/out importados (Sicoob 1.290 linhas, 1.004 conciliadas sozinhas pelo FITID do importador antigo; Inter 580, 447). Fila: Sicoob 286 pendentes, Inter 133. Diferença AGF − banco em 20/10: Sicoob +R$ 416,9 mil, Inter −R$ 3,2 mil — o que sobra no AGF são lançamentos sem linha no extrato (duplicados/baixas indevidas), que a fila não mostra: vêm da planilha de conferência.
+- Achado na importação: a transferência de R$ 750 (Inter→Sicoob, 02/01) estava na tabela de transferências **e** como recebimento no Sicoob — com o painel passando a contar transferências, aparece em dobro no Sicoob. Entra na limpeza.
+- **Pendente**: usuário revisa a planilha (coluna "Decisão") — depois aplicar as correções e conferir saldo AGF = banco nas duas contas.
 
 ## Níveis de acesso — PROPOSTA AGUARDANDO SUA APROVAÇÃO
 
