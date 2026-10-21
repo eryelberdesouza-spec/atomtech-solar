@@ -25,6 +25,9 @@ export interface OFXParseResult {
   conta:         string
   periodoInicio: string
   periodoFim:    string
+  bancoId:       string         // BANKID (077 = Inter, 756 = Sicoob)
+  saldoBanco:    number | null  // LEDGERBAL — saldo informado pelo banco
+  dataSaldo:     string | null  // DTASOF — data a que o saldo se refere
 }
 
 // ─── Extrai valor de uma tag OFX (funciona em SGML e XML) ────────────────────
@@ -110,7 +113,13 @@ export function parseOFX(content: string): OFXParseResult {
     const dtposted  = tag(corpo, 'DTPOSTED')
     const trnamt    = tag(corpo, 'TRNAMT')
     const trntype   = tag(corpo, 'TRNTYPE').toUpperCase()
-    const memo      = tag(corpo, 'MEMO') || tag(corpo, 'NAME') || ''
+    // MEMO + NAME: no Sicoob o NAME traz quem pagou/recebeu ("Recebimento Pix
+    // NELSON SCHNEIDER"); usar só um dos dois perdia o nome do pagador, que é
+    // a base da conciliação por cliente.
+    const memoTag = tag(corpo, 'MEMO'), nameTag = tag(corpo, 'NAME')
+    const memo = memoTag && nameTag && !memoTag.toLowerCase().includes(nameTag.toLowerCase())
+      ? `${memoTag} — ${nameTag}`
+      : (memoTag || nameTag || '')
 
     if (!fitid || !dtposted || !trnamt) continue
 
@@ -149,6 +158,10 @@ export function parseOFX(content: string): OFXParseResult {
   const totalEntradas = transacoes.filter(t => t.tipo === 'C').reduce((s, t) => s + t.valor, 0)
   const totalSaidas   = transacoes.filter(t => t.tipo === 'D').reduce((s, t) => s + t.valor, 0)
 
+  const ledger = text.split(/<LEDGERBAL>/i)[1] || ''
+  const balamt = ledger ? parseFloat(tag(ledger, 'BALAMT').replace(',', '.')) : NaN
+  const dtasof = ledger ? tag(ledger, 'DTASOF') : ''
+
   return {
     transacoes,
     total: transacoes.length,
@@ -158,5 +171,8 @@ export function parseOFX(content: string): OFXParseResult {
     conta,
     periodoInicio,
     periodoFim,
+    bancoId:    tag(text, 'BANKID') || '',
+    saldoBanco: isNaN(balamt) ? null : balamt,
+    dataSaldo:  dtasof ? parseDataOFX(dtasof) : null,
   }
 }

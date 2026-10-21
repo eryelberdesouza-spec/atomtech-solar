@@ -1352,8 +1352,21 @@ export function ExtratoPage() {
         ))}
       </div>
 
-      {/* Aba OFX */}
-      {aba === 'OFX' && <OFXPage />}
+      {/* Aba OFX — desativada (out/2026): o importador antigo criava lançamento
+          novo para cada linha, mesmo quando a parcela já tinha sido baixada à
+          mão, e era a principal fonte de duplicidade. OFX agora entra pela
+          tela de Conciliação, que concilia em vez de lançar. */}
+      {aba === 'OFX' && (
+        <div style={{ background: C.bgCard, border: '1px solid ' + C.emerald, borderRadius: 12, padding: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>OFX agora é importado na Conciliação</div>
+          <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16, maxWidth: 560, marginInline: 'auto' }}>
+            Lá cada linha do extrato é ligada ao lançamento que já existe (inclusive PIX divididos e boletos agrupados)
+            em vez de criar um lançamento novo — que era o que gerava duplicidade.
+          </div>
+          <a href="/conciliacao" style={{ display: 'inline-block', padding: '9px 18px', borderRadius: 8, background: C.emerald, color: '#022C22', fontWeight: 700, textDecoration: 'none', fontSize: 13 }}>Ir para Conciliação →</a>
+        </div>
+      )}
+      {false && <OFXPage />}
 
       {/* Aba PDF */}
       {aba === 'PDF' && <>

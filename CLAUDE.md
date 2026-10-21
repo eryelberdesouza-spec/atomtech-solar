@@ -180,6 +180,22 @@ Aba **✅ Checklist** na OS: cada item é ticado como **feito** (com valor medid
 
 A lista do celular (`OrdensServicoPage.tsx`, view `lista` + `isMobile`) era uma fila única por data de abertura, misturando concluídas/canceladas com as OS do dia. Agora segue a lógica do Kanban do computador: grupos por status na ordem das colunas, concluída/cancelada recolhidas por padrão (lembrado em `localStorage` `os_grupos_abertos`), busca abre todos os grupos. Cards de resumo viraram faixa de 1 linha no celular (em 2x3 comiam metade da tela) e tocar num deles abre e rola até o grupo.
 
+## AGF — conciliação bancária (Etapa 2, 2026-10-20)
+
+Diagnóstico que motivou (conferência linha a linha dos OFX jan–out × AGF, planilha local `conferencia-agf/`, fora do git): saldo do Sicoob no painel R$ 453 mil × R$ 25,9 mil no banco. Causas: (1) **mesmo dinheiro lançado duas vezes** — baixa manual da parcela da proposta + importador de OFX criando lançamento novo; (2) parcela baixada pelo valor cheio quando o cliente pagou em partes (limite de PIX); (3) pagamentos grandes não lançados; (4) lançamento na conta trocada; (5) datas com dia/mês invertidos; (6) painel ignorava `fin_transferencia` e somava movimentos anteriores ao saldo inicial.
+
+- **Tela nova `/conciliacao`** (`ConciliacaoPage.tsx`, router `fin.conciliacao.*` em `conciliacao.router.ts`). Importar OFX **não cria lançamento**: cada linha vai para `fin_extrato_linha` (único por conta+FITID) e fica pendente até ser ligada (`fin_conciliacao`, N:N), virar lançamento, transferência ou ser ignorada. Migração: `GET /run-migration-fin-conciliacao`.
+- A aba OFX da tela antiga de Extrato foi **desativada** (aponta para a Conciliação) — era a porta da duplicidade. A aba PDF continua.
+- Sugestões por linha: já baixado no AGF (só vincula e corrige conta/data), parcela em aberto, **parcial** (divide a parcela; o resto fica em aberto no mesmo título/vencimento), **quitar com diferença** (desconto/retenção de imposto do cliente PJ), combinação de 2–3 parcelas, **duas linhas → uma parcela**, transferência entre contas próprias (cria `fin_transferencia`), regra.
+- Pagador reconhecido por apelido aprendido (`fin_pessoa_alias`, gravado ao conciliar), CNPJ/CPF completo da descrição, **CPF mascarado do Sicoob** (`***.204.431-**` → dígitos do meio) e nome (≥2 palavras, uma não comum).
+- Regras (`fin_extrato_regra`): "TARIFA COBRAN" já vem criada (no Sicoob a tarifa do boleto é debitada à parte). "Aplicar regras" lança todas de uma vez.
+- `ofxParser` agora junta MEMO + NAME (no Sicoob o nome do pagador está no NAME e era descartado) e lê o saldo do banco (LEDGERBAL). **Trava**: arquivo do Inter na conta do Sicoob (ou vice-versa) é recusado — fonte de "conta trocada".
+- **Saldo**: `lib/finSaldo.ts` (`calcularSaldos`) é a fonte única — saldo inicial + movimentos a partir de `fin_conta_bancaria.data_saldo_inicial` + transferências. Usado no painel, fluxo de caixa e conciliação. `data_saldo_inicial` fica **fora do schema Drizzle** de propósito (lida/gravada com SQL cru) para o `select()` não quebrar em banco sem a coluna. Usuário confirmou: saldos iniciais são de **01/01/2026**.
+- Cada importação compara saldo do banco × AGF na data do OFX (cartão da conta mostra a diferença). Atenção: no **Inter o LEDGERBAL é o saldo do dia do download**, não do fim do período do arquivo.
+- "Reabrir" desfaz o vínculo e devolve a linha à fila, mas **não estorna a baixa** da parcela (pode ter sido manual); transferência criada pela conciliação é apagada junto.
+- `lib/finHelpers.ts` passou a abrigar `fmtDateISO`, `registrarAuditoria`, `verificarPeriodoAberto` (antes locais do fin.router).
+- **Pendente**: aplicar as decisões da planilha de conferência (duplicados, contas trocadas, datas) e importar os OFX jan–out na tela nova; depois conferir que saldo AGF = banco nas duas contas.
+
 ## Níveis de acesso — PROPOSTA AGUARDANDO SUA APROVAÇÃO
 
 Ver **`docs/permissoes-proposta.md`**. Resumo do diagnóstico: os quatro perfis existem no cadastro e aparecem na tela com descrições, **mas quase nada é verificado no servidor** — só `empresa.update`, cancelar OS e gestão de usuários. O bloqueio do perfil Técnico é só no front (`App.tsx`/`Layout.tsx`): o navegador esconde o menu, a API não recusa. Um **Visualizador** cria e edita proposta, cliente e OS normalmente.

@@ -2385,6 +2385,119 @@ app.get('/run-migration-os-checklist', async (_, res) => {
   }
 })
 
+// ── Migração: conciliação bancária (Etapa 2) ─────────────────────────────────
+// Cada linha do extrato vira registro próprio (fin_extrato_linha) e a ligação
+// com o AGF fica em fin_conciliacao — N:N, porque 1 PIX pode pagar 2 parcelas
+// e 2 PIX (limite diário) podem pagar 1. Importar extrato NÃO cria lançamento:
+// a linha entra pendente e só some da fila quando conciliada/ignorada.
+app.get('/run-migration-fin-conciliacao', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_extrato_lote (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id    INT NOT NULL,
+        conta_id      INT NOT NULL,
+        arquivo       VARCHAR(200) NULL,
+        periodo_ini   DATE NULL,
+        periodo_fim   DATE NULL,
+        saldo_banco   DECIMAL(12,2) NULL,
+        data_saldo    DATE NULL,
+        total_linhas  INT NOT NULL DEFAULT 0,
+        novas_linhas  INT NOT NULL DEFAULT 0,
+        usuario_nome  VARCHAR(150) NULL,
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_fel_conta (empresa_id, conta_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_extrato_linha (
+        id                  INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id          INT NOT NULL,
+        conta_id            INT NOT NULL,
+        lote_id             INT NULL,
+        fitid               VARCHAR(220) NOT NULL,
+        data                DATE NOT NULL,
+        valor               DECIMAL(12,2) NOT NULL,
+        descricao           VARCHAR(500) NOT NULL,
+        status              ENUM('pendente','conciliado','ignorado') NOT NULL DEFAULT 'pendente',
+        observacao          VARCHAR(300) NULL,
+        conciliado_por_nome VARCHAR(150) NULL,
+        conciliado_em       DATETIME NULL,
+        created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_linha_conta_fitid (conta_id, fitid),
+        INDEX idx_linha_status (empresa_id, conta_id, status, data)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_conciliacao (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id        INT NOT NULL,
+        linha_id          INT NOT NULL,
+        parcela_id        INT NULL,
+        transferencia_id  INT NULL,
+        valor             DECIMAL(12,2) NOT NULL,
+        usuario_nome      VARCHAR(150) NULL,
+        created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_conc_linha (linha_id),
+        INDEX idx_conc_parcela (parcela_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_extrato_regra (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id       INT NOT NULL,
+        padrao           VARCHAR(120) NOT NULL,
+        sinal            ENUM('C','D') NOT NULL,
+        plano_contas_id  INT NULL,
+        centro_custo_id  INT NULL,
+        pessoa_id        INT NULL,
+        descricao        VARCHAR(200) NULL,
+        ativo            TINYINT NOT NULL DEFAULT 1,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_regra_emp (empresa_id)
+      )
+    `)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS fin_pessoa_alias (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id  INT NOT NULL,
+        pessoa_id   INT NOT NULL,
+        alias       VARCHAR(150) NOT NULL,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_alias (empresa_id, alias)
+      )
+    `)
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fin_conta_bancaria' AND COLUMN_NAME = 'data_saldo_inicial'`,
+    )
+    if (!(cols as any[]).length) {
+      await conn.execute(`ALTER TABLE fin_conta_bancaria ADD COLUMN data_saldo_inicial DATE NULL AFTER saldo_inicial`)
+    }
+    // Regra padrão: tarifa de cobrança é debitada à parte no Sicoob.
+    const [empresas]: any = await conn.execute(`SELECT DISTINCT empresa_id FROM fin_conta_bancaria`)
+    for (const e of empresas as any[]) {
+      const [planoTarifa]: any = await conn.execute(
+        `SELECT id FROM fin_plano_contas WHERE empresa_id = ? AND ativo = 1 AND (nome LIKE '%Tarifa%' OR nome LIKE '%Encargos Banc%') ORDER BY id LIMIT 1`,
+        [e.empresa_id],
+      )
+      const [ja]: any = await conn.execute(`SELECT id FROM fin_extrato_regra WHERE empresa_id = ? AND padrao = 'TARIFA COBRAN' LIMIT 1`, [e.empresa_id])
+      if (!(ja as any[]).length) {
+        await conn.execute(
+          `INSERT INTO fin_extrato_regra (empresa_id, padrao, sinal, plano_contas_id, descricao) VALUES (?, 'TARIFA COBRAN', 'D', ?, 'Tarifa de cobrança (boleto)')`,
+          [e.empresa_id, (planoTarifa as any[])[0]?.id ?? null],
+        )
+      }
+    }
+    await conn.end()
+    res.json({ ok: true, message: 'Tabelas de conciliação criadas (fin_extrato_lote, fin_extrato_linha, fin_conciliacao, fin_extrato_regra, fin_pessoa_alias) + fin_conta_bancaria.data_saldo_inicial' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: desconto no fechamento da proposta — condicao_comercial ganha
 //    valor_original (snapshot do valor ofertado), desconto e mostrar_desconto,
 //    pra dar desconto na hora de fechar sem sobrescrever o valor inicial ───────

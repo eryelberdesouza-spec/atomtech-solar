@@ -3,7 +3,7 @@
 // Namespace: trpc.fin.*
 // ═══════════════════════════════════════════════════════════════════
 
-import { router } from './trpc'
+import { router, getRawPool as getRawPoolFin } from './trpc'
 import { z } from 'zod'
 import { eq, and, like, or, asc, desc, sql, isNull, gte, lte, lt, ne, inArray } from 'drizzle-orm'
 import { protectedProcedure } from './trpc'
@@ -32,76 +32,29 @@ import {
 } from '../db/schema'
 import { acharOuCriarClienteParaFinPessoa, propagarFinPessoaParaCliente } from '../lib/pessoaSync'
 import { hojeISO } from '../lib/datas'
-
-// ─── DATA — mysql2 devolve colunas DATE como objeto Date (não string), mesmo com
-// drizzle mode 'string'; String(dateObj).slice(0,10) corrompe o valor.
-// Getters UTC, NÃO locais: o Drizzle entrega meia-noite UTC e a API roda com
-// TZ=America/Sao_Paulo — getDate() local devolvia o dia ANTERIOR (recibo com
-// vencimento 14/10 para parcela de 15/10, emissão recuando 1 dia a cada
-// salvamento). Pool cru (meia-noite local = 03:00Z) dá o mesmo dia em UTC.
-function fmtDateISO(d: unknown): string {
-  if (d instanceof Date) {
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
-  }
-  return String(d).slice(0, 10)
-}
-
-// ─── AUDITORIA — helper de log ────────────────────────────────────────────────
-async function registrarAuditoria(
-  db: any,
-  ctx: { usuario: { empresaId: number; id: number; nome: string } },
-  params: {
-    acao: 'CREATE' | 'UPDATE' | 'DELETE' | 'BAIXA' | 'ESTORNO'
-    entidade: string
-    entidadeId: number
-    dadosAntes?: unknown
-    dadosDepois?: unknown
-  },
-) {
-  await db.insert(finAuditoria).values({
-    empresaId:   ctx.usuario.empresaId,
-    usuarioId:   ctx.usuario.id,
-    usuarioNome: ctx.usuario.nome,
-    acao:        params.acao,
-    entidade:    params.entidade,
-    entidadeId:  params.entidadeId,
-    dadosAntes:  params.dadosAntes !== undefined ? JSON.stringify(params.dadosAntes) : null,
-    dadosDepois: params.dadosDepois !== undefined ? JSON.stringify(params.dadosDepois) : null,
-  })
-}
-
-// ─── FECHAMENTO DE PERÍODO — helper ───────────────────────────────────────────
-// Bloqueia lançar/baixar/estornar/excluir com data dentro de um mês já fechado.
-async function verificarPeriodoAberto(db: any, empresaId: number, dataStr: string | null | undefined) {
-  if (!dataStr) return
-  const [ano, mes] = String(dataStr).slice(0, 10).split('-').map(Number)
-  if (!ano || !mes) return
-  const [fechado] = await db
-    .select({ id: finPeriodoFechado.id })
-    .from(finPeriodoFechado)
-    .where(and(
-      eq(finPeriodoFechado.empresaId, empresaId),
-      eq(finPeriodoFechado.ano, ano),
-      eq(finPeriodoFechado.mes, mes),
-    ))
-    .limit(1)
-  if (fechado) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: `Período ${String(mes).padStart(2, '0')}/${ano} está fechado. Reabra o período antes de lançar, editar ou excluir.`,
-    })
-  }
-}
+import { fmtDateISO, registrarAuditoria, verificarPeriodoAberto } from '../lib/finHelpers'
+import { calcularSaldos } from '../lib/finSaldo'
+import { conciliacaoRouter } from './conciliacao.router'
 
 // ─── CONTAS BANCÁRIAS ─────────────────────────────────────────────────────────
 
 const contaRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db
+    const contas = await ctx.db
       .select()
       .from(finContaBancaria)
       .where(eq(finContaBancaria.empresaId, ctx.usuario.empresaId))
       .orderBy(asc(finContaBancaria.nome))
+    // data_saldo_inicial fica fora do schema Drizzle de propósito: entrou por
+    // migração (run-migration-fin-conciliacao) e o select() do Drizzle quebraria
+    // em banco ainda sem a coluna. Lida aqui à parte, tolerando a ausência.
+    let datas: any[] = []
+    try {
+      const [rows]: any = await getRawPoolFin().query(
+        `SELECT id, DATE_FORMAT(data_saldo_inicial, '%Y-%m-%d') AS dsi FROM fin_conta_bancaria WHERE empresa_id = ?`, [ctx.usuario.empresaId])
+      datas = rows as any[]
+    } catch { /* coluna ainda não migrada */ }
+    return contas.map(c => ({ ...c, dataSaldoInicial: datas.find(d => d.id === c.id)?.dsi ?? null }))
   }),
 
   create: protectedProcedure
@@ -138,6 +91,9 @@ const contaRouter = router({
       conta:        z.string().nullish(),
       saldoInicial: z.number(),
       ativo:        z.boolean(),
+      // Data a que o saldo inicial se refere: movimentos anteriores não entram
+      // no saldo (senão contam em dobro). null = sem data (soma tudo).
+      dataSaldoInicial: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
     }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -152,6 +108,10 @@ const contaRouter = router({
           eq(finContaBancaria.id, input.id),
           eq(finContaBancaria.empresaId, ctx.usuario.empresaId),
         ))
+      if (input.dataSaldoInicial !== undefined) {
+        await getRawPoolFin().query(`UPDATE fin_conta_bancaria SET data_saldo_inicial = ? WHERE id = ? AND empresa_id = ?`,
+          [input.dataSaldoInicial, input.id, ctx.usuario.empresaId])
+      }
       return { ok: true }
     }),
 
@@ -952,9 +912,12 @@ const dashboardRouter = router({
     const totalRecebido = movimentos.find((m: any) => m.tipo === 'RECEBER') ?? { total: '0' }
     const totalPago     = movimentos.find((m: any) => m.tipo === 'PAGAR')   ?? { total: '0' }
 
-    // Saldo real = saldoInicial de todas as contas + recebimentos liquidados - pagamentos liquidados
-    const saldoBase = contas.reduce((sum: number, c: any) => sum + Number(c.saldoInicial ?? 0), 0)
-    const saldoTotal = saldoBase + Number(totalRecebido.total) - Number(totalPago.total)
+    // Saldo por conta: saldo inicial + movimentos a partir da data do saldo
+    // inicial + transferências (lib/finSaldo — mesma conta usada na conciliação).
+    // Antes somava todo pagamento de qualquer data e ignorava transferências.
+    void totalRecebido; void totalPago
+    const saldos = await calcularSaldos(empId)
+    const saldoTotal = saldos.contas.reduce((s, c) => s + c.saldo, 0) + saldos.semConta
 
     // Saldo real por conta = saldoInicial + recebimentos nesta conta - pagamentos nesta conta
     const movPorConta = await ctx.db
@@ -976,7 +939,7 @@ const dashboardRouter = router({
         nome:         c.nome,
         tipo:         c.tipo,
         saldoInicial: Number(c.saldoInicial ?? 0),
-        saldo:        Number(c.saldoInicial ?? 0) + Number(rec?.total ?? 0) - Number(pag?.total ?? 0),
+        saldo:        saldos.contas.find(x => x.contaId === c.id)?.saldo ?? (Number(c.saldoInicial ?? 0) + Number(rec?.total ?? 0) - Number(pag?.total ?? 0)),
       }
     })
 
@@ -1955,7 +1918,11 @@ const fluxoCaixaRouter = router({
         .filter(p => p.tipo === 'PAGAR')
         .reduce((s, p) => s + Number(p.valorPago ?? 0), 0)
 
-      const saldoAtual = saldoBase + totalRecebido - totalPago
+      // Mesma conta do painel (lib/finSaldo): respeita a data do saldo inicial
+      // e as transferências. saldoBase/totais acima ficam só por compatibilidade.
+      void saldoBase; void totalRecebido; void totalPago
+      const saldosAtuais = await calcularSaldos(empId)
+      const saldoAtual = saldosAtuais.contas.reduce((s, c) => s + c.saldo, 0) + saldosAtuais.semConta
 
       // Parcelas abertas no período filtrado
       const abertas = await ctx.db
@@ -3522,4 +3489,5 @@ export const finRouter = router({
   alerta:        alertaRouter,
   auditoria:     auditoriaRouter,
   periodo:       periodoRouter,
+  conciliacao:   conciliacaoRouter,
 })

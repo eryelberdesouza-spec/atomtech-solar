@@ -19,10 +19,11 @@ interface ContaForm {
   agencia: string
   conta: string
   saldoInicial: string
+  dataSaldoInicial: string
   ativo: boolean
 }
 
-const EMPTY_FORM: ContaForm = { nome: '', tipo: 'CORRENTE', banco: '', agencia: '', conta: '', saldoInicial: '', ativo: true }
+const EMPTY_FORM: ContaForm = { nome: '', tipo: 'CORRENTE', banco: '', agencia: '', conta: '', saldoInicial: '', dataSaldoInicial: '', ativo: true }
 
 export function ContasBancariasPage() {
   const [modal, setModal] = useState(false)
@@ -45,7 +46,7 @@ export function ContasBancariasPage() {
     setForm({
       nome: c.nome, tipo: c.tipo, banco: c.banco ?? '',
       agencia: c.agencia ?? '', conta: c.conta ?? '',
-      saldoInicial: maskMoeda(Number(c.saldoInicial ?? 0)), ativo: c.ativo,
+      saldoInicial: maskMoeda(Number(c.saldoInicial ?? 0)), dataSaldoInicial: c.dataSaldoInicial ?? '', ativo: c.ativo,
     })
     setEditId(c.id); setErro(''); setModal(true)
   }
@@ -61,7 +62,7 @@ export function ContasBancariasPage() {
       saldoInicial: form.saldoInicial ? parseFloat(form.saldoInicial.replace(/[R$\s.]/g, '').replace(',', '.')) : 0,
       ativo: form.ativo,
     }
-    if (editId) update.mutate({ id: editId, ...payload })
+    if (editId) update.mutate({ id: editId, ...payload, dataSaldoInicial: form.dataSaldoInicial || null })
     else create.mutate(payload)
   }
 
@@ -200,12 +201,21 @@ export function ContasBancariasPage() {
           </FormRow>
         )}
 
-        <InputMoeda
-          label="Saldo Inicial (saldo atual na conta)"
-          value={form.saldoInicial}
-          onChange={v => setForm({ ...form, saldoInicial: v })}
-          hint="Informe o saldo atual da conta. Lançamentos importados ajustarão o saldo."
-        />
+        <FormRow>
+          <InputMoeda
+            label="Saldo inicial"
+            value={form.saldoInicial}
+            onChange={v => setForm({ ...form, saldoInicial: v })}
+            hint="Saldo do extrato na data ao lado (não o saldo de hoje)."
+          />
+          <Input
+            label="Data do saldo inicial"
+            type="date"
+            value={form.dataSaldoInicial}
+            onChange={e => setForm({ ...form, dataSaldoInicial: e.target.value })}
+            hint="Lançamentos anteriores a esta data não entram no saldo."
+          />
+        </FormRow>
       </Modal>
     </PageWrapper>
   )

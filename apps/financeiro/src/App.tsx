@@ -14,6 +14,7 @@ import { PessoaDetailPage } from './pages/pessoas/PessoaDetailPage'
 import { ConfiguracoesPage } from './pages/config/ConfiguracoesPage'
 import { PropostasPage } from './pages/PropostasPage'
 import { ExtratoPage } from './pages/ExtratoPage'
+import { ConciliacaoPage } from './pages/ConciliacaoPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
 import { ProjetosPage } from './pages/projetos/ProjetosPage'
 import { ProjetoDetailPage } from './pages/projetos/ProjetoDetailPage'
@@ -167,6 +168,7 @@ export default function App() {
               <Route path="/configuracoes/*" element={<ConfiguracoesPage />} />
               <Route path="/propostas" element={<PropostasPage />} />
               <Route path="/extrato" element={<ExtratoPage />} />
+              <Route path="/conciliacao" element={<ConciliacaoPage />} />
               <Route path="/relatorios" element={<RelatoriosPage />} />
               <Route path="/projetos" element={<ProjetosPage />} />
               <Route path="/projetos/:id" element={<ProjetoDetailPage />} />
