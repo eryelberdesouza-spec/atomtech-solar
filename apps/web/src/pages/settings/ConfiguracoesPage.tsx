@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { trpc } from '../../lib/trpc'
-import { Btn, Input, Select, Toggle, Card, Spinner, C } from '../../components/ui'
+import { Btn, Input, Select, Toggle, Card, Spinner, C, TextareaNegrito } from '../../components/ui'
 import { AbaBlocos } from './AbaBlocos'
 import { AbaChecklistOs } from './AbaChecklistOs'
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
@@ -629,9 +629,9 @@ function AbaTextos() {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <p style={{ color: C.textMuted, fontSize: 11, margin: 0 }}>
-          Suporta markdown básico: **negrito**, _itálico_, listas com -
+          Use **negrito** (botão B ou Ctrl+B) e listas com -
         </p>
-        <textarea
+        <TextareaNegrito wrapperStyle={{ flex: 1, minHeight: 0 }}
           value={getTexto(chaveAtiva)}
           onChange={e => setConteudo(c => ({ ...c, [chaveAtiva]: e.target.value }))}
           style={{
@@ -752,7 +752,7 @@ function AbaModelos() {
             <Input label="Título do modelo" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ex: Garantia Padrão 12 Meses" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Conteúdo</label>
-              <textarea
+              <TextareaNegrito
                 value={form.conteudo}
                 onChange={e => setForm(f => ({ ...f, conteudo: e.target.value }))}
                 rows={7}

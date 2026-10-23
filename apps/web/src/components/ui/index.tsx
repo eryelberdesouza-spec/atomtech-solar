@@ -1,4 +1,5 @@
-import type { ReactNode, CSSProperties, InputHTMLAttributes, SelectHTMLAttributes } from 'react'
+import { useRef } from 'react'
+import type { ReactNode, CSSProperties, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 export const C = {
   solar:      '#F5A623',
@@ -113,6 +114,82 @@ export function Input({ label, error, suffix, style, ...props }: InputProps) {
         {suffix && <span style={{ color: C.textDim, fontSize: 12 }}>{suffix}</span>}
       </div>
       {error && <span style={{ color: C.danger, fontSize: 11 }}>{error}</span>}
+    </div>
+  )
+}
+
+// ─── TEXTAREA COM NEGRITO ─────────────────────────────────────────────────────
+// Caixa de texto que vira PDF: botão B e Ctrl+B envolvem a seleção em **…**
+// (o marcador que os geradores de PDF convertem em <strong>). Substitui um
+// <textarea> sem mudar a chamada — o onChange recebe o evento normal.
+interface TextareaNegritoProps extends TextareaHTMLAttributes<HTMLTextAreaElement> { wrapperStyle?: CSSProperties }
+
+// Troca o trecho [ini, fim) por `texto` mantendo o desfazer (Ctrl+Z) do navegador
+function substituirTrecho(el: HTMLTextAreaElement, ini: number, fim: number, texto: string, selIni: number, selFim: number) {
+  el.focus()
+  el.setSelectionRange(ini, fim)
+  let ok = false
+  try { ok = document.execCommand('insertText', false, texto) } catch { ok = false }
+  if (!ok) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+    setter?.call(el, el.value.slice(0, ini) + texto + el.value.slice(fim))
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  el.setSelectionRange(selIni, selFim)
+}
+
+function alternarNegrito(el: HTMLTextAreaElement) {
+  const { value } = el
+  const s = el.selectionStart, e = el.selectionEnd
+  const sel = value.slice(s, e)
+  // Já em negrito (asteriscos por fora ou dentro da seleção) → remove
+  if (s >= 2 && value.slice(s - 2, s) === '**' && value.slice(e, e + 2) === '**') {
+    return substituirTrecho(el, s - 2, e + 2, sel, s - 2, e - 2)
+  }
+  if (sel.length >= 4 && sel.startsWith('**') && sel.endsWith('**')) {
+    return substituirTrecho(el, s, e, sel.slice(2, -2), s, e - 4)
+  }
+  // Sem seleção → **|** com o cursor no meio
+  if (s === e) return substituirTrecho(el, s, e, '****', s + 2, s + 2)
+  // Negrito não atravessa quebra de linha no PDF: cada linha é envolvida à
+  // parte, sem incluir o "- " da lista nem espaços das pontas
+  const novo = sel.split('\n').map(linha => {
+    const m = linha.match(/^(\s*(?:[-•]\s+)?)(.*?)(\s*)$/)
+    return m && m[2] ? `${m[1]}**${m[2]}**${m[3]}` : linha
+  }).join('\n')
+  substituirTrecho(el, s, e, novo, s, s + novo.length)
+}
+
+export function TextareaNegrito({ wrapperStyle, onKeyDown, ...props }: TextareaNegritoProps) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...wrapperStyle }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          type="button"
+          title="Negrito (Ctrl+B)"
+          // mousedown sem foco: clicar no botão não pode desfazer a seleção do texto
+          onMouseDown={e => { e.preventDefault(); if (ref.current) alternarNegrito(ref.current) }}
+          style={{
+            width: 26, height: 22, borderRadius: 5, border: '1px solid ' + C.darkBorder,
+            background: 'transparent', color: C.text, fontWeight: 800, fontSize: 12,
+            fontFamily: 'Georgia, serif', cursor: 'pointer', lineHeight: 1,
+          }}
+        >B</button>
+        <span style={{ color: C.textDim, fontSize: 10 }}>Selecione o texto e clique em B ou use Ctrl+B</span>
+      </div>
+      <textarea
+        ref={ref}
+        {...props}
+        onKeyDown={e => {
+          if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'b') {
+            e.preventDefault()
+            alternarNegrito(e.currentTarget)
+            return
+          }
+          onKeyDown?.(e)
+        }}
+      />
     </div>
   )
 }

@@ -8,7 +8,7 @@ import {
 } from '../../lib/utils'
 import {
   Btn, Badge, Card, Tabs, Spinner, Toggle,
-  EmptyState, PageWrapper, C, Input, Select,
+  EmptyState, PageWrapper, C, Input, Select, TextareaNegrito,
 } from '../../components/ui'
 import { abrirPdfNoNavegador, gerarHTML } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador, gerarHtmlServico } from '../../lib/gerarPdfServicoBrowser'
@@ -1487,7 +1487,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                         <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           ✍️ Itens específicos desta proposta
                         </p>
-                        <textarea
+                        <TextareaNegrito
                           value={textoEditando}
                           onChange={e => setTextoEditando(e.target.value)}
                           rows={6}
@@ -1561,7 +1561,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                         <p style={{ color: C.textDim, fontSize: 11, fontWeight: 600, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                           ✍️ Adições manuais / editar conteúdo
                         </p>
-                        <textarea
+                        <TextareaNegrito
                           value={textoEditando}
                           onChange={e => setTextoEditando(e.target.value)}
                           rows={6}
@@ -1670,7 +1670,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                           <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
                             Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas e <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para destaque.
                           </p>
-                          <textarea
+                          <TextareaNegrito
                             value={textoEditando}
                             onChange={e => setTextoEditando(e.target.value)}
                             rows={8}
@@ -1692,7 +1692,7 @@ function TabBlocos({ blocos, propostaId, textos }: any) {
                       <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
                         Use <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- Item</code> para listas e <code style={{ background: C.darkBorder, padding: '1px 4px', borderRadius: 3 }}>- **Título:** texto</code> para destaque. Deixe vazio para usar o padrão.
                       </p>
-                      <textarea
+                      <TextareaNegrito
                         value={textoEditando}
                         onChange={e => setTextoEditando(e.target.value)}
                         rows={8}
