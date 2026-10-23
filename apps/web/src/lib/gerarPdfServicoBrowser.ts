@@ -42,7 +42,8 @@ function renderListaNumerada(txt: string, cor1: string): string {
   const linhas = txt.split('\n').map(l => l.trim()).filter(Boolean)
   let idx = 0
   return linhas.map(linha => {
-    const linhaStrip = linha.replace(/^[-•*]\s*/, '')
+    // "*" solto é marcador de lista; "**" no início é abertura de negrito
+    const linhaStrip = linha.replace(/^(?:[-•]|\*(?!\*))\s*/, '')
     // Subtítulo: linha "**Título**" exata OU linha toda em MAIÚSCULAS — mesmo
     // com asteriscos desbalanceados digitados (ex.: "*EXCLUSÕES**"), que o
     // conversor de negrito não consome. Os asteriscos são limpos.

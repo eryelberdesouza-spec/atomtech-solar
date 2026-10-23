@@ -623,7 +623,8 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
     const linhas = txt.split('\n').map((l: string) => l.trim()).filter(Boolean)
     let itemIdx = 0
     const itensHtml = linhas.map((linha: string) => {
-      const linhaStrip = linha.replace(/^[-*•]\s*/, '')
+      // "*" solto é marcador de lista; "**" no início é abertura de negrito
+      const linhaStrip = linha.replace(/^(?:[-•]|\*(?!\*))\s*/, '')
       // Subtítulo: linha "**Título**" exata OU linha toda em MAIÚSCULAS —
       // mesmo com asteriscos desbalanceados digitados (ex.: "*EXCLUSÕES**"),
       // que o conversor de negrito não consome. Os asteriscos são limpos.
@@ -636,7 +637,7 @@ export function gerarHTML(data: any, opts: { autoPrint?: boolean; serverSide?: b
       }
       // "-" ou "*" SEM letra-ponto logo após → item numerado
       // "- a. texto", "- b. texto" etc. → texto corrido (preserva o "a.", "b.")
-      const ehItem = /^[-*•]/.test(linha) && !/^[-*•]\s*[a-zA-Z]\.\s/.test(linha)
+      const ehItem = /^(?:[-•]|\*(?!\*))/.test(linha) && !/^[-*•]\s*[a-zA-Z]\.\s/.test(linha)
       const texto = linhaStrip.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       if (ehItem) {
         itemIdx++
