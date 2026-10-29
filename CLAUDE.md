@@ -54,6 +54,8 @@ stateless, só gera o `.pptx` e devolve.
   Variáveis do `apps/api`: `RELATORIO_ENERGIA_URL`, `INTERNAL_SHARED_SECRET` (mesmo valor),
   `RELATORIO_ENERGIA_RESPONSAVEL_TECNICO`, `RELATORIO_ENERGIA_LOCAL_EMISSAO`.
 
+- **Mês com injeção zero (2026-10-29, Ana Claudia 08/2026)**: erro `could not convert string to float: 'None'`. O GDASH dizia "Injetado 0 kWh" (geração toda autoconsumida); o código fazia `gdash.injetada or fatura.injetada`, o zero caía no `or`, e a fatura — **2ª via da Neoenergia, sem as notas "Energia injetada no mes" / "Saldo para o proximo ciclo"** — não tinha o valor. Agora `resolver_injecao_saldo()` (`gerar_relatorio.py`) usa `is None`, o saldo vem da fatura ou da coluna "Saldo (kWh)" do GDASH (campo novo `saldo_kwh` no prompt de visão), e `fmt_*` devolvem "—" para campo ausente em vez de quebrar. Commit `6a0fa7e`. **Deploy pendente**: a CLI da Railway estava deslogada neste PC (precisa `railway login`), e este PC **não tem Python** — a correção não foi rodada localmente. Para testar dá para tirar a imagem do PDF do GDASH com `pdf-lib` + `sharp` (é um bitmap RGB cru 1536×5064, sem filtro).
+
 **Cadastro do cliente e histórico (desde 2026-08-02)**: não existe mais `clientes.json`.
 O seletor de cliente na tela usa o cadastro real do AGO (`trpc.cliente.list`); dados
 técnicos específicos do relatório (potência kWp, quebra do nome na capa) ficam na tabela
