@@ -24,7 +24,7 @@ from extract_conta import extrair_conta_neoenergia  # noqa: E402
 from extract_gdash import extrair_gdash  # noqa: E402
 from generate_narrative import gerar_narrativa  # noqa: E402
 from fill_template import fill, TEMPLATE_PATH  # noqa: E402
-from gerar_relatorio import montar_dados, pdf_para_texto, resolver_injecao_saldo  # noqa: E402
+from gerar_relatorio import montar_dados, pdf_para_texto, resolver_compensado, resolver_injecao_saldo  # noqa: E402
 
 INTERNAL_SHARED_SECRET = os.environ.get("INTERNAL_SHARED_SECRET")
 
@@ -91,6 +91,7 @@ async def gerar(
                 "consumo_faturado_kwh": conta["consumo_faturado_kwh"],
                 "energia_injetada_kwh": injetado,
                 "saldo_proximo_ciclo_kwh": saldo,
+                "energia_compensada_kwh": resolver_compensado(conta, gdash_dados),
                 "total_a_pagar": conta["total_a_pagar"],
                 "vencimento": conta["vencimento"],
                 "ciclo_leitura": conta["ciclo_leitura"],

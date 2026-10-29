@@ -34,6 +34,10 @@ def extrair_conta_neoenergia(texto: str) -> dict:
     inj_m = re.search(r'Energia injetada no mes\s*([\d.,]+)\s*kWh', texto, re.IGNORECASE)
     d['energia_injetada_kwh'] = inj_m.group(1) if inj_m else None
 
+    # Energia compensada (créditos abatidos do consumo) -- nota "ajuste na(s) função(ões) CAT de - 279 kWh"
+    cat_m = re.search(r'CAT de\s*-?\s*([\d.,]+)\s*kWh', texto, re.IGNORECASE)
+    d['energia_compensada_kwh'] = cat_m.group(1) if cat_m else None
+
     saldo_m = re.search(r'Saldo para o proximo ciclo\s*([\d.,]+)\s*kWh', texto, re.IGNORECASE)
     d['saldo_proximo_ciclo_kwh'] = saldo_m.group(1) if saldo_m else None
 

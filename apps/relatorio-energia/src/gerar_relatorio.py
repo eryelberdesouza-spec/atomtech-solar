@@ -58,6 +58,19 @@ def resolver_injecao_saldo(conta: dict, gdash: dict):
     return injetado, saldo
 
 
+def resolver_compensado(conta: dict, gdash: dict):
+    """Energia compensada (kWh): créditos abatidos do consumo no ciclo.
+
+    Não é a energia injetada — mês com injeção 0 pode compensar créditos
+    anteriores (Ana Claudia 08/2026: injetado 0, compensado 279). GDASH primeiro,
+    nota "ajuste ... CAT de - N kWh" da fatura como reserva.
+    """
+    compensado = gdash.get("compensado_kwh")
+    if compensado is None:
+        compensado = num_br(conta.get("energia_compensada_kwh"))
+    return compensado
+
+
 def fmt_kwh(x):
     if x is None:
         return SEM_DADO
@@ -93,6 +106,7 @@ def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
     """Junta conta + GDASH + contrato e calcula os campos derivados (sem IA)."""
     geracao = gdash["geracao_kwh"]
     injetado, saldo = resolver_injecao_saldo(conta, gdash)
+    compensado = resolver_compensado(conta, gdash)
     autoconsumo = geracao - injetado if geracao is not None and injetado is not None else None
 
     hist = gdash["historico_meses"]
@@ -125,6 +139,8 @@ def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
         # fatura
         "CONSUMO_MEDIDO_KWH": fmt_kwh(conta["consumo_medido_kwh"]),
         "ENERGIA_INJETADA_KWH": fmt_kwh(injetado),
+        # abatida do consumo, por isso o sinal; zero e ausente saem sem sinal
+        "ENERGIA_COMPENSADA_KWH": ("-" if compensado else "") + fmt_kwh(compensado),
         "CONSUMO_FATURADO_KWH": fmt_kwh(num_br(conta.get("consumo_faturado_kwh"))),
         "SALDO_PROXIMO_CICLO_KWH": fmt_kwh(saldo),
         "TOTAL_A_PAGAR_R$": "R$ " + conta["total_a_pagar"] if conta.get("total_a_pagar") else SEM_DADO,

@@ -28,6 +28,7 @@ formato (use ponto como separador decimal nos números, sem milhar):
   "faturado_r$": 7949.70,
   "energia_injetada_kwh": 1113,
   "saldo_kwh": 2450,
+  "compensado_kwh": 1113,
   "consumo_total_kwh": 9482.9,
   "historico_meses": [
     {"mes": "Abr/2026", "geracao_kwh": 1427.4, "desempenho_pct": 37.0, "economia_r$": 1555.89},
@@ -39,8 +40,8 @@ formato (use ponto como separador decimal nos números, sem milhar):
 Regras importantes:
 - "historico_meses" deve conter o mês anterior, o mês do relatório e o mês seguinte
   (se o mês seguinte ainda não tiver dado no gráfico, use 0 para geração/desempenho/economia).
-- "energia_injetada_kwh" é o card "Injetado"; "saldo_kwh" é a coluna "Saldo (kWh)" da tabela
-  da unidade geradora. Quando a imagem mostra 0, devolva 0 — zero é um valor, não ausência.
+- "energia_injetada_kwh" é o card "Injetado"; "saldo_kwh" e "compensado_kwh" são as colunas
+  "Saldo (kWh)" e "Compensado (kWh)" da tabela da unidade geradora. Quando a imagem mostra 0, devolva 0 — zero é um valor, não ausência.
 - Se algum campo não existir na imagem, use null.
 - Não invente números. Leia exatamente o que está na imagem (cards, tabela "Meses anteriores").
 """
