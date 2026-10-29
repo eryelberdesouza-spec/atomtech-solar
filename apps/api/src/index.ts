@@ -2238,6 +2238,60 @@ app.get('/run-migration-os-notificacao', async (_, res) => {
   }
 })
 
+// ── Migração: responsável da proposta + log do alerta de vencimento ─────────
+// Responsável é quem conduz a proposta junto ao cliente e recebe o WhatsApp na
+// véspera e no dia do vencimento. Coluna separada de usuario_id/created_by
+// (que continuam sendo "quem criou"): o responsável pode ser trocado depois.
+// Propostas existentes herdam quem criou (decisão do usuário em 2026-10-29).
+app.get('/run-migration-proposta-responsavel', async (_, res) => {
+  try {
+    const mysql2 = await import('mysql2/promise')
+    const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
+    const criadas: string[] = []
+
+    const [cols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'proposta' AND COLUMN_NAME = 'responsavel_id'`,
+    )
+    if (!cols.length) {
+      await conn.execute(`ALTER TABLE proposta ADD COLUMN responsavel_id INT NULL AFTER usuario_id`)
+      await conn.execute(`CREATE INDEX idx_proposta_responsavel ON proposta (responsavel_id)`)
+      criadas.push('proposta.responsavel_id')
+    }
+
+    const [r]: any = await conn.execute(
+      `UPDATE proposta SET responsavel_id = COALESCE(usuario_id, created_by) WHERE responsavel_id IS NULL`,
+    )
+
+    // Uma linha por (proposta, data de validade, véspera/dia): a UNIQUE é o que
+    // impede reenvio quando a rotina roda de novo ou o servidor reinicia.
+    // data_validade entra na chave para que prorrogar a proposta gere alertas
+    // novos para a nova data.
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS proposta_alerta_validade (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        empresa_id     INT NOT NULL,
+        proposta_id    INT NOT NULL,
+        data_validade  DATE NOT NULL,
+        tipo           ENUM('vespera','dia') NOT NULL,
+        responsavel_id INT NULL,
+        mensagem       TEXT NULL,
+        status         ENUM('enviada','falhou','sem_telefone','desativado') NOT NULL,
+        erro           TEXT NULL,
+        criado_em      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_prop_alerta (proposta_id, data_validade, tipo),
+        INDEX idx_prop_alerta_dt (criado_em)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `)
+    criadas.push('tabela proposta_alerta_validade (ou já existia)')
+
+    await conn.end()
+    res.json({ ok: true, criadas, responsavelPreenchidoComQuemCriou: r?.affectedRows ?? 0 })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ── Migração: cria tabela os_anexo ───────────────────────────────────────────
 app.get('/run-migration-os-anexo', async (_, res) => {
   try {
