@@ -31,7 +31,36 @@ from generate_narrative import gerar_narrativa
 from fill_template import fill, TEMPLATE_PATH
 
 
+SEM_DADO = "—"
+
+
+def num_br(s):
+    """'1.113,5' -> 1113.5; None continua None."""
+    if s is None:
+        return None
+    return float(str(s).replace(".", "").replace(",", "."))
+
+
+def resolver_injecao_saldo(conta: dict, gdash: dict):
+    """Energia injetada (kWh, número) e saldo para o próximo ciclo (kWh, número).
+
+    GDASH primeiro, fatura como reserva. Zero é valor válido — mês em que toda a
+    geração foi autoconsumida (caso real: Ana Claudia, 08/2026) — por isso a
+    checagem é `is None`, nunca `or`. A 2ª via da Neoenergia não traz as notas
+    "Energia injetada no mes" / "Saldo para o proximo ciclo"; aí só o GDASH tem.
+    """
+    injetado = gdash.get("energia_injetada_kwh")
+    if injetado is None:
+        injetado = num_br(conta.get("energia_injetada_kwh"))
+    saldo = num_br(conta.get("saldo_proximo_ciclo_kwh"))
+    if saldo is None:
+        saldo = gdash.get("saldo_kwh")
+    return injetado, saldo
+
+
 def fmt_kwh(x):
+    if x is None:
+        return SEM_DADO
     x = float(x)
     if x.is_integer():
         s = f"{int(x):,}".replace(",", ".")
@@ -41,10 +70,14 @@ def fmt_kwh(x):
 
 
 def fmt_money(x):
+    if x is None:
+        return SEM_DADO
     return "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def fmt_pct(x):
+    if x is None:
+        return SEM_DADO
     return f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".") + "%"
 
 
@@ -59,10 +92,8 @@ def pdf_para_texto(caminho_pdf: str) -> str:
 def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
     """Junta conta + GDASH + contrato e calcula os campos derivados (sem IA)."""
     geracao = gdash["geracao_kwh"]
-    injetado_gdash = gdash.get("energia_injetada_kwh") or float(
-        str(conta["energia_injetada_kwh"]).replace(".", "").replace(",", ".")
-    )
-    autoconsumo = geracao - injetado_gdash
+    injetado, saldo = resolver_injecao_saldo(conta, gdash)
+    autoconsumo = geracao - injetado if geracao is not None and injetado is not None else None
 
     hist = gdash["historico_meses"]
     mes_anterior, mes_atual, mes_seguinte = hist[0], hist[1], hist[2]
@@ -93,10 +124,10 @@ def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
         "ECONOMIA_MES_SEGUINTE_R$": fmt_money(mes_seguinte["economia_r$"]),
         # fatura
         "CONSUMO_MEDIDO_KWH": fmt_kwh(conta["consumo_medido_kwh"]),
-        "ENERGIA_INJETADA_KWH": fmt_kwh(injetado_gdash),
-        "CONSUMO_FATURADO_KWH": conta["consumo_faturado_kwh"] + " kWh",
-        "SALDO_PROXIMO_CICLO_KWH": conta["saldo_proximo_ciclo_kwh"] + " kWh",
-        "TOTAL_A_PAGAR_R$": "R$ " + conta["total_a_pagar"],
+        "ENERGIA_INJETADA_KWH": fmt_kwh(injetado),
+        "CONSUMO_FATURADO_KWH": fmt_kwh(num_br(conta.get("consumo_faturado_kwh"))),
+        "SALDO_PROXIMO_CICLO_KWH": fmt_kwh(saldo),
+        "TOTAL_A_PAGAR_R$": "R$ " + conta["total_a_pagar"] if conta.get("total_a_pagar") else SEM_DADO,
         # emissão
         "LOCAL_EMISSAO": cliente["LOCAL_EMISSAO"],
     }

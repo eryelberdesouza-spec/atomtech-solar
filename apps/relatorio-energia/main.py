@@ -24,7 +24,7 @@ from extract_conta import extrair_conta_neoenergia  # noqa: E402
 from extract_gdash import extrair_gdash  # noqa: E402
 from generate_narrative import gerar_narrativa  # noqa: E402
 from fill_template import fill, TEMPLATE_PATH  # noqa: E402
-from gerar_relatorio import montar_dados, pdf_para_texto  # noqa: E402
+from gerar_relatorio import montar_dados, pdf_para_texto, resolver_injecao_saldo  # noqa: E402
 
 INTERNAL_SHARED_SECRET = os.environ.get("INTERNAL_SHARED_SECRET")
 
@@ -79,6 +79,7 @@ async def gerar(
 
             dados = montar_dados(cliente_dados, conta, gdash_dados)
             dados["DATA_EMISSAO"] = date.today().strftime("%d/%m/%Y")
+            injetado, saldo = resolver_injecao_saldo(conta, gdash_dados)
 
             contexto_narrativa = {
                 "cliente": cliente_dados["CLIENTE_NOME"],
@@ -88,8 +89,8 @@ async def gerar(
                 "economia_r$": gdash_dados["economia_r$"],
                 "consumo_medido_kwh": conta["consumo_medido_kwh"],
                 "consumo_faturado_kwh": conta["consumo_faturado_kwh"],
-                "energia_injetada_kwh": conta["energia_injetada_kwh"],
-                "saldo_proximo_ciclo_kwh": conta["saldo_proximo_ciclo_kwh"],
+                "energia_injetada_kwh": injetado,
+                "saldo_proximo_ciclo_kwh": saldo,
                 "total_a_pagar": conta["total_a_pagar"],
                 "vencimento": conta["vencimento"],
                 "ciclo_leitura": conta["ciclo_leitura"],
