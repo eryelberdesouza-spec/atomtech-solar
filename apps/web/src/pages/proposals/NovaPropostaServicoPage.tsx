@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ResponsavelPropostaSelect } from '../../components/ResponsavelPropostaSelect'
 import { trpc } from '../../lib/trpc'
 import { formatCurrency } from '../../lib/utils'
 import { Btn, Input, Card, Spinner, C, PageWrapper } from '../../components/ui'
@@ -93,6 +94,7 @@ export function NovaPropostaServicoPage() {
   // Pré-seleciona o cliente quando aberto a partir da página do cliente (?clienteId=N)
   const [clienteId, setClienteId]           = useState(new URLSearchParams(window.location.search).get('clienteId') ?? '')
   const [tituloServico, setTituloServico]   = useState('')
+  const [responsavelId, setResponsavelId]   = useState<number | null>(null)
   const [dataEmissao, setDataEmissao]       = useState(hoje)
   const [dataValidade, setDataValidade]     = useState(validade)
   const [observacoes, setObservacoes]       = useState('')
@@ -138,12 +140,14 @@ export function NovaPropostaServicoPage() {
     setErro('')
     if (!clienteId)        return setErro('Selecione o cliente')
     if (!tituloServico.trim()) return setErro('Informe o título do serviço')
+    if (!responsavelId)    return setErro('Selecione o responsável pela proposta')
     const itensValidos = itens.filter(i => i.descricao.trim() && parseFloat(i.quantidade) > 0 && parseFloat(i.valorUnitario) >= 0)
     if (itensValidos.length === 0) return setErro('Adicione ao menos um item com descrição e quantidade')
 
     criar.mutate({
       clienteId: parseInt(clienteId),
       tituloServico: tituloServico.trim(),
+      responsavelId,
       dataEmissao,
       dataValidade: dataValidade || undefined,
       observacoesInternas: observacoes || undefined,
@@ -191,6 +195,13 @@ export function NovaPropostaServicoPage() {
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
+
+            <ResponsavelPropostaSelect
+              value={responsavelId}
+              onChange={setResponsavelId}
+              labelStyle={{ display: 'block', color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}
+              selectStyle={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+            />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>

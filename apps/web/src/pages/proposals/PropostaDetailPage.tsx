@@ -10,6 +10,7 @@ import {
   Btn, Badge, Card, Tabs, Spinner, Toggle,
   EmptyState, PageWrapper, C, Input, Select, TextareaNegrito,
 } from '../../components/ui'
+import { ResponsavelPropostaSelect } from '../../components/ResponsavelPropostaSelect'
 import { abrirPdfNoNavegador, gerarHTML } from '../../lib/gerarPdfBrowser'
 import { abrirPdfServicoNoNavegador, gerarHtmlServico } from '../../lib/gerarPdfServicoBrowser'
 import { baixarPdfDoServidor, baixarContratoDoServidor, enviarContratoParaAssinatura } from '../../lib/baixarPdfServidor'
@@ -1882,6 +1883,7 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
     dataValidade:        String(proposta.dataValidade ?? '').slice(0, 10),
     tituloServico:       proposta.tituloServico ?? '',
     observacoesInternas: proposta.observacoesInternas ?? '',
+    responsavelId:       (proposta.responsavelId ?? null) as number | null,
   })
 
   const inpSt: React.CSSProperties = {
@@ -1898,11 +1900,13 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
 
   const handleSalvar = () => {
     if (!form.dataEmissao) { alert('Informe a data de emissão'); return }
+    if (!form.responsavelId) { alert('Selecione o responsável pela proposta'); return }
     onSalvar({
       dataEmissao:         form.dataEmissao,
       dataValidade:        form.dataValidade || null,
       tituloServico:       form.tituloServico || null,
       observacoesInternas: form.observacoesInternas || null,
+      responsavelId:       form.responsavelId,
     })
   }
 
@@ -1911,6 +1915,14 @@ function ModalEditarDados({ proposta, isServico, isLoading, onClose, onSalvar }:
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: '#131F30', border: '1px solid #1E3050', borderRadius: 14, padding: 28, width: 480, maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <h3 style={{ color: '#E2EAF5', fontSize: 16, fontWeight: 700, margin: 0 }}>✏ Editar Dados da Proposta</h3>
+
+        <ResponsavelPropostaSelect
+          value={form.responsavelId}
+          onChange={id => setForm(f => ({ ...f, responsavelId: id }))}
+          labelStyle={lblSt}
+          selectStyle={inpSt}
+          preencherComLogado={false}
+        />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div>
@@ -2061,6 +2073,8 @@ function PropostaDetailPageInner() {
     onSuccess: () => { setShowEditDados(false); utils.proposta.byId.invalidate({ id: propostaId }) },
     onError: (e: any) => alert('Erro ao salvar: ' + (e?.message ?? 'Tente novamente')),
   })
+
+  const { data: usuariosLista } = trpc.usuario.list.useQuery()
 
   const updateClienteMutation = (trpc as any).proposta.updateCliente.useMutation({
     onSuccess: () => { setShowAltCliente(false); utils.proposta.byId.invalidate({ id: propostaId }); (utils as any).cliente.byId.invalidate() },
@@ -2250,6 +2264,7 @@ function PropostaDetailPageInner() {
 
   const { proposta, dimensionamento, equipamentos, precificacao, analiseFinanceira, condicoesComerciais, blocos, itensServico } = data as any
   const isServico = proposta.tipoProposta === 'servico_geral'
+  const responsavelNome = (usuariosLista ?? []).find((u: any) => u.id === proposta.responsavelId)?.nome
   const tab    = isServico ? tabServico : tabSolar
   const setTab = isServico ? setTabServico : setTabSolar
   const TABS   = isServico ? TABS_SERVICO : TABS_SOLAR
@@ -2322,6 +2337,7 @@ function PropostaDetailPageInner() {
               {!isMobile && (
                 <span style={{ color: C.textDim, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
                   Emissão: {formatDate(proposta.dataEmissao)}{proposta.dataValidade && ` · Validade: ${formatDate(proposta.dataValidade)}`}
+                  {responsavelNome && ` · Responsável: ${responsavelNome}`}
                 </span>
               )}
             </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ResponsavelPropostaSelect } from '../../components/ResponsavelPropostaSelect'
 import { trpc } from '../../lib/trpc'
 import { formatCurrency } from '../../lib/utils'
 import { Btn, Input, Select, Card, Spinner, C, PageWrapper } from '../../components/ui'
@@ -166,7 +167,7 @@ const MARCOES_PADRAO = [
 const MARCO_VAZIO = { descricao: '', percentual: 0, prazoDias: 2, tipoPrazo: 'uteis' as const }
 
 const FORM_INICIAL = {
-  clienteId: '', dataEmissao: hoje, dataValidade: validade,
+  clienteId: '', dataEmissao: hoje, dataValidade: validade, responsavelId: null as number | null,
   modoCalculo: 'kwh', potenciaKwpManual: 0, consumoMensalKwh: 0,
   sobredimensionamento: 50, topologia: 'microinversor', tipoSistema: 'on_grid', tipoTelhado: 'ceramico',
   desvioAzimutal: 0, inclinacaoGraus: 20,
@@ -222,9 +223,9 @@ export function NovaPropostaPage() {
   const propostasExistentes = (propostasCliente?.data ?? []).filter((p: any) => !p.isTemplate)
 
   const handleCreate = () => {
-    if (!form.clienteId || form.custoKitFotovoltaico <= 0 || !pagamentoValido) return
+    if (!form.clienteId || !form.responsavelId || form.custoKitFotovoltaico <= 0 || !pagamentoValido) return
     createMutation.mutate({
-      clienteId: Number(form.clienteId),
+      clienteId: Number(form.clienteId), responsavelId: form.responsavelId,
       consumoMedioMensalKwh: form.modoCalculo === 'kwh' ? form.consumoMensalKwh : undefined,
       potenciaFinalKwpManual: form.modoCalculo === 'kwp' ? form.potenciaKwpManual : undefined,
       topologia: form.topologia, tipoTelhado: form.tipoTelhado,
@@ -536,6 +537,14 @@ export function NovaPropostaPage() {
             </div>
 
             <div>
+              <div style={{ marginBottom: 12 }}>
+                <ResponsavelPropostaSelect
+                  value={form.responsavelId}
+                  onChange={id => set('responsavelId', id)}
+                  labelStyle={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}
+                  selectStyle={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Título da Proposta</label>
               <input value={form.titulo} onChange={(e: any) => set('titulo', e.target.value)} placeholder="Opcional — ex: Sistema 12 kWp — Casa de Praia (aparece na listagem)" style={{ width: '100%', padding: '10px 14px', borderRadius: 9, background: C.dark, border: `1px solid ${C.darkBorder}`, color: C.text, fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
               <label style={{ color: C.textDim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', display: 'block', marginBottom: 6 }}>Observações</label>
@@ -578,7 +587,7 @@ export function NovaPropostaPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
               <Btn variant="ghost" onClick={() => setStep(2)}>← Voltar</Btn>
-              <Btn onClick={handleCreate} disabled={form.custoKitFotovoltaico <= 0 || !pagamentoValido || createMutation.isLoading}>{createMutation.isLoading ? '⏳ Criando...' : '✓ Criar Proposta'}</Btn>
+              <Btn onClick={handleCreate} disabled={!form.responsavelId || form.custoKitFotovoltaico <= 0 || !pagamentoValido || createMutation.isLoading}>{createMutation.isLoading ? '⏳ Criando...' : '✓ Criar Proposta'}</Btn>
             </div>
           </div>
         )}

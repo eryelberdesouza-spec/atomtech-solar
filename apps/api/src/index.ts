@@ -13,6 +13,7 @@ import { previsualizarArquivo, gerarRelatoriosPorCliente } from './services/moov
 import { notificarOsAgrupado } from './services/osNotificacao'
 import { hojeISO, agoraBR } from './lib/datas'
 import { iniciarMonitorWhatsapp } from './services/monitorWhatsapp'
+import { iniciarAlertaValidadeProposta } from './services/propostaAlertaValidade'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
@@ -2909,6 +2910,7 @@ async function main() {
     console.log(`\n🚀 Atom Tech API → http://localhost:${PORT}`)
     console.log(`   tRPC: http://localhost:${PORT}/trpc\n`)
     iniciarMonitorWhatsapp()
+    iniciarAlertaValidadeProposta()
   })
 }
 

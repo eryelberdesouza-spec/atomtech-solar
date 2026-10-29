@@ -265,6 +265,10 @@ export const proposta = mysqlTable('proposta', {
   clienteId: int('cliente_id').notNull().references(() => cliente.id),
   faturaId: int('fatura_id').references(() => fatura.id),
   usuarioId: int('usuario_id').references(() => usuario.id),
+  // Quem conduz a proposta junto ao cliente — recebe o WhatsApp na véspera e
+  // no dia do vencimento (services/propostaAlertaValidade.ts). Obrigatório na
+  // criação; antigas herdaram quem criou. Migração /run-migration-proposta-responsavel.
+  responsavelId: int('responsavel_id').references(() => usuario.id),
   status: mysqlEnum('status', ['rascunho','enviada','aceita','recusada','expirada','cancelada']).default('rascunho').notNull(),
   versao: int('versao').default(1).notNull(),
   propostaPaiId: int('proposta_pai_id'),

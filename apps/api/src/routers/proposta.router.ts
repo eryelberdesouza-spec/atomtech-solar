@@ -27,6 +27,7 @@ import {
   cliente,
   empresa,
   historicoConsumo,
+  usuario,
 } from '../db/schema'
 import { calcularDimensionamento, calcularIrradiacaoMensal, getTaxaDesempenho, getAreaFatorTelhado } from '../engines/sizing.engine'
 import { calcularFinanceiro } from '../engines/financial.engine'
@@ -99,6 +100,15 @@ const DESC_INSTALACAO_INVERSOR = 'Instalação do Inversor'
 const DESC_PROJETO             = 'Projeto de Engenharia'
 
 const DESCRICOES_ADICIONAIS = [DESC_INSTALACAO_MODULOS, DESC_INSTALACAO_INVERSOR, DESC_PROJETO]
+
+// Responsável recebe o alerta de vencimento por WhatsApp — tem que ser
+// usuário ativo da mesma empresa, senão o alerta não tem para quem ir.
+async function validarResponsavel(db: any, empresaId: number, responsavelId: number) {
+  const [u] = await db.select({ id: usuario.id }).from(usuario)
+    .where(and(eq(usuario.id, responsavelId), eq(usuario.empresaId, empresaId), eq(usuario.ativo, true)))
+    .limit(1)
+  if (!u) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Responsável pela proposta inválido ou inativo' })
+}
 
 // mysql2 devolve colunas DATE como objeto Date, não string (mesmo com drizzle
 // date() sem mode explícito) — String(dateObj).slice(0,10) vira lixo tipo
@@ -532,6 +542,7 @@ export const propostaRouter = router({
       z.object({
         clienteId: z.number().int().positive(),
         faturaId: z.number().int().positive().optional(),
+        responsavelId: z.number().int().positive({ message: 'Informe o responsável pela proposta' }),
         dataEmissao: z.string(),
         dataValidade: z.string().optional(),
         topologia: z.enum(['tradicional', 'microinversor', 'otimizador']).default('microinversor'),
@@ -577,6 +588,7 @@ export const propostaRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { empresaId, id: usuarioId } = ctx.usuario
+      await validarResponsavel(ctx.db, empresaId, input.responsavelId)
 
       const [cli] = await ctx.db
         .select()
@@ -689,7 +701,7 @@ export const propostaRouter = router({
         empresaId, numero,
         clienteId: input.clienteId,
         faturaId: input.faturaId,
-        usuarioId, status: 'rascunho', versao: 1,
+        usuarioId, responsavelId: input.responsavelId, status: 'rascunho', versao: 1,
         modeloProposta: input.modeloProposta,
         dataEmissao: input.dataEmissao,
         dataValidade: input.dataValidade,
@@ -1440,9 +1452,11 @@ export const propostaRouter = router({
       dataValidade:         z.string().optional().nullable(),
       tituloServico:        z.string().optional().nullable(),
       observacoesInternas:  z.string().optional().nullable(),
+      responsavelId:        z.number().int().positive().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { empresaId } = ctx.usuario
+      if (input.responsavelId !== undefined) await validarResponsavel(ctx.db, empresaId, input.responsavelId)
       const [prop] = await ctx.db.select({ id: proposta.id }).from(proposta)
         .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, empresaId)))
         .limit(1)
@@ -1453,6 +1467,7 @@ export const propostaRouter = router({
       if (input.dataValidade !== undefined)         set.dataValidade        = input.dataValidade
       if (input.tituloServico !== undefined)        set.tituloServico       = input.tituloServico
       if (input.observacoesInternas !== undefined)  set.observacoesInternas = input.observacoesInternas
+      if (input.responsavelId !== undefined)        set.responsavelId       = input.responsavelId
 
       await ctx.db.update(proposta).set(set)
         .where(and(eq(proposta.id, input.id), eq(proposta.empresaId, empresaId)))
@@ -1748,6 +1763,7 @@ export const propostaRouter = router({
       z.object({
         clienteId: z.number().int().positive(),
         tituloServico: z.string().min(1, 'Informe o título do serviço'),
+        responsavelId: z.number().int().positive({ message: 'Informe o responsável pela proposta' }),
         dataEmissao: z.string(),
         dataValidade: z.string().optional(),
         observacoesInternas: z.string().optional(),
@@ -1770,6 +1786,7 @@ export const propostaRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { empresaId, id: usuarioId } = ctx.usuario
+      await validarResponsavel(ctx.db, empresaId, input.responsavelId)
 
       const [cli] = await ctx.db.select().from(cliente)
         .where(and(eq(cliente.id, input.clienteId), eq(cliente.empresaId, empresaId)))
@@ -1783,7 +1800,7 @@ export const propostaRouter = router({
         empresaId, numero,
         tipoProposta: 'servico_geral',
         clienteId: input.clienteId,
-        usuarioId, status: 'rascunho', versao: 1,
+        usuarioId, responsavelId: input.responsavelId, status: 'rascunho', versao: 1,
         modeloProposta: input.modeloProposta,
         tituloServico: input.tituloServico,
         dataEmissao: input.dataEmissao,
@@ -2437,6 +2454,7 @@ export const propostaRouter = router({
         modeloProposta:    orig.modeloProposta,
         tituloServico:     orig.tituloServico,
         usuarioId,
+        responsavelId:     usuarioId, // nova negociação: conduz quem clonou
         status:            'rascunho',
         versao:            1,
         dataEmissao:       hoje,
