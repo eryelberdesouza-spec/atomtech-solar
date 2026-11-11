@@ -28,6 +28,9 @@ export const calculoRouter = router({
       desvioAzimutal: z.number().int().min(-90).max(90).default(0),
       inclinacaoGraus: z.number().int().min(0).max(60).default(20),
       sobredimensionamento: z.number().optional(),
+      // Kit escolhido — sem ele o motor assume módulo de 620 Wp
+      potenciaModuloWp: z.number().positive().optional(),
+      quantidadeModulosManual: z.number().int().positive().optional(),
       empresaId: z.number().optional(),
     }))
     .query(async ({ ctx, input }) => {
@@ -68,6 +71,8 @@ export const calculoRouter = router({
         tipoTelhado: input.tipoTelhado,
         desvioAzimutal: input.desvioAzimutal,
         inclinacaoGraus: input.inclinacaoGraus,
+        potenciaModuloWp: input.potenciaModuloWp,
+        quantidadeModulosManual: input.quantidadeModulosManual,
         premissas: premComOverride as any,
       })
 
@@ -81,6 +86,8 @@ export const calculoRouter = router({
           tipoTelhado: input.tipoTelhado,
           desvioAzimutal: input.desvioAzimutal,
           inclinacaoGraus: input.inclinacaoGraus,
+        potenciaModuloWp: input.potenciaModuloWp,
+        quantidadeModulosManual: input.quantidadeModulosManual,
           potenciaFinalKwpManual: input.potenciaFinalKwpManual,
           premissas: premComOverride as any,
         })

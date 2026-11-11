@@ -637,6 +637,10 @@ export const propostaRouter = router({
         tarifaMediaKwh: tarifaMedia,
         cip,
         potenciaFinalKwpManual: input.potenciaFinalKwpManual,
+        // Kit informado manda: geração e kWp saem de quantidade × potência do
+        // módulo escolhido, não de um sistema dimensionado com módulo de 620 Wp.
+        potenciaModuloWp: input.potenciaModuloWp,
+        quantidadeModulosManual: input.quantidadeModulosManual,
         topologia: input.topologia,
         tipoTelhado: input.tipoTelhado,
         desvioAzimutal: input.desvioAzimutal,
@@ -644,8 +648,7 @@ export const propostaRouter = router({
         premissas: prem as any,
       })
 
-      const quantidadeModulos = input.quantidadeModulosManual && input.quantidadeModulosManual > 0
-        ? input.quantidadeModulosManual : sizingResult.quantidadeModulosAproximada
+      const quantidadeModulos = sizingResult.quantidadeModulosAproximada
       const portasMicro = input.entradasPorMicro ?? input.portasMicroinversor ?? 1
       const quantidadeInversores = input.quantidadeInversoresManual && input.quantidadeInversoresManual > 0
         ? input.quantidadeInversoresManual
@@ -1648,35 +1651,21 @@ export const propostaRouter = router({
       const topologia = input.topologia ?? (dimAtual?.topologia as any) ?? 'microinversor'
       const tarifaMedia = Number(dimAtual?.tarifaUsada) || 1.0684
 
-      let novoSizing
-      if (input.potenciaFinalKwpManual) {
-        const geracaoAnual = input.potenciaFinalKwpManual * 5.6 * 0.785 * 365
-        novoSizing = {
-          consumoMedioMensal: consumoMensal.reduce((a, b) => a + b, 0) / consumoMensal.length,
-          geracaoNecessariaKwh: 0,
-          potenciaRecomendadaKwp: input.potenciaFinalKwpManual,
-          potenciaFinalKwp: input.potenciaFinalKwpManual,
-          quantidadeModulosAproximada: Math.ceil((input.potenciaFinalKwpManual * 1000) / 620),
-          areaEstimadaM2: Math.ceil((input.potenciaFinalKwpManual * 1000) / 620) * 2.3 * 1.2,
-          geracaoMensalKwh: Array(12).fill(geracaoAnual / 12),
-          geracaoAnualKwh: geracaoAnual,
-          percentualCompensacao: 100,
-          economiaMensalEstimada: (geracaoAnual / 12) * tarifaMedia,
-          fatorIrradiacao: 5.6,
-          taxaDesempenho: 78.5,
-        }
-      } else {
-        novoSizing = calcularDimensionamento({
-          consumoMensalKwh: consumoMensal,
-          tarifaMediaKwh: tarifaMedia,
-          cip: 0,
-          topologia,
-          tipoTelhado: (dimAtual?.tipoTelhado as any) ?? 'ceramico',
-          desvioAzimutal: dimAtual?.desvioAzimutal ?? 0,
-          inclinacaoGraus: dimAtual?.inclinacaoGraus ?? 20,
-          premissas,
-        })
-      }
+      // Mesmo motor nos dois modos. O modo kWp manual tinha conta própria
+      // (5,6 × 78,5% fixos, geração igual em todos os meses, sem inclinação,
+      // orientação nem topologia) — substituída em 2026-11-11.
+      const novoSizing = calcularDimensionamento({
+        consumoMensalKwh: consumoMensal,
+        tarifaMediaKwh: tarifaMedia,
+        cip: 0,
+        topologia,
+        tipoTelhado: (dimAtual?.tipoTelhado as any) ?? 'ceramico',
+        desvioAzimutal: dimAtual?.desvioAzimutal ?? 0,
+        inclinacaoGraus: dimAtual?.inclinacaoGraus ?? 20,
+        potenciaFinalKwpManual: input.potenciaFinalKwpManual,
+        potenciaModuloWp: dimAtual?.potenciaModuloWp ?? undefined,
+        premissas,
+      })
 
       await ctx.db.update(dimTable).set({
         consumoMedioMensalKwh: String(novoSizing.consumoMedioMensal),

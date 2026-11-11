@@ -209,7 +209,7 @@ export function NovaPropostaPage() {
   const { data: catInversores } = trpc.equipamento.listInversores.useQuery({ apenasAtivos: true }, { enabled: step === 2 })
 
   const { data: sizingPreview, isLoading: loadingSizing } = trpc.calculo.sizing.useQuery(
-    { consumoMedioMensalKwh: form.modoCalculo === 'kwh' ? form.consumoMensalKwh : undefined, potenciaFinalKwpManual: form.modoCalculo === 'kwp' ? form.potenciaKwpManual : undefined, topologia: form.topologia, tipoTelhado: form.tipoTelhado, desvioAzimutal: form.desvioAzimutal, inclinacaoGraus: form.inclinacaoGraus, sobredimensionamento: form.sobredimensionamento, empresaId: 1 },
+    { consumoMedioMensalKwh: form.modoCalculo === 'kwh' ? form.consumoMensalKwh : undefined, potenciaFinalKwpManual: form.modoCalculo === 'kwp' ? form.potenciaKwpManual : undefined, topologia: form.topologia, tipoTelhado: form.tipoTelhado, desvioAzimutal: form.desvioAzimutal, inclinacaoGraus: form.inclinacaoGraus, sobredimensionamento: form.sobredimensionamento, potenciaModuloWp: form.potenciaModuloWp || undefined, quantidadeModulosManual: form.quantidadeModulosManual || undefined, empresaId: 1 },
     { enabled: step >= 2 && ((form.modoCalculo === 'kwh' && form.consumoMensalKwh > 0) || (form.modoCalculo === 'kwp' && form.potenciaKwpManual > 0)) }
   )
 

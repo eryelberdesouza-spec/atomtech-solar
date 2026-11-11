@@ -621,6 +621,8 @@ export interface SizingInput {
   inclinacaoGraus: number
   premissas: PremissasConfig
   potenciaFinalKwpManual?: number  // Override direto da potência (modo kWp)
+  potenciaModuloWp?: number        // Módulo escolhido no kit (sem ele: 620 Wp)
+  quantidadeModulosManual?: number // Quantidade fixada no kit — vira a fonte da potência
 }
 
 export interface SizingResult {

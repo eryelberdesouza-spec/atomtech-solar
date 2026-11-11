@@ -14,23 +14,30 @@ import type {
 } from '../shared'
 
 // ─── IRRADIAÇÃO SOLAR ───────────────────────────────────────────────
-// Valores baseados no Atlas Brasileiro de Energia Solar (INPE 2017)
-// Irradiação média mensal em kWh/m²/dia para o DF/Centro-Oeste
-// Ajustada pelo desvio azimutal e inclinação dos módulos.
+// Atlas Brasileiro de Energia Solar 2ª ed. (INPE 2017), via CRESESB SunData
+// 3.0 — estação "Brasilia" (15,801° S; 47,849° O), plano inclinado 16° Norte
+// (= latitude). Média anual 5,47 kWh/m²/dia. Ajustada pelo desvio azimutal e
+// inclinação dos módulos.
+//
+// Trocada em 2026-11-11: a tabela anterior dizia seguir o mesmo Atlas mas não
+// batia com ele — Jan 5,80 (Atlas 5,01, mês de chuva), Ago 6,20 (Atlas 6,47),
+// média 5,61 (+2,5%). Conferência independente: PVGIS (SARAH2, 2005–2020,
+// 14% de perdas, 16° N) dá 1.594 kWh/kWp/ano em Brasília — 8 × 630 W
+// ≈ 669 kWh/mês; com esta tabela e PR 78,5%, ≈ 658 kWh/mês.
 
 const IRRADIACAO_MENSAL_DF_BASE = [
-  5.80, // Jan — verão, nublado mas incidente
-  5.60, // Fev
-  5.40, // Mar
-  5.50, // Abr
-  5.70, // Mai
-  5.90, // Jun — inverno, céu limpo
-  6.10, // Jul — pico inverno DF
-  6.20, // Ago
-  5.80, // Set
-  5.20, // Out — início chuvas
-  5.00, // Nov
-  5.10, // Dez
+  5.01, // Jan — chuvas
+  5.50, // Fev
+  5.10, // Mar
+  5.46, // Abr
+  5.56, // Mai
+  5.61, // Jun
+  5.83, // Jul
+  6.47, // Ago — pico (seca, céu limpo)
+  5.91, // Set
+  5.45, // Out
+  4.75, // Nov — mínimo
+  4.98, // Dez
 ]
 
 // Fator de correção por desvio azimutal (Norte = 0°)
@@ -205,13 +212,18 @@ export function calcularDimensionamento(input: SizingInput): SizingResult {
     : potenciaRecomendadaKwp
 
   // 8. Quantidade de módulos — arredonda SEMPRE para cima (conforme regra)
-  // Usa potência do módulo das premissas ou 620Wp como padrão
-  const potenciaModuloWp = Number(premissas.potenciaModuloPadrao ?? 620)
+  // Potência do módulo vem do kit. Antes lia premissas.potenciaModuloPadrao,
+  // campo que NÃO existe nas premissas — caía sempre em 620 Wp: 8 × 630 W
+  // (5,04 kWp) virava ceil(5,04/0,62) = 9 módulos = 5,58 kWp, e a geração
+  // saía ~11% acima do kit real (corrigido em 2026-11-11).
+  const potenciaModuloWp = Number(input.potenciaModuloWp || 620)
   const potenciaModuloKwp = potenciaModuloWp / 1000
-  const quantidadeModulosAprox = Math.ceil(potenciaBaseKwp / potenciaModuloKwp)
+  const quantidadeModulosAprox = input.quantidadeModulosManual && input.quantidadeModulosManual > 0
+    ? input.quantidadeModulosManual
+    : Math.ceil(Number((potenciaBaseKwp / potenciaModuloKwp).toFixed(6)))
 
   // 9. Potência final = módulos × potência unitária (NUNCA arredonda para baixo)
-  const potenciaFinalKwp = quantidadeModulosAprox * potenciaModuloKwp
+  const potenciaFinalKwp = Number((quantidadeModulosAprox * potenciaModuloKwp).toFixed(3))
 
   // 10. Área estimada
   const areaFator = getAreaFatorTelhado(input.tipoTelhado, premissas)
