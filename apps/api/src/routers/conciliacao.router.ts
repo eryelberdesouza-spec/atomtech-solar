@@ -14,7 +14,8 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { router, protectedProcedure, getRawPool } from './trpc'
-import { parseOFX } from '../lib/ofxParser'
+import { parseOFX, sugerirCategoria } from '../lib/ofxParser'
+import { hojeISO } from '../lib/datas'
 import { registrarAuditoria, verificarPeriodoAberto } from '../lib/finHelpers'
 import { calcularSaldos } from '../lib/finSaldo'
 
@@ -276,10 +277,51 @@ export const conciliacaoRouter = router({
          FROM fin_extrato_regra r LEFT JOIN fin_plano_contas pc ON pc.id = r.plano_contas_id
          WHERE r.empresa_id = ? AND r.ativo = 1`, [empId],
       )
+      // Histórico: como linhas da mesma contraparte foram classificadas antes
+      // (CREA, posto, funcionário, aluguel…). Títulos de proposta ficam de fora:
+      // recebimento de contrato não é classificação recorrente.
+      const [hist]: any = await pool.query(
+        `SELECT l.descricao AS linhaDesc, SIGN(l.valor) AS sinal, t.descricao, t.plano_contas_id AS planoContasId,
+                t.centro_custo_id AS centroCustoId, t.pessoa_id AS pessoaId, pc.nome AS planoNome
+         FROM fin_extrato_linha l
+         JOIN fin_conciliacao c ON c.linha_id = l.id
+         JOIN fin_parcela p ON p.id = c.parcela_id
+         JOIN fin_titulo t ON t.id = p.titulo_id
+         JOIN fin_plano_contas pc ON pc.id = t.plano_contas_id
+         WHERE l.empresa_id = ? AND l.status = 'conciliado' AND t.proposta_id IS NULL
+         ORDER BY l.data DESC LIMIT 4000`, [empId],
+      )
+      const memoria = new Map<string, { n: number; porPlano: Map<number, any[]> }>()
+      for (const h of hist as any[]) {
+        const chave = `${h.sinal}|${extrairContraparte(h.linhaDesc)}`
+        if (chave.length < 6) continue
+        const m = memoria.get(chave) ?? { n: 0, porPlano: new Map() }
+        m.n++
+        const lst = m.porPlano.get(h.planoContasId) ?? []
+        lst.push(h); m.porPlano.set(h.planoContasId, lst)
+        memoria.set(chave, m)
+      }
+      const [planos]: any = await pool.query(`SELECT id, nome, tipo FROM fin_plano_contas WHERE empresa_id = ? AND ativo = 1`, [empId])
+      // Os nomes de sugerirCategoria() são genéricos ("Combustível", "Pagamentos
+      // PIX") e raramente iguais ao plano cadastrado: exato → um contém o outro →
+      // palavra com o mesmo começo. Só preenche o formulário; quem confirma é o usuário.
+      const planoPorNome = (nome: string, credito: boolean) => {
+        const n = norm(nome)
+        // Categoria genérica não diz nada — melhor deixar o plano em branco do que chutar.
+        if (n.length < 3 || /^(DESPESAS DIVERSAS|RECEITAS DIVERSAS|PAGAMENTOS PIX|RECEBIMENTOS PIX|RECEBIMENTOS)$/.test(n)) return null
+        const tipos = credito ? ['RECEITA', 'FINANCEIRO', 'TRANSFERENCIA'] : ['DESPESA', 'FINANCEIRO', 'TRANSFERENCIA']
+        const ps = (planos as any[]).filter(p => tipos.includes(p.tipo)).map(p => ({ p, n: norm(p.nome) }))
+          .filter(x => !/^(DESPESAS?|RECEITAS?|FINANCEIRO|TRANSFERENCIAS?)$/.test(x.n))
+        const toks = n.split(' ').filter(t => t.length >= 5 && !['PAGAMENTOS', 'RECEBIMENTOS', 'DIVERSAS', 'DESPESAS', 'RECEITAS'].includes(t))
+        return (ps.find(x => x.n === n) ?? ps.find(x => x.n.includes(n) || n.includes(x.n))
+          ?? ps.find(x => toks.some(t => x.n.split(' ').some(u => u.length >= 5 && u.slice(0, 6) === t.slice(0, 6)))))?.p ?? null
+      }
+
       const A = (abertas as any[]).map(a => ({ ...a, valor: Number(a.valor) }))
       const P = (pagasLivres as any[]).map(a => ({ ...a, valor: Number(a.valor) }))
       const O = (outras as any[]).map(a => ({ ...a, valor: Number(a.valor) }))
       const rotulo = (x: any) => `${x.descricao}${x.nParcelas > 1 ? ` — parc. ${x.numero}` : ''}`
+      const hoje = hojeISO()
 
       const resultado = linhas.map(l => {
         const tipo = l.valor > 0 ? 'RECEBER' : 'PAGAR'
@@ -333,11 +375,58 @@ export const conciliacaoRouter = router({
           sug.push({ tipo: 'regra', score: 86, titulo: `Lançar como ${rg.descricao || rg.planoNome || rg.padrao}`,
             detalhe: rg.planoNome ? `plano: ${rg.planoNome}` : 'regra sem plano de contas', regra: rg })
         }
+        // Classificação usada antes para a mesma contraparte (só quando não há
+        // parcela/título candidato — aí é despesa/receita avulsa recorrente).
+        const contraparte = extrairContraparte(l.descricao)
+        const mem = memoria.get(`${Math.sign(l.valor)}|${contraparte}`)
+        let lancamentoSugerido: any = null
+        if (mem) {
+          const [planoId, usos] = [...mem.porPlano.entries()].sort((a, b) => b[1].length - a[1].length)[0]
+          const descs = new Set(usos.map((u: any) => u.descricao))
+          const ref = usos[0]
+          lancamentoSugerido = {
+            descricao: descs.size === 1 ? ref.descricao : `${ref.planoNome} — ${contraparte}`,
+            planoContasId: planoId, planoNome: ref.planoNome, pessoaId: ref.pessoaId, centroCustoId: ref.centroCustoId,
+            usos: usos.length, consistente: usos.length >= 2 && usos.length / mem.n >= 0.8,
+          }
+          if (!sug.some(s => ['ja_baixado', 'aberta', 'regra', 'transferencia'].includes(s.tipo))) {
+            sug.push({ tipo: 'historico', score: 76 + Math.min(usos.length, 5) * 2, titulo: `Lançar como das outras vezes: ${ref.planoNome}`,
+              detalhe: `"${lancamentoSugerido.descricao}" · usado ${usos.length}x para esta contraparte`, lancamento: lancamentoSugerido })
+          }
+        }
+        if (!lancamentoSugerido) {
+          const p = planoPorNome(sugerirCategoria(l.descricao, l.valor > 0 ? 'C' : 'D'), l.valor > 0)
+          lancamentoSugerido = { descricao: `${l.valor > 0 ? 'Recebimento' : 'Pagamento'} — ${contraparte}`, planoContasId: p?.id ?? null, planoNome: p?.nome ?? null, usos: 0, consistente: false }
+        }
         sug.sort((x, y) => y.score - x.score)
         const pessoaId = quem.size === 1 ? [...quem][0] : null
-        return { ...l, contraparte: extrairContraparte(l.descricao), pessoaSugerida: pessoaId ? pessoas.find(p => p.id === pessoaId)?.nome ?? null : null,
-          pessoaSugeridaId: pessoaId, sugestoes: sug.slice(0, 5) }
+        return { ...l, contraparte, pessoaSugerida: pessoaId ? pessoas.find(p => p.id === pessoaId)?.nome ?? null : null,
+          pessoaSugeridaId: pessoaId, sugestoes: sug.slice(0, 5), lancamentoSugerido, futuro: l.data > hoje, pronta: false }
       })
+
+      // "Pronta para confirmar": sugestão principal forte, sem concorrente
+      // próxima e sem disputar o mesmo alvo com outra linha. Lançamento com
+      // data futura (agendado no banco) nunca entra no lote.
+      const forte = (s: any) => ({
+        ja_baixado: s.score >= 92, aberta: s.score >= 88, transferencia: s.score >= 92, regra: true,
+        varias_linhas: s.score >= 86, combinacao: s.score >= 82, historico: !!s.lancamento?.consistente,
+      } as Record<string, boolean>)[s.tipo] ?? false
+      const alvos = (s: any): string[] => [
+        ...(s.itens ?? []).map((i: any) => `p${i.parcelaId}`),
+        ...(s.linhaParId ? [`l${s.linhaParId}`] : []),
+        ...((s.linhaIds ?? []).map((id: number) => `l${id}`)),
+      ]
+      const candidatas = resultado.filter(l => {
+        const [s1, s2] = l.sugestoes
+        return s1 && !l.futuro && forte(s1) && (!s2 || s1.score - s2.score >= 12)
+      })
+      const uso = new Map<string, number>()
+      for (const l of candidatas) for (const a of alvos(l.sugestoes[0])) uso.set(a, (uso.get(a) ?? 0) + 1)
+      for (const l of candidatas) {
+        const meus = alvos(l.sugestoes[0])
+        // a própria linha aparece como alvo na sugestão de "várias linhas"/transferência da outra
+        if (meus.every(a => (uso.get(a) ?? 0) <= 1 || a === `l${l.id}`)) l.pronta = true
+      }
       return { linhas: resultado, total }
     }),
 
