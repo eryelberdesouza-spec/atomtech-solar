@@ -124,7 +124,14 @@ def completar_dados(conta: dict, gdash: dict) -> None:
         conta["consumo_medido_kwh"] = gdash.get("consumo_kwh")
     conta.setdefault("consumo_medido_kwh", None)
 
-    for item in [gdash, *gdash.get("historico_meses", [])]:
+    hist = gdash.get("historico_meses", [])
+    # Mês seguinte ainda não aconteceu na data do relatório — nunca tem dado.
+    # A visão às vezes lia a barra parcial do mês corrente no gráfico como se
+    # fosse dele (Gustavo 11/2026: "Dez/2026 733,7 kWh"). Sai como "—".
+    if len(hist) >= 3:
+        hist[2].update({"geracao_kwh": None, "desempenho_pct": None, "economia_r$": None})
+
+    for item in [gdash, *hist]:
         if not item.get("desempenho_pct") and (item.get("geracao_kwh") or 0) > 0:
             item["desempenho_pct"] = None
 
