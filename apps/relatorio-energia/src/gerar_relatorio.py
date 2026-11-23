@@ -110,8 +110,28 @@ def pdf_para_texto(caminho_pdf: str, senha: str | None = None) -> str:
     return saida.stdout
 
 
+def completar_dados(conta: dict, gdash: dict) -> None:
+    """Ajusta conta/GDASH NO LUGAR — quem chama depois (texto da IA) vê o mesmo.
+
+    - Consumo medido ausente ou zero com consumo faturado > 0 é impossível:
+      usa o "Consumo" do GDASH (que é a leitura do medidor).
+    - Desempenho 0% com geração > 0 é usina sem estimativa configurada no
+      GDASH (card mostra "∞ %", caso Gustavo Diniz 11/2026): vira "sem dado"
+      em vez de 0,0%, que a IA lia como falha.
+    """
+    medido = conta.get("consumo_medido_kwh")
+    if not medido and num_br(conta.get("consumo_faturado_kwh")):
+        conta["consumo_medido_kwh"] = gdash.get("consumo_kwh")
+    conta.setdefault("consumo_medido_kwh", None)
+
+    for item in [gdash, *gdash.get("historico_meses", [])]:
+        if not item.get("desempenho_pct") and (item.get("geracao_kwh") or 0) > 0:
+            item["desempenho_pct"] = None
+
+
 def montar_dados(cliente: dict, conta: dict, gdash: dict) -> dict:
     """Junta conta + GDASH + contrato e calcula os campos derivados (sem IA)."""
+    completar_dados(conta, gdash)
     geracao = gdash["geracao_kwh"]
     injetado, saldo = resolver_injecao_saldo(conta, gdash)
     compensado = resolver_compensado(conta, gdash)

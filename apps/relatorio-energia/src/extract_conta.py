@@ -56,9 +56,17 @@ def extrair_conta_neoenergia(texto: str) -> dict:
         bloco_medidor = texto[medidor_idx:medidor_idx+300]
         numeros_str = re.findall(r'[\d.]+,\d+', bloco_medidor)
         leituras = [to_float(n) for n in numeros_str if not re.match(r'^\d+,\d{5}$', n)]
-        if len(leituras) >= 2:
-            maiores = sorted(leituras, reverse=True)
-            d['consumo_medido_kwh'] = round(maiores[0] - maiores[1], 2)
+        # Valores DISTINTOS: a linha de Energia Reativa logo abaixo pode repetir
+        # a leitura atual (leitura anterior 0,00 → consumo reativo = leitura
+        # atual). Com repetição, "dois maiores" dava 37.594 − 37.594 = 0
+        # (caso Gustavo Diniz, 11/2026; certo: 37.594 − 36.625 = 969).
+        maiores = sorted(set(leituras), reverse=True)
+        if len(maiores) >= 2:
+            diff = maiores[0] - maiores[1]
+            # Leituras cumulativas são próximas entre si; diferença enorme
+            # significa que o 2º valor não é leitura (ex.: medidor sem consumo).
+            if 0 < diff < maiores[0] * 0.5:
+                d['consumo_medido_kwh'] = round(diff, 2)
 
     return d
 
