@@ -414,7 +414,7 @@ app.post(
       const conn = await mysql2.createConnection(process.env.DATABASE_URL!)
 
       const [clienteRows]: any = await conn.execute(
-        `SELECT nome, distribuidora FROM cliente WHERE id = ? AND empresa_id = ? LIMIT 1`,
+        `SELECT nome, distribuidora, cpf_cnpj FROM cliente WHERE id = ? AND empresa_id = ? LIMIT 1`,
         [clienteId, empresaId],
       )
       const clienteRow = (clienteRows as any[])[0]
@@ -444,6 +444,9 @@ app.post(
         DISTRIBUIDORA: clienteRow.distribuidora || '',
         RESPONSAVEL_TECNICO: responsavelTecnico,
         LOCAL_EMISSAO: localEmissao,
+        // A fatura digital da Neoenergia vem com senha = 5 primeiros dígitos
+        // do CPF/CNPJ do titular. O serviço usa só para abrir o PDF.
+        CPF_CNPJ: clienteRow.cpf_cnpj || '',
       }
 
       const form = new FormData()

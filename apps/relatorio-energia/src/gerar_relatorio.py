@@ -94,11 +94,19 @@ def fmt_pct(x):
     return f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".") + "%"
 
 
-def pdf_para_texto(caminho_pdf: str) -> str:
-    saida = subprocess.run(
-        ["pdftotext", "-layout", caminho_pdf, "-"],
-        capture_output=True, text=True, check=True,
-    )
+class FaturaProtegida(Exception):
+    """PDF com senha que a senha informada (ou a falta dela) não abriu."""
+
+
+def pdf_para_texto(caminho_pdf: str, senha: str | None = None) -> str:
+    args = ["pdftotext", "-layout"]
+    if senha:
+        args += ["-upw", senha]
+    saida = subprocess.run(args + [caminho_pdf, "-"], capture_output=True, text=True)
+    if saida.returncode != 0:
+        if "password" in saida.stderr.lower():
+            raise FaturaProtegida(saida.stderr.strip())
+        raise RuntimeError(f"pdftotext falhou: {saida.stderr.strip()}")
     return saida.stdout
 
 

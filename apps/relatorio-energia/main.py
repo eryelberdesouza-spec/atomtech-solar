@@ -20,7 +20,7 @@ from fastapi.responses import Response
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from extract_conta import extrair_conta_neoenergia  # noqa: E402
+from ler_fatura import FaturaIlegivel, ler_fatura  # noqa: E402
 from extract_gdash import extrair_gdash  # noqa: E402
 from generate_narrative import gerar_narrativa  # noqa: E402
 from fill_template import fill, TEMPLATE_PATH  # noqa: E402
@@ -72,8 +72,8 @@ async def gerar(
         caminho_gdash.write_bytes(await gdash.read())
 
         try:
-            texto_conta = pdf_para_texto(str(caminho_fatura))
-            conta = extrair_conta_neoenergia(texto_conta)
+            # Senha (5 dígitos do CPF/CNPJ), texto ou imagem — ver ler_fatura.py
+            conta = ler_fatura(str(caminho_fatura), cliente_dados.get("CPF_CNPJ"))
 
             gdash_dados = extrair_gdash(str(caminho_gdash))
 
@@ -104,6 +104,8 @@ async def gerar(
             caminho_saida = Path(tmp) / "relatorio.pptx"
             fill(TEMPLATE_PATH, dados, str(caminho_saida))
             conteudo = caminho_saida.read_bytes()
+        except FaturaIlegivel as e:
+            raise HTTPException(422, str(e))
         except Exception as e:
             raise HTTPException(500, f"Falha ao gerar relatório: {e}")
 
