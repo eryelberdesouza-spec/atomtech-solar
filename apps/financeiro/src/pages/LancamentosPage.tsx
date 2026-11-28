@@ -2,7 +2,7 @@
 // Página de Lançamentos — A Pagar / A Receber / Transferências / Extrato
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { trpc } from '../lib/trpc'
 import {
   PageWrapper, C, Btn, KpiCard, Table, Modal, Tabs,
@@ -576,12 +576,17 @@ function ModalComprovante({
   tituloId,
   parcelaAtual,
   onClose,
+  onBaixar,
 }: {
   tituloId:     number
   parcelaAtual: any
   onClose:      () => void
+  onBaixar?:    () => void
 }) {
   const parcelaId = parcelaAtual?.parcelaId
+  // Mesma regra do botão ✓ da lista: só parcela em aberto pode ser baixada.
+  const st = parcelaAtual?.statusDisplay ?? parcelaAtual?.status
+  const podeBaixar = !!onBaixar && !!parcelaId && st !== 'PAGA' && st !== 'CANCELADA'
 
   const agSalvo = parcelaId ? carregarAgLocal(parcelaId) : null
   const [ag, setAg] = useState({
@@ -602,6 +607,8 @@ function ModalComprovante({
   const isLoading = l1 || l2
   const tipo      = parcelaAtual?.tipo ?? byId?.titulo?.tipo ?? 'PAGAR'
   const titleLabel = tipo === 'PAGAR' ? 'Solicitação de Pagamento' : 'Cobrança / Recebimento'
+  const nParcelas  = byId?.parcelas?.length ?? 0
+  const rotuloBaixa = `✓ Confirmar ${tipo === 'PAGAR' ? 'pagamento' : 'recebimento'}${nParcelas > 1 && parcelaAtual?.numero ? ` (parcela ${parcelaAtual.numero})` : ''}`
 
   function salvarDados() {
     if (!parcelaId) return
@@ -628,6 +635,7 @@ function ModalComprovante({
         valorPago:     parcelaAtual.valorPago,
       } : undefined,
       agendamento: comAgendamento ? ag : null,
+      acaoBaixa: podeBaixar ? { parcelaId, rotulo: rotuloBaixa } : null,
     })
   }
 
@@ -659,6 +667,9 @@ function ModalComprovante({
           >
             {salvou ? '✓ Dados salvos!' : '💾 Salvar Dados'}
           </Btn>
+          {podeBaixar && (
+            <Btn variant="success" disabled={isLoading} onClick={onBaixar}>{rotuloBaixa}</Btn>
+          )}
           <Btn disabled={isLoading} onClick={imprimir}>
             {isLoading ? 'Carregando...' : '🖨 Gerar PDF'}
           </Btn>
@@ -977,6 +988,22 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
   const [baixandoParcela, setBaixandoParcela]     = useState<any>(null)
   const [editandoContaParcela, setEditandoContaParcela] = useState<any>(null)
   const [comprovanteRow, setComprovanteRow]       = useState<any>(null)
+  // Botão "Confirmar" dentro da janela do comprovante: ela manda a parcela por
+  // postMessage e fecha; aqui abre a baixa daquela linha. Guarda a última linha
+  // aberta no comprovante porque o modal pode já ter sido fechado.
+  const ultimoComprovante = useRef<any>(null)
+  if (comprovanteRow) ultimoComprovante.current = comprovanteRow
+  useEffect(() => {
+    const ouvir = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin || ev.data?.tipo !== 'agf-baixar') return
+      const r = ultimoComprovante.current
+      if (!r || r.parcelaId !== ev.data.parcelaId) return
+      setComprovanteRow(null)
+      setBaixandoParcela(r)
+    }
+    window.addEventListener('message', ouvir)
+    return () => window.removeEventListener('message', ouvir)
+  }, [])
   const [confirmDelete, setConfirmDelete]         = useState<any>(null)
   const [deleteErro, setDeleteErro]               = useState('')
   const [erro, setErro]                 = useState('')
@@ -1469,6 +1496,7 @@ function TabLancamentos({ tipo }: { tipo: 'PAGAR' | 'RECEBER' }) {
           tituloId={comprovanteRow.tituloId}
           parcelaAtual={comprovanteRow}
           onClose={() => setComprovanteRow(null)}
+          onBaixar={() => { const r = comprovanteRow; setComprovanteRow(null); setBaixandoParcela(r) }}
         />
       )}
 

@@ -486,8 +486,11 @@ export async function gerarComprovantePdf(params: {
   parcelas:      ParcelaInfo[]
   parcelaAtual?: ParcelaInfo
   agendamento:   AgendamentoInfo | null
+  // Parcela em aberto: mostra na janela um botão que fecha o comprovante e
+  // abre a baixa no AGF (quem chamou escuta a mensagem 'agf-baixar').
+  acaoBaixa?:    { parcelaId: number; rotulo: string } | null
 }) {
-  const { tipo, empresa, titulo, parcelas, parcelaAtual, agendamento } = params
+  const { tipo, empresa, titulo, parcelas, parcelaAtual, agendamento, acaoBaixa } = params
   const parcela = parcelaAtual ?? parcelas[0]
 
   // Abre a janela ANTES de qualquer await — navegadores bloqueiam popups
@@ -547,6 +550,18 @@ export async function gerarComprovantePdf(params: {
       ${rodape}
 
       <div class="no-print" style="margin-top:24px;text-align:center;padding:16px;border-top:1px solid #E2E8F0;">
+        ${acaoBaixa ? `<button onclick="agfConfirmar()" style="
+          padding:11px 24px;background:#059669;color:#fff;border:none;border-radius:8px;
+          font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:8px;
+        ">${acaoBaixa.rotulo}</button>
+        <script>
+          function agfConfirmar() {
+            var o = window.opener
+            if (!o || o.closed) { alert('A janela do AGF foi fechada. Abra o AGF e registre a baixa por lá.'); return }
+            try { o.postMessage({ tipo: 'agf-baixar', parcelaId: ${Number(acaoBaixa.parcelaId)} }, o.location.origin); o.focus() } catch (e) {}
+            window.close()
+          }
+        </script>` : ''}
         <button onclick="window.print()" style="
           padding:11px 28px;background:#1E40AF;color:#fff;border:none;border-radius:8px;
           font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:8px;
